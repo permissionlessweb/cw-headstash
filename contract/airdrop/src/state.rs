@@ -2,11 +2,13 @@
 use cosmwasm_std::{Addr, Binary, ContractInfo, Storage, Uint128};
 use cosmwasm_storage::{bucket, bucket_read, singleton, singleton_read, Bucket, ReadonlyBucket, ReadonlySingleton, Singleton};
 use schemars::JsonSchema;
+use secret_toolkit::storage::Keymap;
 use serde::{Deserialize, Serialize};
 
 pub static CONFIG_KEY: &[u8] = b"config";
 pub static ETH_PUBKEY_CLAIMED_KEY: &[u8] = b"eth_pubkey_claimed";
 pub static TOTAL_CLAIMED_KEY: &[u8] = b"total_claimed";
+pub static HEADSTASH_OWNERS: Keymap<String, Uint128> = Keymap::new(b"headstash_owners");
 
 #[derive(Serialize, Deserialize, Clone, Debug, Eq, PartialEq, JsonSchema)]
 pub struct Config {

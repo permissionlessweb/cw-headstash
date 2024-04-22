@@ -1,10 +1,12 @@
+use crate::msg::{ConfigResponse, ExecuteMsg, Headstash, InstantiateMsg, QueryMsg};
+use crate::state::{
+    claim_status_r, claim_status_w, config, config_r, total_claimed_w, Config, HEADSTASH_OWNERS,
+};
 use cosmwasm_std::{
-    entry_point, to_binary, Binary, Deps, DepsMut, Env, MessageInfo, Response, StdError, StdResult, Uint128,
+    entry_point, to_binary, Binary, CosmosMsg, Deps, DepsMut, Env, MessageInfo, Response, StdError,
+    StdResult, Uint128,
 };
 use secret_toolkit::snip20::transfer_msg;
-
-use crate::msg::{ConfigResponse, ExecuteMsg, InstantiateMsg, QueryMsg};
-use crate::state::{claim_status_r, claim_status_w, config, config_r, total_claimed_w, Config};
 
 #[entry_point]
 pub fn instantiate(
@@ -22,31 +24,51 @@ pub fn instantiate(
         claim_msg_plaintext: msg.claim_msg_plaintext,
     };
 
+    // Initialize claim amount
+    // total_claimed_w(deps.storage).save(&Uint128::zero())?;
     config(deps.storage).save(&state)?;
+
     Ok(Response::default())
 }
 
 #[entry_point]
 pub fn execute(deps: DepsMut, env: Env, info: MessageInfo, msg: ExecuteMsg) -> StdResult<Response> {
     match msg {
+        ExecuteMsg::Add { headstash } => try_add_headstash(deps, env, info, headstash),
         ExecuteMsg::Claim {
-            amount,
             eth_pubkey,
             eth_sig,
-            proof,
-        } => try_claim(deps, env, info, amount, eth_pubkey, eth_sig, proof),
+        } => try_claim(deps, env, info, eth_pubkey, eth_sig),
         ExecuteMsg::Clawback {} => todo!(),
     }
+}
+
+pub fn try_add_headstash(
+    deps: DepsMut,
+    env: Env,
+    info: MessageInfo,
+    headstash: Vec<Headstash>,
+) -> StdResult<Response> {
+    // ensure eth_pubkey is not already in KeyMap
+    for hs in headstash.into_iter() {
+        if HEADSTASH_OWNERS.contains(deps.storage, &hs.eth_pubkey) {
+            return Err(StdError::generic_err(
+                "pubkey already has been added, not adding again",
+            ));
+        } else {
+            // add eth_pubkey & amount to KeyMap
+            HEADSTASH_OWNERS.insert(deps.storage, &hs.eth_pubkey, &hs.amount)?;
+        }
+    }
+    Ok(Response::default())
 }
 
 pub fn try_claim(
     deps: DepsMut,
     _env: Env,
     info: MessageInfo,
-    amount: Uint128,
     eth_pubkey: String,
     eth_sig: String,
-    proofs: Vec<String>,
 ) -> StdResult<Response> {
     let config = config_r(deps.storage).load()?;
 
@@ -59,7 +81,7 @@ pub fn try_claim(
     validation::validate_claim(
         &deps,
         info.clone(),
-        eth_pubkey.clone(),
+        eth_pubkey.to_string(),
         eth_sig.clone(),
         config.clone(),
     )?;
@@ -72,43 +94,22 @@ pub fn try_claim(
         ));
     }
 
-    // // validate merkle leafs to proofs
-    // let user_input = format!("{}{}", eth_pubkey, amount);
-    // let hash = sha2::Sha256::digest(user_input.as_bytes())
-    //     .as_slice()
-    //     .try_into()
-    //     .map_err(|_| StdError::generic_err("Wrong length - debug69)"))?;
+    // get headstash amount from KeyMap
+    let headstash_amount = HEADSTASH_OWNERS
+        .get(deps.storage, &eth_pubkey)
+        .ok_or_else(|| StdError::generic_err("Ethereum Pubkey not found in the contract state!"))?;
 
-    // let hash = proofs.into_iter().try_fold(hash, |hash, p| {
-    //     let mut proof_buf = [0; 32];
-    //     hex::decode_to_slice(p, &mut proof_buf)
-    //         .expect("merkle verification process error - debug710");
-    //     let mut hashes = [hash, proof_buf];
-    //     hashes.sort_unstable();
-    //     sha2::Sha256::digest(&hashes.concat())
-    //         .as_slice()
-    //         .try_into()
-    //         .map_err(|_| StdError::generic_err("Wrong length - debug420"))
-    // })?;
+    let mut msgs: Vec<CosmosMsg> = vec![];
 
-    // let mut root_buf: [u8; 32] = [0; 32];
-    // hex::decode_to_slice(config.merkle_root.as_ref(), &mut root_buf)
-    //     .expect("merkle verification process error - debug711");
-    // if root_buf != hash {
-    //     return Err(StdError::generic_err("Failed to verify merkle proofs!"));
-    // }
-
-    // let mut msgs = vec![];
-
-    // msgs.push(transfer_msg(
-    //     info.sender.to_string(),
-    //     amount,
-    //     None,
-    //     None,
-    //     256,
-    //     config.snip20_1.code_hash,
-    //     config.snip20_1.address.to_string(),
-    // )?);
+    msgs.push(transfer_msg(
+        info.sender.to_string(),
+        headstash_amount,
+        None,
+        None,
+        0,
+        config.snip20_1.code_hash,
+        config.snip20_1.address.to_string(),
+    )?);
 
     // update address as claimed
     claim_status_w(deps.storage).save(eth_pubkey.as_bytes(), &true)?;
@@ -116,9 +117,7 @@ pub fn try_claim(
     // total_claimed_w(deps.storage)
     //     .update(|claimed| -> StdResult<Uint128> { Ok(claimed + amount) })?;
 
-    Ok(Response::default()
-    // .add_messages(msgs)
-)
+    Ok(Response::default().add_messages(msgs))
 }
 
 #[entry_point]
@@ -137,9 +136,8 @@ fn query_config(deps: Deps) -> StdResult<ConfigResponse> {
 
 // src: https://github.com/public-awesome/launchpad/blob/main/contracts/sg-eth-airdrop/src/claim_airdrop.rs#L85
 pub mod validation {
-    use crate::verify_ethereum_text;
-
     use super::*;
+    use crate::verify_ethereum_text;
 
     pub fn validate_instantiation_params(
         _info: MessageInfo,

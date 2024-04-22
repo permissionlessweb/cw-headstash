@@ -31,10 +31,8 @@ let create_account = async () => {
 
   const createAccount = {
     claim: {
-      amount: "420",
       eth_pubkey: eth_pubkey,
       eth_sig: eth_sig.slice(2),
-      proof: partial_tree,
     }
   }
 
@@ -53,10 +51,32 @@ let create_account = async () => {
       // }
     })
 
-    console.log(encoded_memo);
+  console.log(encoded_memo);
   console.log(tx);
 }
-export { create_account }
+
+let add_headstash = async (jsonData) => {
+
+  let headstashes = JSON.parse(jsonData);
+
+  const addMsg = { add: { headstash: [headstashes] } }
+  const tx = await secretjs.tx.compute.executeContract({
+    sender: wallet.address,
+    contract_address: scrtHeadstashContractAddr,
+    msg: addMsg,
+    code_hash: scrtHeadstashCodeHash,
+  },
+    {
+      gasLimit: 400_000,
+      // explicitSignerData: {
+      //   accountNumber: 22761,
+      //   sequence: 191,
+      //   chainId: "pulsar-3"
+      // }
+    })
+  console.log(tx);
+}
+export { create_account, add_headstash }
 
 
 

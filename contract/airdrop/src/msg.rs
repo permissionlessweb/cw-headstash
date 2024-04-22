@@ -4,6 +4,13 @@ use serde::{Deserialize, Serialize};
 
 use crate::state::Config;
 
+///
+#[derive(Serialize, Deserialize, Clone, Debug, Eq, PartialEq, JsonSchema)]
+pub struct Headstash {
+    pub eth_pubkey: String,
+    pub amount: Uint128,
+}
+
 #[derive(Serialize, Deserialize, Clone, Debug, Eq, PartialEq, JsonSchema)]
 pub struct InstantiateMsg {
     pub snip20_1: ContractInfo,
@@ -18,11 +25,12 @@ pub struct InstantiateMsg {
 #[derive(Serialize, Deserialize, Clone, Debug, Eq, PartialEq, JsonSchema)]
 #[serde(rename_all = "snake_case")]
 pub enum ExecuteMsg {
+    Add {
+        headstash: Vec<Headstash>,
+    },
     Claim {
-        amount: Uint128,
         eth_pubkey: String,
         eth_sig: String,
-        proof: Vec<String>,
     },
     Clawback {},
 }

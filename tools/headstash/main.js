@@ -1,5 +1,5 @@
 import { Wallet, SecretNetworkClient, EncryptionUtilsImpl, MsgExecuteContract, fromUtf8, MsgExecuteContractResponse } from "secretjs";
-import { create_account } from './account.js'
+import { create_account, add_headstash } from './account.js'
 import { i_snip20, deposit_to_snip20, query_token_info, query_token_config, set_viewing_key, query_balance, fund_headstash } from './snip20.js'
 import * as fs from "fs";
 
@@ -20,9 +20,9 @@ export const scrtIBCThiolDenom = "ibc/07FFE4A5E55AFA423DF355E3138858E6A302909F74
 const entropy = "eretskeretjableret";
 
 // airdrop contract
-export const scrtHeadstashCodeId = 6680;
-export const scrtHeadstashCodeHash = "590f7fa919496b667f5d80434ed3acdb9a9e8b6b1fd08e3c60c3cd54b26add55";
-export const scrtHeadstashContractAddr = "secret13z42ltd95fewqhdzzecdklp5knhlyj3n6v7g6j";
+export const scrtHeadstashCodeId = 6684;
+export const scrtHeadstashCodeHash = "9b5d98452b320499b9520e2f062e7f527cbd1d0046b7304bb378d3033438a2b5";
+export const scrtHeadstashContractAddr = "secret1qyhpstprdhgdexykrrg538jlg5qtrranfj5tx8";
 export const merkle_root = "d599867bdb2ade1e470d9ec9456490adcd9da6e0cfd8f515e2b95d345a5cd92f";
 
 // account stuff
@@ -154,7 +154,10 @@ if (args.length < 1) {
 
 } else if (args[0] === '-a') { // create an account, claims airdrop 
   create_account(args[1])
-
+} else if (args[0] === '-add-hs') { // create an account, claims airdrop 
+  const jsonData = fs.readFileSync('./tools/headstash/accounts.json')
+  add_headstash(jsonData)
+  .then(() => { console.log("Added accounts to the heastash!"); })
   //////////////////////////////// SNIP20 ACTIONS //////////////////////////////////
 } else if (args[0] === '-i-terp') {
   i_snip20("terp-snip20", "TERP", scrtIBCTerpDenom)
