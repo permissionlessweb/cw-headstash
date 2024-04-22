@@ -7,6 +7,7 @@ use cosmwasm_std::{
     entry_point, to_binary, Binary, CosmosMsg, Deps, DepsMut, Env, MessageInfo, Response, StdError,
     StdResult, Uint128,
 };
+use rs_merkle::{algorithms::Sha256, Hasher, MerkleProof};
 use secret_toolkit::snip20::transfer_msg;
 
 #[entry_point]
@@ -29,12 +30,13 @@ pub fn instantiate(
         snip20_1: msg.snip20_1,
         snip20_2: msg.snip20_2,
         start_date: start_date,
+        total_accounts: msg.total_accounts,
         total_amount: msg.total_amount,
         viewing_key: msg.viewing_key,
     };
 
     // Initialize claim amount
-    total_claimed_w(deps.storage).save(&Uint128::zero())?;
+    // total_claimed_w(deps.storage).save(&Uint128::zero())?;
     config(deps.storage).save(&state)?;
 
     Ok(Response::default())
@@ -47,7 +49,10 @@ pub fn execute(deps: DepsMut, env: Env, info: MessageInfo, msg: ExecuteMsg) -> S
         ExecuteMsg::Claim {
             eth_pubkey,
             eth_sig,
-        } => try_claim(deps, env, info, eth_pubkey, eth_sig),
+            amount,
+            index,
+            proofs,
+        } => try_claim(deps, env, info, eth_pubkey, eth_sig, amount, index, proofs),
         ExecuteMsg::Clawback {} => try_clawback(deps, env, info),
     }
 }
@@ -133,10 +138,11 @@ pub fn try_claim(
     info: MessageInfo,
     eth_pubkey: String,
     eth_sig: String,
+    amount: Uint128,
+    index: u64,
+    proofs: Vec<Binary>,
 ) -> StdResult<Response> {
     let config = config_r(deps.storage).load()?;
-
-    let sender = info.sender.to_string();
 
     // make sure airdrop has not ended
     available(&config, &env)?;
@@ -151,6 +157,43 @@ pub fn try_claim(
         config.clone(),
     )?;
 
+    // validate merkle root
+    let mut leaves_to_validate: Vec<(usize, [u8; 32])> = vec![];
+    let mut indices: Vec<usize> = vec![];
+    let mut leaves: Vec<[u8; 32]> = vec![];
+
+    // Add account as a leaf
+    let leaf_hash = Sha256::hash((eth_pubkey.to_string() + &amount.to_string()).as_bytes());
+    leaves_to_validate.push((index as usize, leaf_hash));
+
+    // Need to sort by index in order for the proof to work
+    leaves_to_validate.sort_by_key(|item| item.0);
+
+    for leaf in leaves_to_validate.iter() {
+        indices.push(leaf.0);
+        leaves.push(leaf.1);
+    }
+
+    // Convert partial tree from base64 to binary
+    let mut partial_tree_binary: Vec<[u8; 32]> = vec![];
+    for node in proofs.iter() {
+        let mut arr: [u8; 32] = Default::default();
+        arr.clone_from_slice(node.as_slice());
+        partial_tree_binary.push(arr);
+    }
+
+    // Prove that user is in airdrop
+    let proof = MerkleProof::<Sha256>::new(partial_tree_binary);
+
+    // Convert to a fixed length array without messing up the contract
+    let mut root: [u8; 32] = Default::default();
+    root.clone_from_slice(config.merkle_root.as_slice());
+    if !proof.verify(root, &indices, &leaves, config.total_accounts as usize) {
+        return  Err(StdError::generic_err(
+            "Barkin up the wrong tree. Invalid merkle proof verification!",
+        ));
+    }
+
     // check if address has already claimed
     let state = claim_status_r(deps.storage).may_load(eth_pubkey.as_bytes())?;
     if state == Some(true) {
@@ -160,15 +203,15 @@ pub fn try_claim(
     }
 
     // get headstash amount from KeyMap
-    let headstash_amount = HEADSTASH_OWNERS
-        .get(deps.storage, &eth_pubkey)
-        .ok_or_else(|| StdError::generic_err("Ethereum Pubkey not found in the contract state!"))?;
+    // let headstash_amount = HEADSTASH_OWNERS
+    //     .get(deps.storage, &eth_pubkey)
+    //     .ok_or_else(|| StdError::generic_err("Ethereum Pubkey not found in the contract state!"))?;
 
     let mut msgs: Vec<CosmosMsg> = vec![];
 
     msgs.push(transfer_msg(
         info.sender.to_string(),
-        headstash_amount,
+        amount,
         None,
         None,
         0,
@@ -179,7 +222,7 @@ pub fn try_claim(
     if !config.snip20_2.is_none() {
         let hs2 = transfer_msg(
             info.sender.to_string(),
-            headstash_amount.into(),
+            amount.into(),
             None,
             None,
             0,
@@ -192,8 +235,8 @@ pub fn try_claim(
     // update address as claimed
     claim_status_w(deps.storage).save(eth_pubkey.as_bytes(), &true)?;
     // update total_claimed
-    total_claimed_w(deps.storage)
-        .update(|claimed| -> StdResult<Uint128> { Ok(claimed + headstash_amount) })?;
+    // total_claimed_w(deps.storage)
+    //     .update(|claimed| -> StdResult<Uint128> { Ok(claimed + amount) })?;
 
     Ok(Response::default().add_messages(msgs))
 }

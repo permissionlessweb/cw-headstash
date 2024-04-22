@@ -20,6 +20,7 @@ pub struct Config {
     pub end_date: Option<u64>,
     pub snip20_1: ContractInfo,
     pub snip20_2: Option<ContractInfo>,
+    pub total_accounts: u32,
     pub total_amount: Uint128,
     pub viewing_key: String,
 }

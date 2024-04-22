@@ -21,6 +21,7 @@ pub struct InstantiateMsg {
     pub snip20_1: ContractInfo,
     pub snip20_2: Option<ContractInfo>,
     pub start_date: Option<u64>,
+    pub total_accounts: u32,
     pub total_amount: Uint128,
     pub viewing_key: String,
 }
@@ -28,8 +29,16 @@ pub struct InstantiateMsg {
 #[derive(Serialize, Deserialize, Clone, Debug, Eq, PartialEq, JsonSchema)]
 #[serde(rename_all = "snake_case")]
 pub enum ExecuteMsg {
-    Add { headstash: Vec<Headstash> },
-    Claim { eth_pubkey: String, eth_sig: String },
+    Add {
+        headstash: Vec<Headstash>,
+    },
+    Claim {
+        eth_pubkey: String,
+        eth_sig: String,
+        amount: Uint128,
+        index: u64,
+        proofs: Vec<Binary>,
+    },
     Clawback {},
 }
 
@@ -50,5 +59,5 @@ pub enum QueryAnswer {
         end: Option<u64>,
         // decay_start: Option<u64>,
         // decay_factor: Option<Uint128>
-    }
+    },
 }
