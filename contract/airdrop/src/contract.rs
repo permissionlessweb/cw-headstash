@@ -1,6 +1,7 @@
 use crate::msg::{ConfigResponse, ExecuteMsg, Headstash, InstantiateMsg, QueryMsg};
 use crate::state::{
-    claim_status_r, claim_status_w, config, config_r, total_claimed_w, Config, HEADSTASH_OWNERS,
+    claim_status_r, claim_status_w, config, config_r, decay_claimed_w, total_claimed_r,
+    total_claimed_w, Config, HEADSTASH_OWNERS,
 };
 use cosmwasm_std::{
     entry_point, to_binary, Binary, CosmosMsg, Deps, DepsMut, Env, MessageInfo, Response, StdError,
@@ -16,16 +17,19 @@ pub fn instantiate(
     msg: InstantiateMsg,
 ) -> StdResult<Response> {
     let state = Config {
+        admin: msg.admin.unwrap_or(info.sender),
+        claim_msg_plaintext: msg.claim_msg_plaintext,
+        end_date: msg.end_date,
+        merkle_root: msg.merkle_root,
         snip20_1: msg.snip20_1,
         snip20_2: msg.snip20_2,
-        merkle_root: msg.merkle_root,
+        start_date: msg.start_date,
+        total_amount: msg.total_amount,
         viewing_key: msg.viewing_key,
-        admin: Some(msg.admin.unwrap_or(info.sender)),
-        claim_msg_plaintext: msg.claim_msg_plaintext,
     };
 
     // Initialize claim amount
-    // total_claimed_w(deps.storage).save(&Uint128::zero())?;
+    total_claimed_w(deps.storage).save(&Uint128::zero())?;
     config(deps.storage).save(&state)?;
 
     Ok(Response::default())
@@ -39,8 +43,52 @@ pub fn execute(deps: DepsMut, env: Env, info: MessageInfo, msg: ExecuteMsg) -> S
             eth_pubkey,
             eth_sig,
         } => try_claim(deps, env, info, eth_pubkey, eth_sig),
-        ExecuteMsg::Clawback {} => todo!(),
+        ExecuteMsg::Clawback {} => try_clawback(deps, env, info),
     }
+}
+
+pub fn try_clawback(deps: DepsMut, env: Env, info: MessageInfo) -> StdResult<Response> {
+    // ensure sender is admin
+    let config = config_r(deps.storage).load()?;
+    let admin = config.admin;
+    if info.sender != admin {
+        return Err(StdError::generic_err(
+            "you cannot clawback the headstash, silly!",
+        ));
+    }
+
+    // ensure clawback can happen, update state
+    if let Some(end_date) = config.end_date {
+        if env.block.time.seconds() > end_date {
+            decay_claimed_w(deps.storage).update(|claimed| {
+                if claimed {
+                    Err(StdError::generic_err("this jawn already was clawed-back!"))
+                } else {
+                    Ok(true)
+                }
+            })?;
+        }
+        let total_claimed = total_claimed_r(deps.storage).load()?;
+        let clawback_total = config.total_amount.checked_sub(total_claimed)?;
+
+        let mut msgs: Vec<CosmosMsg> = vec![];
+        let hs1 = transfer_msg(
+            admin.to_string(),
+            clawback_total,
+            None,
+            None,
+            0,
+            config.snip20_1.code_hash,
+            config.snip20_1.address.to_string(),
+        )?;
+        msgs.push(hs1);
+
+        return Ok(Response::default().add_messages(msgs));
+    }
+
+    Err(StdError::generic_err(
+        "Clawback was not setup for this one, playa!",
+    ))
 }
 
 pub fn try_add_headstash(
@@ -49,6 +97,14 @@ pub fn try_add_headstash(
     info: MessageInfo,
     headstash: Vec<Headstash>,
 ) -> StdResult<Response> {
+    // ensure sender is admin
+    let config = config_r(deps.storage).load()?;
+
+    if info.sender != config.admin {
+        return Err(StdError::generic_err(
+            "you cannot add an address to the headstash, silly!",
+        ));
+    }
     // ensure eth_pubkey is not already in KeyMap
     for hs in headstash.into_iter() {
         if HEADSTASH_OWNERS.contains(deps.storage, &hs.eth_pubkey) {
@@ -111,11 +167,24 @@ pub fn try_claim(
         config.snip20_1.address.to_string(),
     )?);
 
+    if !config.snip20_2.is_none() {
+        let hs2 = transfer_msg(
+            info.sender.to_string(),
+            headstash_amount.into(),
+            None,
+            None,
+            0,
+            config.snip20_2.clone().unwrap().code_hash,
+            config.snip20_2.unwrap().address.to_string(),
+        )?;
+        msgs.push(hs2);
+    };
+
     // update address as claimed
     claim_status_w(deps.storage).save(eth_pubkey.as_bytes(), &true)?;
     // update total_claimed
-    // total_claimed_w(deps.storage)
-    //     .update(|claimed| -> StdResult<Uint128> { Ok(claimed + amount) })?;
+    total_claimed_w(deps.storage)
+        .update(|claimed| -> StdResult<Uint128> { Ok(claimed + headstash_amount) })?;
 
     Ok(Response::default().add_messages(msgs))
 }

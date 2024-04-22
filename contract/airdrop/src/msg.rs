@@ -13,25 +13,22 @@ pub struct Headstash {
 
 #[derive(Serialize, Deserialize, Clone, Debug, Eq, PartialEq, JsonSchema)]
 pub struct InstantiateMsg {
+    pub admin: Option<Addr>,
+    pub start_date: Option<u64>,
+    pub end_date: Option<u64>,
+    pub claim_msg_plaintext: String,
+    pub merkle_root: Binary,
     pub snip20_1: ContractInfo,
     pub snip20_2: Option<ContractInfo>,
-    pub merkle_root: Binary,
-    pub viewing_key: String,
     pub total_amount: Uint128,
-    pub claim_msg_plaintext: String,
-    pub admin: Option<Addr>,
+    pub viewing_key: String,
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug, Eq, PartialEq, JsonSchema)]
 #[serde(rename_all = "snake_case")]
 pub enum ExecuteMsg {
-    Add {
-        headstash: Vec<Headstash>,
-    },
-    Claim {
-        eth_pubkey: String,
-        eth_sig: String,
-    },
+    Add { headstash: Vec<Headstash> },
+    Claim { eth_pubkey: String, eth_sig: String },
     Clawback {},
 }
 
