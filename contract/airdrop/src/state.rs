@@ -16,7 +16,7 @@ pub struct Config {
     pub admin: Addr,
     pub claim_msg_plaintext: String,
     pub merkle_root: Binary,
-    pub start_date: Option<u64>,
+    pub start_date: u64,
     pub end_date: Option<u64>,
     pub snip20_1: ContractInfo,
     pub snip20_2: Option<ContractInfo>,

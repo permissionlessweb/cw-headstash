@@ -1,4 +1,4 @@
-use crate::msg::{ConfigResponse, ExecuteMsg, Headstash, InstantiateMsg, QueryMsg};
+use crate::msg::{ExecuteMsg, Headstash, InstantiateMsg, QueryAnswer, QueryMsg};
 use crate::state::{
     claim_status_r, claim_status_w, config, config_r, decay_claimed_w, total_claimed_r,
     total_claimed_w, Config, HEADSTASH_OWNERS,
@@ -12,10 +12,15 @@ use secret_toolkit::snip20::transfer_msg;
 #[entry_point]
 pub fn instantiate(
     deps: DepsMut,
-    _env: Env,
+    env: Env,
     info: MessageInfo,
     msg: InstantiateMsg,
 ) -> StdResult<Response> {
+    let start_date = match msg.start_date {
+        None => env.block.time.seconds(),
+        Some(date) => date,
+    };
+
     let state = Config {
         admin: msg.admin.unwrap_or(info.sender),
         claim_msg_plaintext: msg.claim_msg_plaintext,
@@ -23,7 +28,7 @@ pub fn instantiate(
         merkle_root: msg.merkle_root,
         snip20_1: msg.snip20_1,
         snip20_2: msg.snip20_2,
-        start_date: msg.start_date,
+        start_date: start_date,
         total_amount: msg.total_amount,
         viewing_key: msg.viewing_key,
     };
@@ -105,6 +110,9 @@ pub fn try_add_headstash(
             "you cannot add an address to the headstash, silly!",
         ));
     }
+    // make sure airdrop has not ended
+    available(&config, &env)?;
+
     // ensure eth_pubkey is not already in KeyMap
     for hs in headstash.into_iter() {
         if HEADSTASH_OWNERS.contains(deps.storage, &hs.eth_pubkey) {
@@ -121,7 +129,7 @@ pub fn try_add_headstash(
 
 pub fn try_claim(
     deps: DepsMut,
-    _env: Env,
+    env: Env,
     info: MessageInfo,
     eth_pubkey: String,
     eth_sig: String,
@@ -131,6 +139,7 @@ pub fn try_claim(
     let sender = info.sender.to_string();
 
     // make sure airdrop has not ended
+    available(&config, &env)?;
 
     // validate eth_signature comes from eth pubkey.
     // Occurs before claim check to prevent data leak of eth_pubkey claim status.
@@ -189,17 +198,42 @@ pub fn try_claim(
     Ok(Response::default().add_messages(msgs))
 }
 
+pub fn available(config: &Config, env: &Env) -> StdResult<()> {
+    let current_time = env.block.time.seconds();
+
+    // Check if airdrop started
+    if current_time < config.start_date {
+        return Err(StdError::generic_err("This airdrop has not started yet!"));
+    }
+    if let Some(end_date) = config.end_date {
+        if current_time > end_date {
+            return Err(StdError::generic_err("This airdrop has ended!"));
+        }
+    }
+
+    Ok(())
+}
+
 #[entry_point]
 pub fn query(deps: Deps, _env: Env, msg: QueryMsg) -> StdResult<Binary> {
     match msg {
         QueryMsg::Config {} => to_binary(&query_config(deps)?),
+        QueryMsg::Dates {} => to_binary(&query_dates(deps)?),
     }
 }
 
-fn query_config(deps: Deps) -> StdResult<ConfigResponse> {
-    let state = config_r(deps.storage).load()?;
-    Ok(ConfigResponse {
+fn query_config(deps: Deps) -> StdResult<QueryAnswer> {
+    Ok(QueryAnswer::ConfigResponse {
         config: config_r(deps.storage).load()?,
+    })
+}
+
+fn query_dates(deps: Deps) -> StdResult<QueryAnswer> {
+    let config = config_r(deps.storage).load()?;
+    Ok(QueryAnswer::DatesResponse {
+        start: config.start_date,
+        end: config.end_date,
+        // decay_start: config.decay_start,
     })
 }
 
