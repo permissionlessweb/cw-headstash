@@ -1,35 +1,40 @@
 import { exec } from 'child_process';
-import { wallet, scrtHeadstashContractAddr } from './main.js';
+import { wallet, scrtHeadstashContractAddr, secretjs, scrtHeadstashCodeHash} from './main.js';
 import fs from 'fs';
 
 const jsonString = fs.readFileSync('./tools/headstash/amounts.json', 'utf8');
 var jsonData = JSON.parse(jsonString);
-var batchSize = 100;
+var batchSize = 1600;
 
-function runCommand(command) {
-  exec(command, (error, stdout, stderr) => {
-    if (error) {
-      console.error(`exec error: ${error}`);
-    } else {
-      console.log(`stdout: ${stdout}`);
-      console.log(`stderr: ${stderr}`);
-    }
-  });
-}
 
 let printBatch = async (index) => {
-  // TODO: ensure batch prints remaining accounts if < batchSize
   var batch = jsonData.slice(index * batchSize, (index + 1) * batchSize);
-  let value = (index + 1);
-
-  const command = `sc tx wasm execute ${scrtHeadstashContractAddr} '{"add": ${JSON.stringify(batch)}}' --generate-only --from ${wallet.address} --output ./generated/signed-${value}}.json`;
-
-  runCommand(command);
-
+  console.log(batch)
+  
+  if (batch.length === 0) {
+    throw new Error("Batch is empty");
+  }
+  
+  const addMsg = { add: { headstash: batch } }
+  const tx = await secretjs.tx.compute.executeContract({
+    sender: wallet.address,
+    contract_address: scrtHeadstashContractAddr,
+    msg: addMsg,
+    code_hash: scrtHeadstashCodeHash,
+  },
+    {
+      gasLimit: 8_000_000,
+      // explicitSignerData: {
+      //   accountNumber: 22761,
+      //   sequence: (376 + index + 1),
+      //   chainId: "pulsar-3"
+      // }
+    })
+  console.log(tx);
   if (index * batchSize < jsonData.length) {
     setTimeout(function () {
       printBatch(index + 1);
-    }, 100); // delay next batch
+    }, 6000); // delay next batch
   }
 }
 

@@ -38,6 +38,7 @@ pub enum ExecuteMsg {
 pub enum QueryMsg {
     Config {},
     Dates {},
+    Clawback {},
 }
 
 #[cw_serde]
@@ -50,5 +51,8 @@ pub enum QueryAnswer {
         end: Option<u64>,
         // decay_start: Option<u64>,
         // decay_factor: Option<Uint128>
+    },
+    ClawbackResponse {
+        bool: bool,
     }
 }

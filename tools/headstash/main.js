@@ -23,7 +23,7 @@ const entropy = "eretskeretjableret";
 // airdrop contract
 export const scrtHeadstashCodeId = 6684;
 export const scrtHeadstashCodeHash = "9b5d98452b320499b9520e2f062e7f527cbd1d0046b7304bb378d3033438a2b5";
-export const scrtHeadstashContractAddr = "secret1qyhpstprdhgdexykrrg538jlg5qtrranfj5tx8";
+export const scrtHeadstashContractAddr = "secret1hrrex58xgff4nf98yfanhpy4w0yap9pe5u7tzc";
 export const merkle_root = "d599867bdb2ade1e470d9ec9456490adcd9da6e0cfd8f515e2b95d345a5cd92f";
 
 // account stuff
@@ -155,10 +155,6 @@ if (args.length < 1) {
 
 } else if (args[0] === '-a') { // create an account, claims airdrop 
   create_account(args[1])
-} else if (args[0] === '-add-hs') { // create an account, claims airdrop 
-  const jsonData = fs.readFileSync('./tools/headstash/accounts.json')
-  add_headstash(jsonData)
-  .then(() => { console.log("Added accounts to the heastash!"); })
   //////////////////////////////// SNIP20 ACTIONS //////////////////////////////////
 } else if (args[0] === '-i-terp') {
   i_snip20("terp-snip20", "TERP", scrtIBCTerpDenom)

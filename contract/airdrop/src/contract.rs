@@ -1,7 +1,7 @@
 use crate::msg::{ExecuteMsg, Headstash, InstantiateMsg, QueryAnswer, QueryMsg};
 use crate::state::{
-    claim_status_r, claim_status_w, config, config_r, decay_claimed_w, total_claimed_r,
-    total_claimed_w, Config, HEADSTASH_OWNERS,
+    claim_status_r, claim_status_w, config, config_r, decay_claimed_r, decay_claimed_w,
+    total_claimed_r, total_claimed_w, Config, HEADSTASH_OWNERS,
 };
 use cosmwasm_std::{
     entry_point, to_binary, Binary, CosmosMsg, Deps, DepsMut, Env, MessageInfo, Response, StdError,
@@ -104,6 +104,12 @@ pub fn try_add_headstash(
 ) -> StdResult<Response> {
     // ensure sender is admin
     let config = config_r(deps.storage).load()?;
+
+    if headstash.is_empty() {
+        return Err(StdError::generic_err(
+            "the msg you sent contained an empty value!",
+        ));
+    }
 
     if info.sender != config.admin {
         return Err(StdError::generic_err(
@@ -219,7 +225,14 @@ pub fn query(deps: Deps, _env: Env, msg: QueryMsg) -> StdResult<Binary> {
     match msg {
         QueryMsg::Config {} => to_binary(&query_config(deps)?),
         QueryMsg::Dates {} => to_binary(&query_dates(deps)?),
+        QueryMsg::Clawback {} => to_binary(&query_clawback(deps)?),
     }
+}
+
+fn query_clawback(deps: Deps) -> StdResult<QueryAnswer> {
+    Ok(QueryAnswer::ClawbackResponse {
+        bool: decay_claimed_r(deps.storage).load()?,
+    })
 }
 
 fn query_config(deps: Deps) -> StdResult<QueryAnswer> {

@@ -57,9 +57,10 @@ let create_account = async () => {
 
 let add_headstash = async (jsonData) => {
 
-  let headstashes = JSON.parse(jsonData);
+  var headstashes = [String];
+  headstashes = JSON.parse(jsonData);
 
-  const addMsg = { add: { headstash: [headstashes] } }
+  const addMsg = { add: { headstash: headstashes } }
   const tx = await secretjs.tx.compute.executeContract({
     sender: wallet.address,
     contract_address: scrtHeadstashContractAddr,

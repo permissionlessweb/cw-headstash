@@ -50,6 +50,11 @@ pub fn claim_status_w(storage: &mut dyn Storage) -> Bucket<bool> {
     bucket(storage, ETH_PUBKEY_CLAIMED_KEY)
 }
 
+
+pub fn decay_claimed_r(storage: &dyn Storage) -> ReadonlySingleton<bool> {
+    singleton_read(storage, ETH_PUBKEY_CLAIMED_KEY)
+}
+
 // decayed state
 pub fn decay_claimed_w(storage: &mut dyn Storage) -> Singleton<bool> {
     singleton(storage, DECAY_CLAIMED_KEY)
