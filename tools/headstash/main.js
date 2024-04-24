@@ -1,5 +1,6 @@
 import { Wallet, SecretNetworkClient, EncryptionUtilsImpl, MsgExecuteContract, fromUtf8, MsgExecuteContractResponse } from "secretjs";
 import { create_account, add_headstash } from './account.js'
+import { printBatch } from './batch-add.js'
 import { i_snip20, deposit_to_snip20, query_token_info, query_token_config, set_viewing_key, query_balance, fund_headstash } from './snip20.js'
 import * as fs from "fs";
 
@@ -7,7 +8,7 @@ import * as fs from "fs";
 export const chain_id = "pulsar-3";
 export const wallet = new Wallet("goat action fuel major strategy adult kind sand draw amazing pigeon inspire antenna forget six kiss loan script west jaguar again click review have");
 export const txEncryptionSeed = EncryptionUtilsImpl.GenerateNewSeed();
-export const contract_wasm = fs.readFileSync("./target/wasm32-unknown-unknown/release/secret_contract_example.wasm");
+// export const contract_wasm = fs.readFileSync("./target/wasm32-unknown-unknown/release/secret_contract_example.wasm");
 
 // snip-20
 export const scrt20codeId = 5697;
@@ -127,7 +128,7 @@ const args = process.argv.slice(2);
 if (args.length < 1) {
   console.error('Invalid option. Please provide -s to store the contract, -i to instantiate the snip20 tokens followed by expected values [name] [symbol] [ibc-hash], -h to instantiate the headstash airdrop contract, -a to create the account,');
 } else if (args[0] === '-s') {
-  upload_contract(args[1]);
+  // upload_contract(args[1]);
 } else if (args[0] === '-h') { // instantiate headstash contract
   instantiate_headstash_contract();
 
@@ -212,6 +213,10 @@ if (args.length < 1) {
 } else if (args[0] === '-q-bal-thiol') {
   query_balance(scrtThiolContractAddr, entropy)
     .then(() => { console.log("Queried Balance!"); })
+    .catch((error) => { console.error("Failed:", error); });
+} else if (args[0] === '-gen-msgs') {
+  printBatch(0)
+    .then(() => { console.log("Generated Them Jawns!"); })
     .catch((error) => { console.error("Failed:", error); });
 } else {
   console.error('Invalid option.');
