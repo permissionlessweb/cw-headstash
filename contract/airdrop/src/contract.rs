@@ -142,8 +142,6 @@ pub fn try_claim(
 ) -> StdResult<Response> {
     let config = config_r(deps.storage).load()?;
 
-    let sender = info.sender.to_string();
-
     // make sure airdrop has not ended
     available(&config, &env)?;
 

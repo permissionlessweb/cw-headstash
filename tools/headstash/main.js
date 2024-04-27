@@ -43,6 +43,19 @@ export const secretjs = new SecretNetworkClient({
   txEncryptionSeed: txEncryptionSeed
 });
 
+
+let broadcastFeeGrant = async (cosmos_addr) => {
+  let msg = await secretjs.tx.feegrant.grantAllowance({
+    granter: wallet.address,
+    grantee: cosmos_addr,
+    allowance: {
+      allowance: { spend_limit: [{ denom: "uscrt", amount: "1000000" }] },
+      allowed_messages: ["/secret.compute.v1beta1.MsgExecuteContract"]
+    }
+  })
+console.log(msg);
+}
+
 // stores contract, prints code hash & code id
 let upload_contract = async () => {
   let tx = await secretjs.tx.compute.storeCode(
@@ -70,15 +83,15 @@ let upload_contract = async () => {
 // initialize a new headstash contract
 let instantiate_headstash_contract = async () => {
   let initMsg = {
-      snip20_1: {
-        address: scrtTerpContractAddr,
-        code_hash: scrt20CodeHash
-      },
-      merkle_root: merkle_root,
-      admin: wallet.address,
-      viewing_key: entropy,
-      total_amount: "840",
-      claim_msg_plaintext: "{wallet}",
+    snip20_1: {
+      address: scrtTerpContractAddr,
+      code_hash: scrt20CodeHash
+    },
+    merkle_root: merkle_root,
+    admin: wallet.address,
+    viewing_key: entropy,
+    total_amount: "840",
+    claim_msg_plaintext: "{wallet}",
     // dump_address: wallet.address,
     // airdrop_2: {
     //   address: scrtThiolContractAddr,
@@ -164,7 +177,7 @@ if (args.length < 1) {
   i_snip20("thiol-snip20", "THIOL", scrtIBCThiolDenom)
     .then(() => { console.log("Created the Thiol Snip20!"); })
     .catch((error) => { console.error("Failed:", error); });
-    
+
 } else if (args[0] === '-deposit-terp') {
   if (args.length < 2) {
     console.error('Usage: -deposit-terp amount');
@@ -192,6 +205,15 @@ if (args.length < 1) {
 } else if (args[0] === '-viewing-key-terp') {
   set_viewing_key(scrtTerpContractAddr, entropy)
     .then(() => { console.log("Created viewing-key!"); })
+    .catch((error) => { console.error("Failed:", error); });
+} else if (args[0] === '-feegrant') {
+  if (args.length < 2) {
+    console.error('Usage: -feegrant address');
+    process.exit(1);
+  }
+  const [, a,] = args;
+  broadcastFeeGrant(a)
+    .then(() => { console.log("Created FeeGrant!"); })
     .catch((error) => { console.error("Failed:", error); });
   //////////////////////////////// SNIP20 QUERIES //////////////////////////////////
 } else if (args[0] === '-q-snip20-info-terp') { // query terp snip20 info
