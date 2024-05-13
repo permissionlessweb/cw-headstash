@@ -6,32 +6,28 @@ import * as fs from "fs";
 
 // wallet
 export const chain_id = "pulsar-3";
-export const wallet = new Wallet("goat action fuel major strategy adult kind sand draw amazing pigeon inspire antenna forget six kiss loan script west jaguar again click review have");
+export const wallet = new Wallet(process.env.WALLET_PRIVATE_KEY);
 export const txEncryptionSeed = EncryptionUtilsImpl.GenerateNewSeed();
-// export const contract_wasm = fs.readFileSync("./target/wasm32-unknown-unknown/release/secret_contract_example.wasm");
+export const contract_wasm = fs.readFileSync(process.env.CONTRACT_WASM_FILE);
 
-// snip-20
+// snip-20 details 
 export const scrt20codeId = 5697;
 export const scrt20CodeHash = "c74bc4b0406507257ed033caa922272023ab013b0c74330efc16569528fa34fe";
+// contract address
 export const scrtTerpContractAddr = "secret1wmp90kd0zsnq3p35m457ufc4p807v3j7tvkhwx";
 export const scrtThiolContractAddr = "secret1g6d9cjsw2k9n5xr5u750u8t4v4hvhmcy828q7w";
+// TERP & THIOL ibc-hashes 
 export const scrtIBCTerpDenom = "ibc/BE5D2CF4CFB043522B95ACAF30113B6DDEDE8FB09B9CFBE4322B70C487781241";
 export const scrtIBCThiolDenom = "ibc/07FFE4A5E55AFA423DF355E3138858E6A302909F74595676A9EDC1A76D9511F1";
 
 const entropy = "eretskeretjableret";
 
 // airdrop contract
-export const scrtHeadstashCodeId = 6684;
-export const scrtHeadstashCodeHash = "9b5d98452b320499b9520e2f062e7f527cbd1d0046b7304bb378d3033438a2b5";
-export const scrtHeadstashContractAddr = "secret1hrrex58xgff4nf98yfanhpy4w0yap9pe5u7tzc";
-export const merkle_root = "d599867bdb2ade1e470d9ec9456490adcd9da6e0cfd8f515e2b95d345a5cd92f";
+export const scrtHeadstashCodeId = 6908;
+export const scrtHeadstashCodeHash = "b12ed8795b14346520f7f67e3c74e5601afa585b7c50878c31bd3d3190061130";
+export const scrtHeadstashContractAddr = "secret162ygjnc4n0jk4paz7lck8fzpwgd5u3zqguxers";
 
 // account stuff
-export const cosmos_sig = "oZvPavC1xXLpe3hzurUrBmLWFWZFQi/VF7u5dH7YrUJESeRX0rNB1oKixuVlwSFjh17f1SD/06SWdNzOXyTLDg==";
-export const eth_pubkey = "0x254768D47Cf8958a68242ce5AA1aDB401E1feF2B";
-export const eth_sig = "0xf7992bd3f7cb1030b5d69d3326c6e2e28bfde2e38cbb8de753d1be7b5a5ecbcf2d3eccd3fe2e1fccb2454c47dcb926bd047ecf5b74c7330584cbfd619248de811b"
-export const pubkey = { type: "tendermint/PubKeySecp256k1", value: "AyZtxhLgis4Ec66OVlKDnuzEZqqV641sm46R3mbE2cpO" }
-export const partial_tree = ["fbff7c66d3f610bcf8223e61ce12b10bb64a3433622ff39af83443bcec78920a"]
 export const permitKey = "eretskeretjableret"
 
 // signing client 
@@ -43,7 +39,7 @@ export const secretjs = new SecretNetworkClient({
   txEncryptionSeed: txEncryptionSeed
 });
 
-
+// generate fee grant
 let broadcastFeeGrant = async (cosmos_addr) => {
   let msg = await secretjs.tx.feegrant.grantAllowance({
     granter: wallet.address,
@@ -53,7 +49,7 @@ let broadcastFeeGrant = async (cosmos_addr) => {
       allowed_messages: ["/secret.compute.v1beta1.MsgExecuteContract"]
     }
   })
-console.log(msg);
+  console.log(msg);
 }
 
 // stores contract, prints code hash & code id
@@ -92,22 +88,6 @@ let instantiate_headstash_contract = async () => {
     viewing_key: entropy,
     total_amount: "840",
     claim_msg_plaintext: "{wallet}",
-    // dump_address: wallet.address,
-    // airdrop_2: {
-    //   address: scrtThiolContractAddr,
-    //   code_hash: scrt20CodeHash
-    // },
-    // start_date: 1713386815,
-    // end_date: 1744922815,
-    // decay_start: 1723927615,
-    // total_accounts: 2,
-    // max_amount: "420",
-    // default_claim: "50",
-    // task_claim: [{
-    //   address: scrtHeadstashContractAddr,
-    //   percent: "50",
-    // }],
-    // query_rounding: "1"
   };
 
   let tx = await secretjs.tx.compute.instantiateContract(
@@ -141,7 +121,7 @@ const args = process.argv.slice(2);
 if (args.length < 1) {
   console.error('Invalid option. Please provide -s to store the contract, -i to instantiate the snip20 tokens followed by expected values [name] [symbol] [ibc-hash], -h to instantiate the headstash airdrop contract, -a to create the account,');
 } else if (args[0] === '-s') {
-  // upload_contract(args[1]);
+  upload_contract(args[1]);
 } else if (args[0] === '-h') { // instantiate headstash contract
   instantiate_headstash_contract();
 
@@ -193,6 +173,24 @@ if (args.length < 1) {
     console.error('Usage: -d amount');
     process.exit(1);
   }
+// -s - stores airdrop contract
+// -h - instantiates headstash contract with default settings
+// -fund-hs-terp <amount> - funds the headstash contract with scrt TERP tokens.
+// -fund-hs-thiol <amount>  - funds the headstash contract with scrt THIOL tokens.
+// -a - claims the airdrop with hardcoded eth pubkey and signature
+// -deposit-thiol <amount> -  Convert THIOL to snip20 THIOL
+// -deposit-terp <amount> - Convert TERP to snip20 TERP
+// -viewing-key-thiol - create viewing key for THIOL
+// -viewing-key-terp - create viewing key for TERP
+// -feegrant <address> - Authorize feegrant to an address
+// -q-snip20-info-terp 
+// -q-snip20-info-thiol
+// -q-snip20-config-terp
+// -q-snip20-config-thiol
+// -q-snip20-bal-terp
+// -q-snip20-bal-thiol
+// -gen-msgs - batch add address to an airdrop. 
+
   const [, a,] = args;
   console.log("depositing THIOL")
   deposit_to_snip20(scrtThiolContractAddr, a, scrtIBCThiolDenom)
@@ -224,17 +222,17 @@ if (args.length < 1) {
   query_token_config(scrtTerpContractAddr, scrt20CodeHash)
 } else if (args[0] === '-q-snip20-config-thiol') {  // query thiol snip20 config 
   query_token_config(scrtThiolContractAddr, scrt20CodeHash)
-} else if (args[0] === '-q-bal-terp') {
+} else if (args[0] === '-q-snip20-bal-terp') {
   query_balance(scrtTerpContractAddr, entropy)
     .then(() => { console.log("Queried Balance!"); })
     .catch((error) => { console.error("Failed:", error); });
-} else if (args[0] === '-q-bal-thiol') {
+} else if (args[0] === '-q-snip20-bal-thiol') {
   query_balance(scrtThiolContractAddr, entropy)
     .then(() => { console.log("Queried Balance!"); })
     .catch((error) => { console.error("Failed:", error); });
 } else if (args[0] === '-gen-msgs') {
   printBatch(0)
-    .then(() => { console.log("Generated Them Jawns!"); })
+    .then(() => { console.log("generated them jawns"); })
     .catch((error) => { console.error("Failed:", error); });
 } else {
   console.error('Invalid option.');
