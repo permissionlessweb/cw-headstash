@@ -3,14 +3,7 @@ use cosmwasm_std::{Addr, Binary, ContractInfo, Uint128};
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
-use crate::state::Config;
-
-///
-#[derive(Serialize, Deserialize, Clone, Debug, Eq, PartialEq, JsonSchema)]
-pub struct Headstash {
-    pub eth_pubkey: String,
-    pub amount: Uint128,
-}
+use crate::state::{Config, Headstash};
 
 #[derive(Serialize, Deserialize, Clone, Debug, Eq, PartialEq, JsonSchema)]
 pub struct InstantiateMsg {
@@ -53,5 +46,5 @@ pub enum QueryAnswer {
     },
     ClawbackResponse {
         bool: bool,
-    }
+    },
 }

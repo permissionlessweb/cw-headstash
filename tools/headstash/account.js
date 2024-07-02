@@ -40,7 +40,7 @@ let add_headstash = async (jsonData) => {
     })
   console.log(tx);
 }
-export { create_account, add_headstash }
+export { claim, add_headstash }
 
 
 

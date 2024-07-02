@@ -1,7 +1,6 @@
-use crate::msg::{ExecuteMsg, Headstash, InstantiateMsg, QueryAnswer, QueryMsg};
+use crate::msg::{ExecuteMsg, InstantiateMsg, QueryAnswer, QueryMsg};
 use crate::state::{
-    claim_status_r, claim_status_w, config, config_r, decay_claimed_r, decay_claimed_w,
-    total_claimed_r, total_claimed_w, Config, HEADSTASH_OWNERS,
+    claim_status_r, claim_status_w, config, config_r, decay_claimed_r, decay_claimed_w, total_claimed_r, total_claimed_w, Config, Headstash, HEADSTASH_OWNERS
 };
 use cosmwasm_std::{
     entry_point, to_binary, Binary, CosmosMsg, Deps, DepsMut, Env, MessageInfo, Response, StdError,

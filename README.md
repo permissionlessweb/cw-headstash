@@ -4,8 +4,10 @@ Transparency-minimized airdrop contract for cosmos bech32 addresses to claim via
 
 ## Content
 
-- [Airdrop](./contract/airdrop/): Main contract 
-- [Headstash Tools](./tools/headstash/README.md): `secretjs` scripts to deploy & interact with headstash instances.
+- [Headstash Contract](./contract/airdrop/) - CosmWasm contract that verifies eth signatures and distirbutes snip20 tokens.
+- [Headstash Tools](./tools/headstash/README.md) - `secretjs` scripts to deploy & interact with headstash instances.
+- [Headstash & Feegrant API](./) - express.js server that provides distribution data to ui, as well as can authorize feegrants by verifying eth signatures.
+- [Headstash UI Demo ](./) - webapp for claiming a headstash. 
 
 ## Demo 
 
@@ -27,6 +29,9 @@ Inside of [`main.js`](./tools/headstash/main.js), there are various constant val
 | `scrtHeadstashCodeId` | code id of headstash contract |
 | `scrtHeadstashCodeHash` | code hash of headstash contract |
 | `scrtHeadstashContractAddr` | contract address of headstash contract |
+| `scrtIBCDenom1` | native or ibc denom |
+| `scrtIBCDenom2` | native or ibc denom |
+| `ethPubkeysToAdd` | file location of eth pubkeys included in headstash instance. see [#6](README.md#6-add-eth-address-able-to-claim) |
 
 
 ## Usage Guidelines 
@@ -38,7 +43,7 @@ make build
 We can deploy using the [headstash tools](./tools/headstash/) scripts. Make sure you have build the contract locally, or else the scripts will not work properly.\
 To deploy, navigate to the headstash tools, install the node dependencies, and run:
 ```sh
-cd tools/cupboard && yarn && node main.js -s
+cd tools/headstash && yarn && node main.js -s
 ```
 *This will store the wasm blob we've built to secret netowrk & return our code-id*
 
@@ -75,20 +80,28 @@ to add address that can verify & claim their headstash, our headstash-tools can 
 
 To add addresses to claim their headstash:
 ```sh
-node main.js -add
+node tools/headstash/main.js -add
 ```
 
 ## 7. Fund Headstash 
 If you decided not to use ibc hooks, or using either an existing snip or native asset, than we need need to fund the contract with the tokens to distribute.
 
+### Wrap Into SNIP20 
+```sh
+node main.js -convert-token1 432 
+```
+
+### Fund Headstash 
 To fund the headstash contract:
 ```sh
 node main.js -fund-hs-token1 <amount>
 ```
+
 ## 8. Provide Feegrants
 feegrants can be provided to wallet addresses via:
 ```sh 
 node main.js -feegrant <addr-to-feegrant>
+```
 
 ## 9. Claim Assets
 Claiming tokens involves the generation of an eth signature, with the secret pubkey address as the msg string of the signature. This signature is passed to the contract, along with the eth pubkey that generated it. 
@@ -98,6 +111,11 @@ node main.js -claim
 ```
 
 And thats it! Weve successfully claimed our headstash privately.
+## 10. Verify You have claimed
+We can query the snip20 contract to confirm our new balance
+```sh
+node main.js -q-snip1-bal
+```
 
 
 ## Additional Information 

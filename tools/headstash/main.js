@@ -6,29 +6,32 @@ import * as fs from "fs";
 
 // wallet
 export const chain_id = "pulsar-3";
-export const wallet = new Wallet("goat action fuel major strategy adult kind sand draw amazing pigeon inspire antenna forget six kiss loan script west jaguar again click review have");
+export const wallet = new Wallet("<your-mnemonic-seed>");
 export const txEncryptionSeed = EncryptionUtilsImpl.GenerateNewSeed();
-export const contract_wasm = fs.readFileSync(process.env.CONTRACT_WASM_FILE);
+export const contract_wasm = fs.readFileSync("./target/wasm32-unknown-unknown/release/secret_headstash.wasm");
+
+// headstash contract
+export const scrtHeadstashCodeId = 9016;
+export const scrtHeadstashCodeHash = "f89afb136c18be3d1f008b799ca140f7916a1c62a2fc5c1e8e9e4f14778eafe9";
+export const scrtHeadstashContractAddr = "";
 
 // snip-20 
 export const scrt20codeId = 5697;
 export const scrt20CodeHash = "c74bc4b0406507257ed033caa922272023ab013b0c74330efc16569528fa34fe";
 // snip-20 addrs
-export const scrtContractAddr1 = "secret1pvjqpqm89zf54m6z7fvvhusqqyl43mc4s3t5rn";
-export const scrtContractAddr2 = "secret1ndn9w3edt38793nkczqpqmz7dulgczflz0jrgd";
+export const scrtContractAddr1 = "";
+export const scrtContractAddr2 = "";
 // token ONE & TWO denoms.
-export const scrtIBCDenom1 = "ibc/406ABC147BF3368070EF44FE1522FF2679AFC0561035C6691A22537CB83CB7BF";
-export const scrtIBCDenom2 = "ibc/D6C33E6955CA35DF269FCD45624FADDF4967ECB19C3D13B94D6AADB4698706CB";
+export const scrtIBCDenom1 = "";
+export const scrtIBCDenom2 = "";
 
-const entropy = "eretskeretjableret";
+export const entropy = "eretskeretjableret";
 export const permitKey = entropy;
 
-// headstash contract
-export const scrtHeadstashCodeId = 6908;
-export const scrtHeadstashCodeHash = "b12ed8795b14346520f7f67e3c74e5601afa585b7c50878c31bd3d3190061130";
-export const scrtHeadstashContractAddr = "secret1yte948dkca975mkmve62hp79qy0pa5m227fwsp";
-
-
+// add msgs 
+export const ethPubkeysToAdd = fs.readFileSync('./tools/example-data/amounts.json', 'utf8');
+export var ethPubkeys = JSON.parse(ethPubkeysToAdd);
+export var batchSize = 1600;
 
 // signing client 
 export const secretjs = new SecretNetworkClient({
@@ -81,7 +84,6 @@ let instantiate_headstash_contract = async () => {
   let initMsg = {
     admin: wallet.address,
     claim_msg_plaintext: "{wallet}",
-    merkle_root: merkle_root,
     snip20_1: {
       address: scrtContractAddr1,
       code_hash: scrt20CodeHash
@@ -106,8 +108,6 @@ let instantiate_headstash_contract = async () => {
       gasLimit: 400_000,
     }
   );
-
-  console.log(tx);
   //Find the contract_address in the logs
   const contractAddress = tx.arrayLog.find(
     (log) => log.type === "message" && log.key === "contract_address"
@@ -132,9 +132,9 @@ if (args.length < 1) {
     .then(() => { console.log("Created the Second Snip20!"); })
     .catch((error) => { console.error("Failed:", error); });
 
-} else if (args[0] === '-dt1') {
+} else if (args[0] === '-convert-token1') {
   if (args.length < 2) {
-    console.error('Usage: -dt1 amount');
+    console.error('Usage: -convert-token1 amount');
     process.exit(1);
   }
   const [, a,] = args;
@@ -142,7 +142,7 @@ if (args.length < 1) {
   deposit_to_snip20(scrtContractAddr1, a, scrtIBCDenom1)
     .then(() => { console.log("Converted token ONE into its secret form!"); })
     .catch((error) => { console.error("Failed:", error); });
-} else if (args[0] === '-dt2') {
+} else if (args[0] === '-convert-token2') {
   if (args.length < 2) {
     console.error('Usage: -d amount');
     process.exit(1);
@@ -152,11 +152,11 @@ if (args.length < 1) {
   deposit_to_snip20(scrtContractAddr2, a, scrtIBCDenom2)
     .then(() => { console.log("Converted token TWO into its secret form!"); })
     .catch((error) => { console.error("Failed:", error); });
-} else if (args[0] === '-viewing-key-token2') {
+} else if (args[0] === '-viewing-key-2') {
   set_viewing_key(scrtContractAddr2, entropy)
     .then(() => { console.log("Created viewing-key!"); })
     .catch((error) => { console.error("Failed:", error); });
-} else if (args[0] === '-viewing-key-terp') {
+} else if (args[0] === '-viewing-key-1') {
   set_viewing_key(scrtContractAddr1, entropy)
     .then(() => { console.log("Created viewing-key!"); })
     .catch((error) => { console.error("Failed:", error); });
@@ -170,19 +170,19 @@ if (args.length < 1) {
     .then(() => { console.log("Created FeeGrant!"); })
     .catch((error) => { console.error("Failed:", error); });
   //////////////////////////////// SNIP20 QUERIES  /////////////////////////////////
-} else if (args[0] === '-q-snip20-info-token1') {   // query snip20 1 info
+} else if (args[0] === '-q-snip1-info') {   // query snip20 1 info
   query_token_info(scrtContractAddr1, scrt20CodeHash)
-} else if (args[0] === '-q-snip20-info-token2') {   // query snip20 2 info 
+} else if (args[0] === '-q-snip2-info') {   // query snip20 2 info 
   query_token_info(scrtContractAddr2, scrt20CodeHash)
-} else if (args[0] === '-q-snip20-config-token1') { // query snip20 1 config
+} else if (args[0] === '-q-snip1-config') { // query snip20 1 config
   query_token_config(scrtContractAddr1, scrt20CodeHash)
-} else if (args[0] === '-q-snip20-config-token2') { // query snip20 2 config 
+} else if (args[0] === '-q-snip2-config') { // query snip20 2 config 
   query_token_config(scrtContractAddr2, scrt20CodeHash)
-} else if (args[0] === '-q-snip20-bal-token1') {    // query balance snip20 1
+} else if (args[0] === '-q-snip1-bal') {    // query balance snip20 1
   query_balance(scrtContractAddr1, entropy)
     .then(() => { console.log("Queried Balance!"); })
     .catch((error) => { console.error("Failed:", error); });
-} else if (args[0] === '-q-snip20-bal-token2') {    // query balance snip20 2
+} else if (args[0] === '-q-snip2-bal') {    // query balance snip20 2
   query_balance(scrtContractAddr2, entropy)
     .then(() => { console.log("Queried Balance!"); })
     .catch((error) => { console.error("Failed:", error); });
@@ -192,7 +192,7 @@ if (args.length < 1) {
   //////////////////////////////// HEADSTASH ACTIONS ///////////////////////////////
 } else if (args[0] === '-fund-hs-token1') {
   if (args.length < 2) {
-    console.error('Usage: -fund-hs-token2 amount');
+    console.error('Usage: -fund-hs-token1 amount');
     process.exit(1);
   }
   const [, a,] = args;

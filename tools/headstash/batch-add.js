@@ -1,20 +1,11 @@
-import { exec } from 'child_process';
-import { wallet, scrtHeadstashContractAddr, secretjs, scrtHeadstashCodeHash} from './main.js';
-import fs from 'fs';
-
-const jsonString = fs.readFileSync('./tools/headstash/amounts.json', 'utf8');
-var jsonData = JSON.parse(jsonString);
-var batchSize = 1600;
-
+import { wallet, scrtHeadstashContractAddr, secretjs, scrtHeadstashCodeHash, ethPubkeys, batchSize } from './main.js';
 
 let printBatch = async (index) => {
-  var batch = jsonData.slice(index * batchSize, (index + 1) * batchSize);
+  var batch = ethPubkeys.slice(index * batchSize, (index + 1) * batchSize);
   console.log(batch)
-  
   if (batch.length === 0) {
     return "Batch is empty";
   }
-  
   const addMsg = { add: { headstash: batch } }
   const tx = await secretjs.tx.compute.executeContract({
     sender: wallet.address,
@@ -26,11 +17,10 @@ let printBatch = async (index) => {
       gasLimit: 8_000_000,
     })
   console.log(tx);
-  if (index * batchSize < jsonData.length) {
+  if (index * batchSize < ethPubkeys.length) {
     setTimeout(function () {
       printBatch(index + 1);
     }, 6000); // delay next batch
   }
 }
-
 export { printBatch }
