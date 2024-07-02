@@ -25,7 +25,6 @@ pub fn instantiate(
         admin: msg.admin.unwrap_or(info.sender),
         claim_msg_plaintext: msg.claim_msg_plaintext,
         end_date: msg.end_date,
-        merkle_root: msg.merkle_root,
         snip20_1: msg.snip20_1,
         snip20_2: msg.snip20_2,
         start_date: start_date,

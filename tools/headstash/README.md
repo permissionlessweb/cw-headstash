@@ -1,6 +1,23 @@
 #  Tools
 
-## Commands
-
-## Notes
-- Adding 200 addresses cost ~ 1 SCRT token @ `0.1 SCRT` for Fee Price  [example tx](https://testnet.ping.pub/secret/tx/C54BBEBE5360E98E200DDDA21E69278A05A11C342EDA8798011CA10BB8F0C320)
+| Command | Description |
+| --- | --- |
+| `-store` | Stores an airdrop contract |
+| `-i-snip1` | Instantiates SNIP-20 version of token ONE |
+| `-i-snip2` | Optional, Instantiates SNIP-20 version of token TWO |
+| `-init-headstash` | Instantiates headstash contract with default settings |
+| `-fund-hs-token1 <amount>` | Funds the headstash contract with token ONE snip20 |
+| `-fund-hs-token2 <amount>` | Funds the headstash contract with token TWO snip20 |
+| `-claim` | Claims the airdrop with hardcoded Eth pubkey and signature |
+| `-deposit-token1 <amount>` | Converts THIOL to SNIP20 token TWO |
+| `-deposit-token2 <amount>` | Converts TERP to SNIP20 token ONE |
+| `-viewing-key-token1` | Creates a viewing key for token TWO |
+| `-viewing-key-token2` | Creates a viewing key for token ONE|
+| `-feegrant <address>` | Authorizes feegrant to an address |
+| `-q-snip1-info` | Queries SNIP20 info for token ONE |
+| `-q-snip2-info` | Queries SNIP20 info for token TWO |
+| `-q-snip1-bal` | Queries SNIP20 config for token ONE |
+| `-q-snip2-bal` | Queries SNIP20 config for token TWO |
+| `-q-snip1-bal` | Queries SNIP20 balance for token ONE |
+| `-q-snip2-bal` | Queries SNIP20 balance for token TWO |
+| `-add` | Batch adds address to an airdrop |

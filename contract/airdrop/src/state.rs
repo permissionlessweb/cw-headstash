@@ -5,17 +5,16 @@ use schemars::JsonSchema;
 use secret_toolkit::storage::Keymap;
 use serde::{Deserialize, Serialize};
 
-pub static CONFIG_KEY: &[u8] = b"config";
-pub static ETH_PUBKEY_CLAIMED_KEY: &[u8] = b"eth_pubkey_claimed";
-pub static TOTAL_CLAIMED_KEY: &[u8] = b"total_claimed";
-pub static DECAY_CLAIMED_KEY: &[u8] = b"decay_claimed";
-pub static HEADSTASH_OWNERS: Keymap<String, Uint128> = Keymap::new(b"headstash_owners");
+pub static CONFIG_KEY: &[u8] = b"ck";
+pub static ETH_PUBKEY_CLAIMED_KEY: &[u8] = b"epck";
+pub static TOTAL_CLAIMED_KEY: &[u8] = b"tck";
+pub static DECAY_CLAIMED_KEY: &[u8] = b"dck";
+pub static HEADSTASH_OWNERS: Keymap<String, Uint128> = Keymap::new(b"ho");
 
 #[derive(Serialize, Deserialize, Clone, Debug, Eq, PartialEq, JsonSchema)]
 pub struct Config {
     pub admin: Addr,
     pub claim_msg_plaintext: String,
-    pub merkle_root: Binary,
     pub start_date: u64,
     pub end_date: Option<u64>,
     pub snip20_1: ContractInfo,

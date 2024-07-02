@@ -1,33 +1,6 @@
-import { chain_id, scrtHeadstashCodeHash, scrtHeadstashContractAddr, secretjs, txEncryptionSeed, wallet, permitKey, pubkey, cosmos_sig, eth_pubkey, eth_sig, partial_tree } from "./main.js";
+import {  scrtHeadstashCodeHash, scrtHeadstashContractAddr, secretjs, wallet } from "./main.js";
 
-let create_account = async () => {
-  // const addressProofMsg = {
-  //   address: wallet.address,
-  //   amount: "420",
-  //   contract: scrtHeadstashContractAddr,
-  //   index: 1,
-  //   key: permitKey,
-  // }
-  // encode memo to base64 string
-  // const encoded_memo = Buffer.from(JSON.stringify(addressProofMsg)).toString('base64');
-
-  // const fillerMsg = {
-  //   coins: [],
-  //   contract: scrtHeadstashContractAddr,
-  //   execute_msg: {},
-  //   sender: wallet.address,
-  // }
-
-  // // account
-  // const permitParams = {
-  //   params: fillerMsg,
-  //   signature: {
-  //     pub_key: pubkey,
-  //     signature: cosmos_sig,
-  //   },
-  //   chain_id: chain_id,
-  //   memo: encoded_memo,
-  // }
+let claim = async (eth_pubkey, eth_sig) => {
 
   const createAccount = {
     claim: {

@@ -17,7 +17,6 @@ pub struct InstantiateMsg {
     pub admin: Option<Addr>,
     pub claim_msg_plaintext: String,
     pub end_date: Option<u64>,
-    pub merkle_root: Binary,
     pub snip20_1: ContractInfo,
     pub snip20_2: Option<ContractInfo>,
     pub start_date: Option<u64>,

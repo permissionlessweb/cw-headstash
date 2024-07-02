@@ -12,7 +12,7 @@ let printBatch = async (index) => {
   console.log(batch)
   
   if (batch.length === 0) {
-    throw new Error("Batch is empty");
+    return "Batch is empty";
   }
   
   const addMsg = { add: { headstash: batch } }
@@ -24,11 +24,6 @@ let printBatch = async (index) => {
   },
     {
       gasLimit: 8_000_000,
-      // explicitSignerData: {
-      //   accountNumber: 22761,
-      //   sequence: (376 + index + 1),
-      //   chainId: "pulsar-3"
-      // }
     })
   console.log(tx);
   if (index * batchSize < jsonData.length) {
