@@ -162,7 +162,7 @@ if (args.length < 1) {
     .catch((error) => { console.error("Failed:", error); });
 } else if (args[0] === '-feegrant') {
   if (args.length < 2) {
-    console.error('Usage: -feegrant address');
+    console.error('Usage: -feegrant <addr-to-feegrant>');
     process.exit(1);
   }
   const [, a,] = args;

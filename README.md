@@ -7,6 +7,9 @@ Transparency-minimized airdrop contract for cosmos bech32 addresses to claim via
 - [Airdrop](./contract/airdrop/): Main contract 
 - [Headstash Tools](./tools/headstash/README.md): `secretjs` scripts to deploy & interact with headstash instances.
 
+## Demo 
+
+## Dashboard
 
 ## Setup Instructions
 
@@ -42,7 +45,7 @@ cd tools/cupboard && yarn && node main.js -s
 ### 3. Prepare SNIP-20
 The headstash distributes SNIP20s, so we will need to create an snip20 instance that is for our IBC token to wrap into.
 
-To create our snip20, add your desired ibc token denom to the constants in `main.js`, then run:
+To create our snip20, add your desired ibc token denom to the constants in `main.js`. To review obtaining an ibc-denom, [refer here](./IBC_HOOKS.md) then run:
 ```sh
 node main.js -i-snip1
 ```
@@ -82,8 +85,12 @@ To fund the headstash contract:
 ```sh
 node main.js -fund-hs-token1 <amount>
 ```
+## 8. Provide Feegrants
+feegrants can be provided to wallet addresses via:
+```sh 
+node main.js -feegrant <addr-to-feegrant>
 
-## 8. Claim Assets
+## 9. Claim Assets
 Claiming tokens involves the generation of an eth signature, with the secret pubkey address as the msg string of the signature. This signature is passed to the contract, along with the eth pubkey that generated it. 
 
 ```sh
