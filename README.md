@@ -56,11 +56,17 @@ node main.js -i-snip1
 ```
 *This will return our contract address, be sure to add this to the constants in `main.js`*
 
+https://github.com/hard-nett/secret-airdrop/assets/123711748/8cd1b629-2f04-4ea9-9834-de274e1d6c90
+
+
 ### 4. Create Headstash Instance
 Now we can provide the total amount of tokens we expect to distribute to create our headstash contract. The snip20 weve created is set as the token the contract will distribute.
 ```sh
 node main.js -init-headstash
 ```
+
+https://github.com/hard-nett/secret-airdrop/assets/123711748/b8db775a-b712-45ec-919f-60f143fa1428
+
 
 ### 5. Deploy IBC Hooks For Auto Wrapping
 Now we can make converting the ibc token into its snip20 version and funding our airdrop contract happen in one transaction with ibc-hooks. [Refer here](./IBC_HOOKS.md) for guides to deploy ibc hooks.
@@ -82,6 +88,7 @@ To add addresses to claim their headstash:
 ```sh
 node tools/headstash/main.js -add
 ```
+https://github.com/hard-nett/secret-airdrop/assets/123711748/28f61f24-e1a3-4a03-a2b0-99ec5ece7551
 
 ## 7. Fund Headstash 
 If you decided not to use ibc hooks, or using either an existing snip or native asset, than we need need to fund the contract with the tokens to distribute.
@@ -97,6 +104,9 @@ To fund the headstash contract:
 node main.js -fund-hs-token1 <amount>
 ```
 
+
+https://github.com/hard-nett/secret-airdrop/assets/123711748/131f7631-c6e8-4eb0-9efe-2f4c5649878e
+
 ## 8. Provide Feegrants
 feegrants can be provided to wallet addresses via:
 ```sh 
@@ -109,6 +119,7 @@ Claiming tokens involves the generation of an eth signature, with the secret pub
 ```sh
 node main.js -claim
 ```
+
 
 And thats it! Weve successfully claimed our headstash privately.
 ## 10. Verify You have claimed
