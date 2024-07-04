@@ -6,8 +6,8 @@ Transparency-minimized airdrop contract for cosmos bech32 addresses to claim via
 
 - [Headstash Contract](./contract/airdrop/) - CosmWasm contract that verifies eth signatures and distirbutes snip20 tokens.
 - [Headstash Tools](./tools/headstash/README.md) - `secretjs` scripts to deploy & interact with headstash instances.
-- [Headstash & Feegrant API](./) - express.js server that provides distribution data to ui, as well as can authorize feegrants by verifying eth signatures.
-- [Headstash UI Demo ](./) - webapp for claiming a headstash. 
+- [Headstash & Feegrant API](https://github.com/hard-nett/community-dashboard/tree/no-merkle/caching-api) - express.js server that provides distribution data to ui, as well as can authorize feegrants by verifying eth signatures.
+- [Headstash UI Demo ](https://github.com/hard-nett/community-dashboard/tree/no-merkle) - webapp for claiming a headstash. 
 
 ## Demo 
 
