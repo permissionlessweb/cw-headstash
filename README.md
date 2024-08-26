@@ -7,7 +7,7 @@ Transparency-minimized airdrop contract for cosmos bech32 addresses to claim via
 - [Headstash Contract](./contract/airdrop/) - CosmWasm contract that verifies eth signatures and distirbutes snip20 tokens.
 - [Headstash Tools](./tools/headstash/README.md) - `secretjs` scripts to deploy & interact with headstash instances.
 - [Headstash & Feegrant API](https://github.com/hard-nett/community-dashboard/tree/no-merkle/caching-api) - express.js server that provides distribution data to ui, as well as can authorize feegrants by verifying eth signatures.
-- [Headstash UI Demo ](https://github.com/hard-nett/community-dashboard/tree/no-merkle) - webapp for claiming a headstash. 
+- [Headstash UI Demo](https://github.com/hard-nett/community-dashboard/tree/no-merkle) - webapp for claiming a headstash. 
 
 ## Demo 
 
@@ -134,6 +134,10 @@ node main.js -q-snip1-bal
 The cost to add 200 addresses to the contract map is  ~ 1 SCRT token @ `0.1 SCRT` for Fee Price  [example tx](https://testnet.ping.pub/secret/tx/C54BBEBE5360E98E200DDDA21E69278A05A11C342EDA8798011CA10BB8F0C320)
 
 ### Future Goals
+- On contract init, create snip25 contract for each token sent.
+- Allow cosmos or eth pubkeys to verify ownership and claim headstash.
+- Update total_amount when accepted token is sent, allow claim proportional to distribution amount after each claim
+- Add optional randomness multiplier to airdrop claim.
 - Create merkle tree implementation 
 - Define custom value for each token denomination 
 - Configure claim hooks 

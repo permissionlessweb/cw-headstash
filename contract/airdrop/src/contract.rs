@@ -1,13 +1,17 @@
+use crate::error::ContractError;
 use crate::msg::{ExecuteMsg, InstantiateMsg, QueryAnswer, QueryMsg};
 use crate::state::{
-    claim_status_r, claim_status_w, config, config_r, decay_claimed_r, decay_claimed_w, total_claimed_r, total_claimed_w, Config, Headstash, HEADSTASH_OWNERS
+    claim_status_r, claim_status_w, config, config_r, decay_claimed_r, decay_claimed_w,
+    total_claimed_r, total_claimed_w, Config, Headstash, Token, HEADSTASH_OWNERS,
 };
+use crate::SNIP25_REPLY_ID;
+use anybuf::Anybuf;
 use cosmwasm_std::{
-    entry_point, to_binary, Binary, CosmosMsg, Deps, DepsMut, Env, MessageInfo, Response, StdError,
-    StdResult, Uint128,
+    entry_point, to_binary, Binary, CosmosMsg, Deps, DepsMut, Empty, Env, MessageInfo, Reply,
+    Response, StdError, StdResult, SubMsg, Uint128,
 };
-use secret_toolkit::snip20::transfer_msg;
 
+use secret_toolkit::snip20::transfer_msg;
 #[entry_point]
 pub fn instantiate(
     deps: DepsMut,
@@ -20,8 +24,9 @@ pub fn instantiate(
         Some(date) => date,
     };
 
+    // todo: instantiate snip25 for each tokens sent in msg.
     let state = Config {
-        admin: msg.admin.unwrap_or(info.sender),
+        admin: info.sender,
         claim_msg_plaintext: msg.claim_msg_plaintext,
         end_date: msg.end_date,
         snip20_1: msg.snip20_1,
@@ -41,163 +46,207 @@ pub fn instantiate(
 #[entry_point]
 pub fn execute(deps: DepsMut, env: Env, info: MessageInfo, msg: ExecuteMsg) -> StdResult<Response> {
     match msg {
-        ExecuteMsg::Add { headstash } => try_add_headstash(deps, env, info, headstash),
+        ExecuteMsg::Add { headstash } => {
+            self::headstash::try_add_headstash(deps, env, info, headstash)
+        }
         ExecuteMsg::Claim {
             eth_pubkey,
             eth_sig,
-        } => try_claim(deps, env, info, eth_pubkey, eth_sig),
-        ExecuteMsg::Clawback {} => try_clawback(deps, env, info),
+            heady_wallet,
+        } => self::headstash::try_claim(deps, env, info, eth_pubkey, eth_sig, heady_wallet),
+        ExecuteMsg::Clawback {} => self::headstash::try_clawback(deps, env, info),
     }
 }
 
-pub fn try_clawback(deps: DepsMut, env: Env, info: MessageInfo) -> StdResult<Response> {
-    // ensure sender is admin
-    let config = config_r(deps.storage).load()?;
-    let admin = config.admin;
-    if info.sender != admin {
-        return Err(StdError::generic_err(
-            "you cannot clawback the headstash, silly!",
-        ));
+pub mod headstash {
+    use anybuf::Anybuf;
+    use secret_cosmwasm_std::Binary;
+
+    use super::*;
+
+    pub fn try_clawback(deps: DepsMut, env: Env, info: MessageInfo) -> StdResult<Response> {
+        // ensure sender is admin
+        let config = config_r(deps.storage).load()?;
+        let admin = config.admin;
+        if info.sender != admin {
+            return Err(StdError::generic_err(
+                "you cannot clawback the headstash, silly!",
+            ));
+        }
+
+        // ensure clawback can happen, update state
+        if let Some(end_date) = config.end_date {
+            if env.block.time.seconds() > end_date {
+                decay_claimed_w(deps.storage).update(|claimed| {
+                    if claimed {
+                        Err(StdError::generic_err("this jawn already was clawed-back!"))
+                    } else {
+                        Ok(true)
+                    }
+                })?;
+            }
+            let total_claimed = total_claimed_r(deps.storage).load()?;
+            let clawback_total = config.total_amount.checked_sub(total_claimed)?;
+
+            let mut msgs: Vec<CosmosMsg> = vec![];
+            let mint_msg = snip20_reference_impl::msg::ExecuteMsg::Mint {
+                recipient: admin.to_string(),
+                amount: secret_cosmwasm_std::Uint128::from(clawback_total.u128()),
+                memo: None,
+                decoys: None, // todo:: generate random decoys
+                entropy: None,
+                padding: None,
+            };
+            let binary = cosmwasm_std::to_binary(&mint_msg)?;
+            msgs.push(CosmosMsg::Stargate {
+                type_url: "/secret.compute.v1beta1.MsgExecuteContract".into(),
+                value: Anybuf::new()
+                    .append_string(1, env.contract.address.to_string()) // sender (This contract)
+                    .append_string(2, config.snip20_1.address) // SNIP25 contract addr
+                    .append_bytes(3, binary.to_vec()) // msg-bytes
+                    .append_repeated_message::<Anybuf>(5, &[]) // empty native tokens sent for now.
+                    .into_vec()
+                    .into(),
+            });
+
+            return Ok(Response::default().add_messages(msgs));
+        }
+
+        Err(StdError::generic_err(
+            "Clawback was not setup for this one, playa!",
+        ))
     }
 
-    // ensure clawback can happen, update state
-    if let Some(end_date) = config.end_date {
-        if env.block.time.seconds() > end_date {
-            decay_claimed_w(deps.storage).update(|claimed| {
-                if claimed {
-                    Err(StdError::generic_err("this jawn already was clawed-back!"))
-                } else {
-                    Ok(true)
-                }
-            })?;
+    pub fn try_add_headstash(
+        deps: DepsMut,
+        env: Env,
+        info: MessageInfo,
+        headstash: Vec<Headstash>,
+    ) -> StdResult<Response> {
+        // ensure sender is admin
+        let config = config_r(deps.storage).load()?;
+
+        if headstash.is_empty() {
+            return Err(StdError::generic_err(
+                "the msg you sent contained an empty value!",
+            ));
         }
-        let total_claimed = total_claimed_r(deps.storage).load()?;
-        let clawback_total = config.total_amount.checked_sub(total_claimed)?;
+
+        if info.sender != config.admin {
+            return Err(StdError::generic_err(
+                "you cannot add an address to the headstash, silly!",
+            ));
+        }
+        // make sure airdrop has not ended
+        available(&config, &env)?;
+
+        // ensure eth_pubkey is not already in KeyMap
+        for hs in headstash.into_iter() {
+            if HEADSTASH_OWNERS.contains(deps.storage, &hs.eth_pubkey) {
+                return Err(StdError::generic_err(
+                    "pubkey already has been added, not adding again",
+                ));
+            } else {
+                // add eth_pubkey & amount to KeyMap
+                HEADSTASH_OWNERS.insert(deps.storage, &hs.eth_pubkey, &hs.amount)?;
+            }
+        }
+        Ok(Response::default())
+    }
+
+    pub fn try_claim(
+        deps: DepsMut,
+        env: Env,
+        info: MessageInfo,
+        eth_pubkey: String,
+        eth_sig: String,
+        heady_wallet: String,
+    ) -> StdResult<Response> {
+        let config = config_r(deps.storage).load()?;
+
+        // make sure airdrop has not ended
+        available(&config, &env)?;
+
+        // validate eth_signature comes from eth pubkey.
+        // Occurs before claim check to prevent data leak of eth_pubkey claim status.
+        validation::validate_claim(
+            &deps,
+            info.clone(),
+            eth_pubkey.to_string(),
+            eth_sig.clone(),
+            config.clone(),
+        )?;
+
+        // check if address has already claimed
+        let state = claim_status_r(deps.storage).may_load(eth_pubkey.as_bytes())?;
+        if state == Some(true) {
+            return Err(StdError::generic_err(
+                "You have already claimed your headstash, homie!",
+            ));
+        }
+
+        // get headstash amount from KeyMap
+        let headstash_amount =
+            HEADSTASH_OWNERS
+                .get(deps.storage, &eth_pubkey)
+                .ok_or_else(|| {
+                    StdError::generic_err("Ethereum Pubkey not found in the contract state!")
+                })?;
 
         let mut msgs: Vec<CosmosMsg> = vec![];
-        let hs1 = transfer_msg(
-            admin.to_string(),
-            clawback_total,
-            None,
-            None,
-            0,
-            config.snip20_1.code_hash,
-            config.snip20_1.address.to_string(),
-        )?;
-        msgs.push(hs1);
 
-        return Ok(Response::default().add_messages(msgs));
+        // mint headstash amount to heady wallet.
+        let mint_msg = snip20_reference_impl::msg::ExecuteMsg::Mint {
+            recipient: deps.api.addr_validate(&heady_wallet)?.to_string(),
+            amount: secret_cosmwasm_std::Uint128::from(headstash_amount.u128()),
+            memo: None,
+            decoys: None, // todo:: generate random decoys
+            entropy: None,
+            padding: None,
+        };
+        let binary = cosmwasm_std::to_binary(&mint_msg)?;
+
+        msgs.push(CosmosMsg::Stargate {
+            type_url: "/secret.compute.v1beta1.MsgExecuteContract".into(),
+            value: Anybuf::new()
+                .append_string(1, env.contract.address.to_string()) // sender (This contract)
+                .append_string(2, config.snip20_1.address) // SNIP25 contract addr
+                .append_bytes(3, binary.to_vec()) // msg-bytes
+                .append_repeated_message::<Anybuf>(5, &[]) // empty native tokens sent for now.
+                .into_vec()
+                .into(),
+        });
+
+        if !config.snip20_2.is_none() {
+            msgs.push(CosmosMsg::Stargate {
+                type_url: "/secret.compute.v1beta1.MsgExecuteContract".into(),
+                value: Anybuf::new()
+                    .append_string(1, env.contract.address) // sender (This contract)
+                    .append_string(2, config.snip20_2.unwrap().address) // SNIP25 contract addr
+                    .append_bytes(3, binary.to_vec()) // msg-bytes
+                    .append_repeated_message::<Anybuf>(5, &[]) // empty native tokens sent for now.
+                    .into_vec()
+                    .into(),
+            });
+        };
+
+        // update address as claimed
+        claim_status_w(deps.storage).save(eth_pubkey.as_bytes(), &true)?;
+        // update total_claimed
+        total_claimed_w(deps.storage)
+            .update(|claimed| -> StdResult<Uint128> { Ok(claimed + headstash_amount) })?;
+
+        Ok(Response::default().add_messages(msgs))
     }
-
-    Err(StdError::generic_err(
-        "Clawback was not setup for this one, playa!",
-    ))
 }
 
-pub fn try_add_headstash(
-    deps: DepsMut,
-    env: Env,
-    info: MessageInfo,
-    headstash: Vec<Headstash>,
-) -> StdResult<Response> {
-    // ensure sender is admin
-    let config = config_r(deps.storage).load()?;
-
-    if headstash.is_empty() {
-        return Err(StdError::generic_err(
-            "the msg you sent contained an empty value!",
-        ));
+#[entry_point]
+pub fn query(deps: Deps, _env: Env, msg: QueryMsg) -> StdResult<Binary> {
+    match msg {
+        QueryMsg::Config {} => to_binary(&query_config(deps)?),
+        QueryMsg::Dates {} => to_binary(&query_dates(deps)?),
+        QueryMsg::Clawback {} => to_binary(&query_clawback(deps)?),
     }
-
-    if info.sender != config.admin {
-        return Err(StdError::generic_err(
-            "you cannot add an address to the headstash, silly!",
-        ));
-    }
-    // make sure airdrop has not ended
-    available(&config, &env)?;
-
-    // ensure eth_pubkey is not already in KeyMap
-    for hs in headstash.into_iter() {
-        if HEADSTASH_OWNERS.contains(deps.storage, &hs.eth_pubkey) {
-            return Err(StdError::generic_err(
-                "pubkey already has been added, not adding again",
-            ));
-        } else {
-            // add eth_pubkey & amount to KeyMap
-            HEADSTASH_OWNERS.insert(deps.storage, &hs.eth_pubkey, &hs.amount)?;
-        }
-    }
-    Ok(Response::default())
-}
-
-pub fn try_claim(
-    deps: DepsMut,
-    env: Env,
-    info: MessageInfo,
-    eth_pubkey: String,
-    eth_sig: String,
-) -> StdResult<Response> {
-    let config = config_r(deps.storage).load()?;
-
-    // make sure airdrop has not ended
-    available(&config, &env)?;
-
-    // validate eth_signature comes from eth pubkey.
-    // Occurs before claim check to prevent data leak of eth_pubkey claim status.
-    validation::validate_claim(
-        &deps,
-        info.clone(),
-        eth_pubkey.to_string(),
-        eth_sig.clone(),
-        config.clone(),
-    )?;
-
-    // check if address has already claimed
-    let state = claim_status_r(deps.storage).may_load(eth_pubkey.as_bytes())?;
-    if state == Some(true) {
-        return Err(StdError::generic_err(
-            "You have already claimed your headstash, homie!",
-        ));
-    }
-
-    // get headstash amount from KeyMap
-    let headstash_amount = HEADSTASH_OWNERS
-        .get(deps.storage, &eth_pubkey)
-        .ok_or_else(|| StdError::generic_err("Ethereum Pubkey not found in the contract state!"))?;
-
-    let mut msgs: Vec<CosmosMsg> = vec![];
-
-    msgs.push(transfer_msg(
-        info.sender.to_string(),
-        headstash_amount,
-        None,
-        None,
-        0,
-        config.snip20_1.code_hash,
-        config.snip20_1.address.to_string(),
-    )?);
-
-    if !config.snip20_2.is_none() {
-        let hs2 = transfer_msg(
-            info.sender.to_string(),
-            headstash_amount.into(),
-            None,
-            None,
-            0,
-            config.snip20_2.clone().unwrap().code_hash,
-            config.snip20_2.unwrap().address.to_string(),
-        )?;
-        msgs.push(hs2);
-    };
-
-    // update address as claimed
-    claim_status_w(deps.storage).save(eth_pubkey.as_bytes(), &true)?;
-    // update total_claimed
-    total_claimed_w(deps.storage)
-        .update(|claimed| -> StdResult<Uint128> { Ok(claimed + headstash_amount) })?;
-
-    Ok(Response::default().add_messages(msgs))
 }
 
 pub fn available(config: &Config, env: &Env) -> StdResult<()> {
@@ -214,15 +263,6 @@ pub fn available(config: &Config, env: &Env) -> StdResult<()> {
     }
 
     Ok(())
-}
-
-#[entry_point]
-pub fn query(deps: Deps, _env: Env, msg: QueryMsg) -> StdResult<Binary> {
-    match msg {
-        QueryMsg::Config {} => to_binary(&query_config(deps)?),
-        QueryMsg::Dates {} => to_binary(&query_dates(deps)?),
-        QueryMsg::Clawback {} => to_binary(&query_clawback(deps)?),
-    }
 }
 
 fn query_clawback(deps: Deps) -> StdResult<QueryAnswer> {

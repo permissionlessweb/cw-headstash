@@ -12,6 +12,12 @@ pub static DECAY_CLAIMED_KEY: &[u8] = b"dck";
 pub static HEADSTASH_OWNERS: Keymap<String, Uint128> = Keymap::new(b"ho");
 
 #[derive(Serialize, Deserialize, Clone, Debug, Eq, PartialEq, JsonSchema)]
+pub enum Token {
+    Terp,
+    Thiol,
+}
+
+#[derive(Serialize, Deserialize, Clone, Debug, Eq, PartialEq, JsonSchema)]
 pub struct Headstash {
     pub eth_pubkey: String,
     pub amount: Uint128,
