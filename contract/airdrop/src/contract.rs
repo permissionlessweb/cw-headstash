@@ -1,17 +1,13 @@
-use crate::error::ContractError;
 use crate::msg::{ExecuteMsg, InstantiateMsg, QueryAnswer, QueryMsg};
 use crate::state::{
     claim_status_r, claim_status_w, config, config_r, decay_claimed_r, decay_claimed_w,
-    total_claimed_r, total_claimed_w, Config, Headstash, Token, HEADSTASH_OWNERS,
+    total_claimed_r, total_claimed_w, Config, Headstash, HEADSTASH_OWNERS,
 };
-use crate::SNIP25_REPLY_ID;
-use anybuf::Anybuf;
 use cosmwasm_std::{
-    entry_point, to_binary, Binary, CosmosMsg, Deps, DepsMut, Empty, Env, MessageInfo, Reply,
-    Response, StdError, StdResult, SubMsg, Uint128,
+    entry_point, to_binary, Binary, CosmosMsg, Deps, DepsMut, Env, MessageInfo, Response, StdError,
+    StdResult, Uint128,
 };
 
-use secret_toolkit::snip20::transfer_msg;
 #[entry_point]
 pub fn instantiate(
     deps: DepsMut,
@@ -59,10 +55,8 @@ pub fn execute(deps: DepsMut, env: Env, info: MessageInfo, msg: ExecuteMsg) -> S
 }
 
 pub mod headstash {
-    use anybuf::Anybuf;
-    use secret_cosmwasm_std::Binary;
-
     use super::*;
+    use anybuf::Anybuf;
 
     pub fn try_clawback(deps: DepsMut, env: Env, info: MessageInfo) -> StdResult<Response> {
         // ensure sender is admin
@@ -222,7 +216,7 @@ pub mod headstash {
                 type_url: "/secret.compute.v1beta1.MsgExecuteContract".into(),
                 value: Anybuf::new()
                     .append_string(1, env.contract.address) // sender (This contract)
-                    .append_string(2, config.snip20_2.unwrap().address) // SNIP25 contract addr
+                    .append_string(2, config.snip20_2.unwrap().address) // Second SNIP25 contract addr
                     .append_bytes(3, binary.to_vec()) // msg-bytes
                     .append_repeated_message::<Anybuf>(5, &[]) // empty native tokens sent for now.
                     .into_vec()
@@ -295,20 +289,11 @@ pub mod validation {
         _info: MessageInfo,
         msg: InstantiateMsg,
     ) -> Result<(), StdError> {
-        // validate_airdrop_amount(msg.airdrop_amount)?;
         validate_plaintext_msg(msg.claim_msg_plaintext)?;
-        // validate_instantiate_funds(info)?;
         Ok(())
     }
 
-    pub fn compute_plaintext_msg(config: &Config, info: MessageInfo) -> String {
-        str::replace(
-            &config.claim_msg_plaintext,
-            "{wallet}",
-            info.sender.as_ref(),
-        )
-    }
-
+    /// Validates an ethereum signature comes from a given pubkey.
     pub fn validate_claim(
         deps: &DepsMut,
         info: MessageInfo,
@@ -316,20 +301,7 @@ pub mod validation {
         eth_sig: String,
         config: Config,
     ) -> Result<(), StdError> {
-        validate_eth_sig(deps, info, eth_pubkey.clone(), eth_sig, config)?;
-        Ok(())
-    }
-
-    fn validate_eth_sig(
-        deps: &DepsMut,
-        info: MessageInfo,
-        eth_pubkey: String,
-        eth_sig: String,
-        config: Config,
-    ) -> Result<(), StdError> {
-        let valid_eth_sig =
-            validate_ethereum_text(deps, info, &config, eth_sig, eth_pubkey.clone())?;
-        match valid_eth_sig {
+        match validate_ethereum_text(deps, info, &config, eth_sig, eth_pubkey.clone())? {
             true => Ok(()),
             false => Err(StdError::generic_err("cannot validate eth_sig")),
         }
@@ -351,6 +323,15 @@ pub mod validation {
                 msg: format!("Could not decode {eth_sig}"),
             }),
         }
+    }
+
+    /// Replaces the compute plain text with the message sender.
+    pub fn compute_plaintext_msg(config: &Config, info: MessageInfo) -> String {
+        str::replace(
+            &config.claim_msg_plaintext,
+            "{wallet}",
+            info.sender.as_ref(),
+        )
     }
 
     pub fn validate_plaintext_msg(plaintext_msg: String) -> Result<(), StdError> {
