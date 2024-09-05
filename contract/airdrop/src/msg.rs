@@ -1,19 +1,36 @@
 use cosmwasm_schema::cw_serde;
-use cosmwasm_std::{Addr, Binary, ContractInfo, Uint128};
+use cosmwasm_std::{Addr, Binary, Uint128};
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
 use crate::state::{Config, Headstash};
 
 #[derive(Serialize, Deserialize, Clone, Debug, Eq, PartialEq, JsonSchema)]
-pub struct InstantiateMsg {
-    pub admin: Addr,
-    pub claim_msg_plaintext: String,
-    pub end_date: Option<u64>,
-    pub snip20_1: ContractInfo,
-    pub snip20_2: Option<ContractInfo>,
-    pub start_date: Option<u64>,
+pub struct Snip120u {
+    pub token: String,
+    pub name: String,
+    pub addr: Option<Addr>,
     pub total_amount: Uint128,
+}
+
+#[derive(Serialize, Deserialize, Clone, Debug, Eq, PartialEq, JsonSchema)]
+pub struct InstantiateMsg {
+    /// owner of contract
+    pub owner: Addr,
+    /// {wallet}
+    pub claim_msg_plaintext: String,
+    /// optional date that once reached, will start headstash distribution event.
+    pub start_date: Option<u64>,
+    /// optional date that once reached, will end headstash distribution event.
+    pub end_date: Option<u64>,
+    /// code-id of custom snip20 contract for headstashes
+    pub snip120u_code_id: u64,
+    /// code hash of custom snip20 contract for headstashes
+    pub snip120u_code_hash: String,
+    /// A list of custom snip20-headstash contracts.
+    /// This contract must be set as an authorized minter for each, or else this contract will not work.
+    pub snips: Vec<Snip120u>,
+    /// viewing key permit.
     pub viewing_key: String,
 }
 
@@ -55,7 +72,7 @@ pub enum QueryAnswer {
     },
 }
 
-mod snip {
+pub mod snip {
     use super::*;
 
     #[derive(Serialize, Deserialize, Clone, Debug, Eq, PartialEq, JsonSchema)]
