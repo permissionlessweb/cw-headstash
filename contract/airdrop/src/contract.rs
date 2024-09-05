@@ -1,4 +1,4 @@
-use crate::msg::{ExecuteMsg, InstantiateMsg, QueryAnswer, QueryMsg};
+use crate::msg::{ExecuteMsg, InstantiateMsg, MigrateMsg, QueryAnswer, QueryMsg};
 use crate::state::{
     claim_status_r, config, config_r, decay_claimed_r, decay_claimed_w, Config, Headstash,
     HEADSTASH_OWNERS, SNIP120U_REPLY, TOTAL_CLAIMED,
@@ -89,9 +89,9 @@ pub fn execute(deps: DepsMut, env: Env, info: MessageInfo, msg: ExecuteMsg) -> S
 #[entry_point]
 pub fn query(deps: Deps, _env: Env, msg: QueryMsg) -> StdResult<Binary> {
     match msg {
-        QueryMsg::Config {} => to_binary(&query_config(deps)?),
-        QueryMsg::Dates {} => to_binary(&dates(deps)?),
-        QueryMsg::Clawback {} => to_binary(&clawback(deps)?),
+        QueryMsg::Config {} => to_binary(&queries::query_config(deps)?),
+        QueryMsg::Dates {} => to_binary(&queries::dates(deps)?),
+        QueryMsg::Clawback {} => to_binary(&queries::clawback(deps)?),
     }
 }
 
@@ -145,6 +145,13 @@ pub fn reply(deps: DepsMut, _env: Env, reply: Reply) -> StdResult<Response> {
                 msg: "bad reply".into(),
             })
         }
+    }
+}
+
+#[entry_point]
+pub fn migrate(_deps: DepsMut, _env: Env, msg: MigrateMsg) -> StdResult<Response> {
+    match msg {
+        _ => Err(StdError::generic_err("unimplemented")),
     }
 }
 
@@ -243,7 +250,7 @@ pub mod headstash {
             ));
         }
         // make sure airdrop has not ended
-        available(&config, &env)?;
+        queries::available(&config, &env)?;
 
         // ensure eth_pubkey is not already in KeyMap
         for hs in headstash.into_iter() {
@@ -271,7 +278,7 @@ pub mod headstash {
         let config = config_r(deps.storage).load()?;
 
         // make sure airdrop has not ended
-        available(&config, &env)?;
+        queries::available(&config, &env)?;
 
         // validate eth_signature comes from eth pubkey.
         // Occurs before claim check to prevent data leak of eth_pubkey claim status.
@@ -339,43 +346,46 @@ pub mod headstash {
     }
 }
 
-pub fn available(config: &Config, env: &Env) -> StdResult<()> {
-    let current_time = env.block.time.seconds();
+pub mod queries {
+    use super::*;
 
-    // Check if airdrop started
-    if current_time < config.start_date {
-        return Err(StdError::generic_err("This airdrop has not started yet!"));
-    }
-    if let Some(end_date) = config.end_date {
-        if current_time > end_date {
-            return Err(StdError::generic_err("This airdrop has ended!"));
+    pub fn available(config: &Config, env: &Env) -> StdResult<()> {
+        let current_time = env.block.time.seconds();
+
+        // Check if airdrop started
+        if current_time < config.start_date {
+            return Err(StdError::generic_err("This airdrop has not started yet!"));
         }
+        if let Some(end_date) = config.end_date {
+            if current_time > end_date {
+                return Err(StdError::generic_err("This airdrop has ended!"));
+            }
+        }
+
+        Ok(())
     }
 
-    Ok(())
-}
+    pub fn clawback(deps: Deps) -> StdResult<QueryAnswer> {
+        Ok(QueryAnswer::ClawbackResponse {
+            bool: decay_claimed_r(deps.storage).load()?,
+        })
+    }
 
-pub fn clawback(deps: Deps) -> StdResult<QueryAnswer> {
-    Ok(QueryAnswer::ClawbackResponse {
-        bool: decay_claimed_r(deps.storage).load()?,
-    })
-}
+    pub fn query_config(deps: Deps) -> StdResult<QueryAnswer> {
+        Ok(QueryAnswer::ConfigResponse {
+            config: config_r(deps.storage).load()?,
+        })
+    }
 
-pub fn query_config(deps: Deps) -> StdResult<QueryAnswer> {
-    Ok(QueryAnswer::ConfigResponse {
-        config: config_r(deps.storage).load()?,
-    })
+    pub fn dates(deps: Deps) -> StdResult<QueryAnswer> {
+        let config = config_r(deps.storage).load()?;
+        Ok(QueryAnswer::DatesResponse {
+            start: config.start_date,
+            end: config.end_date,
+            // decay_start: config.decay_start,
+        })
+    }
 }
-
-pub fn dates(deps: Deps) -> StdResult<QueryAnswer> {
-    let config = config_r(deps.storage).load()?;
-    Ok(QueryAnswer::DatesResponse {
-        start: config.start_date,
-        end: config.end_date,
-        // decay_start: config.decay_start,
-    })
-}
-
 // src: https://github.com/public-awesome/launchpad/blob/main/contracts/sg-eth-airdrop/src/claim_airdrop.rs#L85
 pub mod validation {
     use super::*;
