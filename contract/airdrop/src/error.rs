@@ -6,6 +6,8 @@ pub enum ContractError {
     #[error("{0}")]
     Std(#[from] StdError),
 
+    #[error("This headstash contract has not been set as an eligible minter yet.")]
+    HeadstashNotSnip120uMinter {},
     #[error("unauthorized")]
     Unauthorized {},
     

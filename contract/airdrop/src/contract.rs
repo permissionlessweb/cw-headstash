@@ -1,9 +1,10 @@
 use crate::msg::{ExecuteMsg, InstantiateMsg, MigrateMsg, QueryAnswer, QueryMsg};
 use crate::state::{
     claim_status_r, config, config_r, decay_claimed_r, decay_claimed_w, Config, Headstash,
-    HEADSTASH_OWNERS, SNIP120U_REPLY, TOTAL_CLAIMED,
+    HEADSTASH_OWNERS, TOTAL_CLAIMED,
 };
-use crate::SNIP25_REPLY_ID;
+use crate::SNIP120U_REPLY;
+
 use cosmwasm_std::{
     entry_point, to_binary, Addr, Binary, CosmosMsg, Deps, DepsMut, Env, Event, MessageInfo, Reply,
     Response, StdError, StdResult, SubMsg, SubMsgResult, Uint128, WasmMsg,
@@ -64,6 +65,8 @@ pub fn instantiate(
         snip120us: msg.snips,
         start_date: start_date,
         viewing_key: msg.viewing_key,
+        snip_hash: msg.snip120u_code_hash,
+        circuitboard: msg.circuitboard,
     };
 
     config(deps.storage).save(&state)?;
@@ -98,7 +101,7 @@ pub fn query(deps: Deps, _env: Env, msg: QueryMsg) -> StdResult<Binary> {
 #[entry_point]
 pub fn reply(deps: DepsMut, _env: Env, reply: Reply) -> StdResult<Response> {
     match reply.id {
-        SNIP25_REPLY_ID => {
+        SNIP120U_REPLY => {
             match reply.result {
                 SubMsgResult::Ok(c) => {
                     let mut origin_key = None;
@@ -158,10 +161,12 @@ pub fn migrate(_deps: DepsMut, _env: Env, msg: MigrateMsg) -> StdResult<Response
 pub mod headstash {
     // use crate::state::AllowanceAction;
 
-    use crate::state::TOTAL_CLAIMED;
+    use crate::{error::ContractError, state::TOTAL_CLAIMED};
 
     use super::*;
     use anybuf::Anybuf;
+    use cosmwasm_std::from_binary;
+    use secret_toolkit::snip20::MintersResponse;
 
     pub fn try_clawback(deps: DepsMut, env: Env, info: MessageInfo) -> StdResult<Response> {
         let mut msgs: Vec<CosmosMsg> = vec![];
@@ -254,13 +259,20 @@ pub mod headstash {
 
         // ensure eth_pubkey is not already in KeyMap
         for hs in headstash.into_iter() {
-            if HEADSTASH_OWNERS.contains(deps.storage, &(hs.pubkey.clone(), hs.snip.clone())) {
-                return Err(StdError::generic_err(
-                    "pubkey already has been added, not adding again",
-                ));
-            } else {
-                // add eth_pubkey & amount to KeyMap
-                HEADSTASH_OWNERS.insert(deps.storage, &(hs.pubkey, hs.snip), &hs.amount)?;
+            let key = hs.pubkey;
+            for snip in hs.snip.into_iter() {
+                if HEADSTASH_OWNERS.contains(deps.storage, &(key.clone(), snip.addr.clone())) {
+                    return Err(StdError::generic_err(
+                        "pubkey already has been added, not adding again",
+                    ));
+                } else {
+                    // add eth_pubkey & amount to KeyMap
+                    HEADSTASH_OWNERS.insert(
+                        deps.storage,
+                        &(key.clone(), snip.addr),
+                        &snip.amount,
+                    )?;
+                }
             }
         }
         Ok(Response::default())
@@ -300,6 +312,25 @@ pub mod headstash {
 
         for snip in config.snip120us {
             if let Some(addr) = snip.addr {
+                // ensure each snip configured has this contract set as minter.
+                let res: Binary = deps.querier.query_wasm_smart(
+                    config.snip_hash.clone(),
+                    addr.clone(),
+                    &snip20_reference_impl::msg::QueryMsg::Minters {},
+                )?;
+                let all: MintersResponse = from_binary(&res)?;
+                if all
+                    .minters
+                    .minters
+                    .into_iter()
+                    .find(|m| m == &env.contract.address.to_string())
+                    .is_none()
+                {
+                    return Err(StdError::generic_err(
+                        ContractError::HeadstashNotSnip120uMinter {}.to_string(),
+                    ));
+                };
+
                 // get headstash amount from KeyMap
                 let headstash_amount = HEADSTASH_OWNERS
                     .get(deps.storage, &(eth_pubkey.clone(), addr.to_string()))
@@ -308,6 +339,7 @@ pub mod headstash {
                     })?;
 
                 // mint headstash amount to heady wallet.
+                // todo: import custom snip120u crate and set alloance on mint
                 let mint_msg = snip20_reference_impl::msg::ExecuteMsg::Mint {
                     recipient: deps.api.addr_validate(&heady_wallet)?.to_string(),
                     amount: secret_cosmwasm_std::Uint128::from(headstash_amount.u128()),
@@ -316,24 +348,23 @@ pub mod headstash {
                     // allowances: Some(
                     //     vec[
                     //      AllowanceAction {
-                    //         spender: todo!(),
-                    //         amount: todo!(),
-                    //         expiration: todo!(),
-                    //         memo: todo!(), // ibc-hook msg for secret-cw-ica-controller
+                    //         spender: config.circuitboard,
+                    //         amount: headstash_amount.clone(),
+                    //         expiration: None,
+                    //         memo: None,
                     //         decoys: todo!(),
                     //     }],
                     // ),
                     entropy: None,
                     padding: None,
                 };
-                let binary = cosmwasm_std::to_binary(&mint_msg)?;
 
                 msgs.push(CosmosMsg::Stargate {
                     type_url: "/secret.compute.v1beta1.MsgExecuteContract".into(),
                     value: Anybuf::new()
                         .append_string(1, env.contract.address.to_string()) // sender (This contract)
                         .append_string(2, addr.clone()) // SNIP25 contract addr
-                        .append_bytes(3, binary.to_vec()) // msg-bytes
+                        .append_bytes(3, cosmwasm_std::to_binary(&mint_msg)?.to_vec()) // msg-bytes
                         .append_repeated_message::<Anybuf>(5, &[]) // empty native tokens sent for now.
                         .into_vec()
                         .into(),

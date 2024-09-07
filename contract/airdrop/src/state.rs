@@ -8,7 +8,6 @@ use secret_toolkit::storage::Keymap;
 use serde::{Deserialize, Serialize};
 
 use crate::msg::Snip120u;
-pub const SNIP120U_REPLY: u64 = 120;
 
 pub static CONFIG_KEY: &[u8] = b"ck";
 pub static ETH_PUBKEY_CLAIMED_KEY: &[u8] = b"epck";
@@ -21,10 +20,14 @@ pub static SNIP120US: Keymap<String, Uint128> = Keymap::new(b"snip");
 pub static TOTAL_CLAIMED: Keymap<String, Uint128> = Keymap::new(b"tc");
 
 #[derive(Serialize, Deserialize, Clone, Debug, Eq, PartialEq, JsonSchema)]
+pub struct Snip {
+    pub addr: String,
+    pub amount: Uint128,
+}
+#[derive(Serialize, Deserialize, Clone, Debug, Eq, PartialEq, JsonSchema)]
 pub struct Headstash {
     pub pubkey: String,
-    pub snip: String,
-    pub amount: Uint128,
+    pub snip: Vec<Snip>,
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug, Eq, PartialEq, JsonSchema)]
@@ -34,6 +37,8 @@ pub struct Config {
     pub start_date: u64,
     pub end_date: Option<u64>,
     pub snip120us: Vec<Snip120u>,
+    pub snip_hash: String,
+    pub circuitboard: String,
     pub viewing_key: String,
 }
 

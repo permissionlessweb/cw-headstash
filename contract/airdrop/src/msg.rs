@@ -30,6 +30,8 @@ pub struct InstantiateMsg {
     /// A list of custom snip20-headstash contracts.
     /// This contract must be set as an authorized minter for each, or else this contract will not work.
     pub snips: Vec<Snip120u>,
+    /// Contract addr of headstash circuitboard.
+    pub circuitboard: String,
     /// viewing key permit.
     pub viewing_key: String,
 }
