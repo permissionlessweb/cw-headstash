@@ -16,15 +16,14 @@ backtraces = ["cosmwasm-std/backtraces"]
 
 [dependencies]
 anybuf = { version = "0.5.0" }
-snip20-reference-impl = { git = "https://github.com/scrtlabs/snip20-reference-impl", rev = "6bd9ed593ccace18125bd1b84d093dfdc4599cc1" }
-secret-cosmwasm-std = { package = "cosmwasm-std", git = "https://github.com/scrtlabs/cosmwasm/", default-features = false, tag = "v1.1.9-secret" }
-cosmwasm-std = { package = "secret-cosmwasm-std", version = "1.1.11", features = [
+# snip20-reference-impl = { git = "https://github.com/scrtlabs/snip20-reference-impl", rev = "6bd9ed593ccace18125bd1b84d093dfdc4599cc1" }
+cosmwasm-std = { package = "secret-cosmwasm-std", version = "1.1.11", default-features = false,features = [
   "stargate",
   "staking",
   "ibc3",
   "random",
 ] }
-cosmwasm-storage = { package = "secret-cosmwasm-storage", version = "1.0.0" }
+cosmwasm-storage = { package = "secret-cosmwasm-storage", version = "1.1.11" }
 schemars = { version = "0.8.11" }
 serde = { version = "1.0" }
 thiserror = { version = "1.0" }
