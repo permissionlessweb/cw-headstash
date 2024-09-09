@@ -26,7 +26,7 @@ pub struct Snip {
 }
 #[derive(Serialize, Deserialize, Clone, Debug, Eq, PartialEq, JsonSchema)]
 pub struct Headstash {
-    pub pubkey: String,
+    pub eth_addr: String,
     pub snip: Vec<Snip>,
 }
 

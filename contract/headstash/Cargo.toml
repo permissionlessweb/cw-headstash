@@ -1,5 +1,5 @@
 [package]
-name = "secret_headstash"
+name = "cw-headstash"
 version = "0.1.0"
 authors = ["TerpNETFoundation"]
 edition = "2021"
@@ -17,8 +17,7 @@ backtraces = ["cosmwasm-std/backtraces"]
 library = []
 
 [dependencies]
-anybuf = { version = "0.5.0" }
-# snip20-reference-impl = { git = "https://github.com/scrtlabs/snip20-reference-impl", rev = "6bd9ed593ccace18125bd1b84d093dfdc4599cc1" }
+cw-orch = "0.25.0"
 cosmwasm-std = { package = "secret-cosmwasm-std", version = "1.1.11", default-features = false,features = [
   "stargate",
   "staking",
@@ -29,7 +28,7 @@ cosmwasm-storage = { package = "secret-cosmwasm-storage", version = "1.1.11" }
 schemars = { version = "0.8.11" }
 serde = { version = "1.0" }
 thiserror = { version = "1.0" }
-cosmwasm-schema = "1.0.0"
+cosmwasm-schema = "1.1.8"
 sha2            = { version = "0.10.2", default-features = false }
 sha3 = "0.10"
 hex = "0.4"

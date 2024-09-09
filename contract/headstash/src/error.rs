@@ -8,9 +8,13 @@ pub enum ContractError {
 
     #[error("This headstash contract has not been set as an eligible minter yet.")]
     HeadstashNotSnip120uMinter {},
+
     #[error("unauthorized")]
     Unauthorized {},
     
     #[error("Contract got an unexpected Reply")]
     UnexpectedReply(),
+
+    #[error("Duplicate snip120u were provided")]
+    DuplicateSnip120u(),
 }

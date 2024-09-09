@@ -1,3 +1,4 @@
+use crate::error::ContractError;
 use crate::msg::{ExecuteMsg, InstantiateMsg, MigrateMsg, QueryAnswer, QueryMsg};
 use crate::state::{
     claim_status_r, config, config_r, decay_claimed_r, decay_claimed_w, Config, Headstash,
@@ -12,8 +13,6 @@ use cosmwasm_std::{
     to_binary, Addr, Binary, CosmosMsg, Deps, DepsMut, Env, MessageInfo, Reply, Response, StdError,
     StdResult, SubMsgResult, Uint128,
 };
-// use snip20_reference_impl::msg::InitConfig;
-// use snip20_reference_impl::msg::InstantiateMsg as Snip120uInitMsg;
 
 #[cfg_attr(not(feature = "library"), entry_point)]
 pub fn instantiate(
@@ -29,6 +28,32 @@ pub fn instantiate(
         Some(date) => date,
     };
 
+    for snip in msg.snips.clone() {
+        let snips = msg.snips.iter();
+        if snips.clone().any(|a| a.addr == snip.addr) {
+            return Err(StdError::generic_err(
+                ContractError::DuplicateSnip120u {}.to_string(),
+            ));
+        }
+        if snips.clone().any(|a| a.native_token == snip.native_token) {
+            return Err(StdError::generic_err(
+                ContractError::DuplicateSnip120u {}.to_string(),
+            ));
+        }
+    }
+    let state = Config {
+        admin: info.sender,
+        claim_msg_plaintext: msg.claim_msg_plaintext,
+        end_date: msg.end_date,
+        snip120us: msg.snips,
+        start_date: start_date,
+        viewing_key: msg.viewing_key,
+        snip_hash: msg.snip120u_code_hash,
+        circuitboard: msg.circuitboard,
+    };
+
+    config(deps.storage).save(&state)?;
+    Ok(Response::default())
     // for each coin sent, we instantiate a custom snip120u contract.
     // sent as submsg to handle reply and save contract addr to state.
     // for coin in info.funds {
@@ -60,23 +85,7 @@ pub fn instantiate(
     //         }
     //     }
     // }
-
-    let state = Config {
-        admin: info.sender,
-        claim_msg_plaintext: msg.claim_msg_plaintext,
-        end_date: msg.end_date,
-        snip120us: msg.snips,
-        start_date: start_date,
-        viewing_key: msg.viewing_key,
-        snip_hash: msg.snip120u_code_hash,
-        circuitboard: msg.circuitboard,
-    };
-
-    config(deps.storage).save(&state)?;
-
-    Ok(
-        Response::default(), // .add_submessages(submsg).add_events(attr)
-    )
+    // .add_submessages(submsg).add_events(attr)
 }
 
 #[cfg_attr(not(feature = "library"), entry_point)]
@@ -104,55 +113,54 @@ pub fn query(deps: Deps, _env: Env, msg: QueryMsg) -> StdResult<Binary> {
 }
 
 #[cfg_attr(not(feature = "library"), entry_point)]
-pub fn reply(deps: DepsMut, _env: Env, reply: Reply) -> StdResult<Response> {
+pub fn reply(_deps: DepsMut, _env: Env, reply: Reply) -> StdResult<Response> {
     match reply.id {
-        SNIP120U_REPLY => {
-            match reply.result {
-                SubMsgResult::Ok(c) => {
-                    let mut origin_key = None;
-                    let mut init_addr = None;
-
-                    let mut config = config_r(deps.storage).load()?;
-
-                    for event in c.events {
-                        if event.ty == "instantiate" {
-                            for attr in &event.attributes {
-                                if attr.key == "contract_address" {
-                                    init_addr = Some(attr.value.clone());
-                                }
-                            }
-                        }
-                        if event.ty == "snip120u" {
-                            for attr in &event.attributes {
-                                if attr.key == "origin" {
-                                    origin_key = Some(attr.value.clone());
-                                }
-                            }
-
-                            if let Some(coin) = origin_key.clone() {
-                                if let Some(addr) = init_addr.clone() {
-                                    if let Some(matching_snip120) = config
-                                        .snip120us
-                                        .iter_mut()
-                                        .find(|snip120| snip120.token == coin)
-                                    {
-                                        matching_snip120.addr = Some(Addr::unchecked(addr.clone()));
-                                    }
-                                    TOTAL_CLAIMED.insert(deps.storage, &addr, &Uint128::zero())?;
-                                }
-                            }
-                        }
-                    }
-                }
-                SubMsgResult::Err(_) => todo!(),
-            }
-            Ok(Response::new())
-        }
         _ => {
             return Err(StdError::GenericErr {
                 msg: "bad reply".into(),
             })
-        }
+        } // SNIP120U_REPLY => {
+          //     match reply.result {
+          //         SubMsgResult::Ok(c) => {
+          //             let mut origin_key = None;
+          //             let mut init_addr = None;
+
+          //             let mut config = config_r(deps.storage).load()?;
+
+          //             for event in c.events {
+          //                 if event.ty == "instantiate" {
+          //                     for attr in &event.attributes {
+          //                         if attr.key == "contract_address" {
+          //                             init_addr = Some(attr.value.clone());
+          //                         }
+          //                     }
+          //                 }
+          //                 if event.ty == "snip120u" {
+          //                     for attr in &event.attributes {
+          //                         if attr.key == "origin" {
+          //                             origin_key = Some(attr.value.clone());
+          //                         }
+          //                     }
+
+          //                     if let Some(coin) = origin_key.clone() {
+          //                         if let Some(addr) = init_addr.clone() {
+          //                             if let Some(matching_snip120) = config
+          //                                 .snip120us
+          //                                 .iter_mut()
+          //                                 .find(|snip120| snip120.token == coin)
+          //                             {
+          //                                 matching_snip120.addr = Some(Addr::unchecked(addr.clone()));
+          //                             }
+          //                             TOTAL_CLAIMED.insert(deps.storage, &addr, &Uint128::zero())?;
+          //                         }
+          //                     }
+          //                 }
+          //             }
+          //         }
+          //         SubMsgResult::Err(_) => todo!(),
+          //     }
+          //     Ok(Response::new())
+          // }
     }
 }
 
@@ -167,10 +175,9 @@ pub mod headstash {
     // use crate::state::AllowanceAction;
     // use secret_toolkit::snip20::MintersResponse;
 
-    use crate::state::TOTAL_CLAIMED;
+    use crate::state::{AllowanceAction, TOTAL_CLAIMED};
 
     use super::*;
-    use anybuf::Anybuf;
 
     pub fn try_clawback(deps: DepsMut, env: Env, info: MessageInfo) -> StdResult<Response> {
         let mut msgs: Vec<CosmosMsg> = vec![];
@@ -196,47 +203,34 @@ pub mod headstash {
             }
 
             for snip in config.snip120us {
-                if let Some(addr) = snip.addr {
-                    // get headstash amount from KeyMap
-                    let total_claimed = TOTAL_CLAIMED
-                        .get(deps.storage, &addr.to_string())
-                        .ok_or_else(|| StdError::generic_err("weird bug!"))?;
+                // get headstash amount from KeyMap
+                let total_claimed = TOTAL_CLAIMED
+                    .get(deps.storage, &snip.addr.to_string())
+                    .ok_or_else(|| StdError::generic_err("weird bug!"))?;
 
-                    let clawback_total = snip.total_amount.checked_sub(total_claimed)?;
+                let clawback_total = snip.total_amount.checked_sub(total_claimed)?;
 
-                    let mint_msg = secret_toolkit::snip20::mint_msg(
-                        admin.to_string(),
-                        clawback_total,
-                        None,
-                        None,
-                        1usize,
-                        "".into(),
-                        addr.to_string(),
-                    )?;
-                    let binary = cosmwasm_std::to_binary(&mint_msg)?;
+                let mint_msg = secret_toolkit::snip20::mint_msg(
+                    admin.to_string(),
+                    clawback_total,
+                    None,
+                    None,
+                    1usize,
+                    "".into(),
+                    snip.addr.to_string(),
+                )?;
 
-                    msgs.push(CosmosMsg::Stargate {
-                        type_url: "/secret.compute.v1beta1.MsgExecuteContract".into(),
-                        value: Anybuf::new()
-                            .append_string(1, env.contract.address.to_string()) // sender (This contract)
-                            .append_string(2, addr.clone()) // SNIP25 contract addr
-                            .append_bytes(3, binary.to_vec()) // msg-bytes
-                            .append_repeated_message::<Anybuf>(5, &[]) // empty native tokens sent for now.
-                            .into_vec()
-                            .into(),
-                    });
-                    // Update total claimed
-                    TOTAL_CLAIMED.insert(deps.storage, &addr.to_string(), &clawback_total)?;
-                } else {
-                }
+                msgs.push(mint_msg);
+                // Update total claimed
+                TOTAL_CLAIMED.insert(deps.storage, &snip.addr.to_string(), &clawback_total)?;
             }
-
-            return Ok(Response::default().add_messages(msgs));
+        } else {
+            return Err(StdError::generic_err(
+                "Clawback was not setup for this one, playa!",
+            ));
         }
 
-        Err(StdError::generic_err(
-            "Clawback was not setup for this one, playa!",
-        ))
+        return Ok(Response::default().add_messages(msgs));
     }
 
     pub fn try_add_headstash(
@@ -264,7 +258,7 @@ pub mod headstash {
 
         // ensure eth_pubkey is not already in KeyMap
         for hs in headstash.into_iter() {
-            let key = hs.pubkey;
+            let key = hs.eth_addr;
             for snip in hs.snip.into_iter() {
                 if HEADSTASH_OWNERS.contains(deps.storage, &(key.clone(), snip.addr.clone())) {
                     return Err(StdError::generic_err(
@@ -316,77 +310,55 @@ pub mod headstash {
         }
 
         for snip in config.snip120us {
-            if let Some(addr) = snip.addr {
-                // // ensure each snip configured has this contract set as minter.
-                // let res: Binary = deps.querier.query_wasm_smart(
-                //     config.snip_hash.clone(),
-                //     addr.clone(),
-                //     &snip20_reference_impl::msg::QueryMsg::Minters {},
-                // )?;
-                // let all: MintersResponse = from_binary(&res)?;
-                // if all
-                //     .minters
-                //     .minters
-                //     .into_iter()
-                //     .find(|m| m == &env.contract.address.to_string())
-                //     .is_none()
-                // {
-                //     return Err(StdError::generic_err(
-                //         ContractError::HeadstashNotSnip120uMinter {}.to_string(),
-                //     ));
-                // };
+            // // ensure each snip configured has this contract set as minter.
+            // let res: Binary = deps.querier.query_wasm_smart(
+            //     config.snip_hash.clone(),
+            //     addr.clone(),
+            //     &snip20_reference_impl::msg::QueryMsg::Minters {},
+            // )?;
+            // let all: MintersResponse = from_binary(&res)?;
+            // if all
+            //     .minters
+            //     .minters
+            //     .into_iter()
+            //     .find(|m| m == &env.contract.address.to_string())
+            //     .is_none()
+            // {
+            //     return Err(StdError::generic_err(
+            //         ContractError::HeadstashNotSnip120uMinter {}.to_string(),
+            //     ));
+            // };
 
-                // get headstash amount from KeyMap
-                let headstash_amount = HEADSTASH_OWNERS
-                    .get(deps.storage, &(eth_pubkey.clone(), addr.to_string()))
-                    .ok_or_else(|| {
-                        StdError::generic_err("Ethereum Pubkey not found in the contract state!")
-                    })?;
+            // get headstash amount from KeyMap
+            let headstash_amount = HEADSTASH_OWNERS
+                .get(deps.storage, &(eth_pubkey.clone(), snip.addr.to_string()))
+                .ok_or_else(|| {
+                    StdError::generic_err("Ethereum Pubkey not found in the contract state!")
+                })?;
 
-                // mint headstash amount to heady wallet.
-                // todo: import custom snip120u crate and set alloance on mint
-                let mint_msg = secret_toolkit::snip20::mint_msg(
-                    deps.api.addr_validate(&heady_wallet)?.to_string(),
-                    headstash_amount,
-                    None,
-                    None,
-                    1usize,
-                    "".into(),
-                    addr.to_string(),
-                )?;
-                // let mint_msg = snip20_reference_impl::msg::ExecuteMsg::Mint {
-                //     recipient: ,
-                //     amount: secret_cosmwasm_std::Uint128::from()),
-                //     memo: None,
-                //     decoys: None, // todo:: generate random decoys
-                //     // allowances: Some(
-                //     //     vec[
-                //     //      AllowanceAction {
-                //     //         spender: config.circuitboard,
-                //     //         amount: headstash_amount.clone(),
-                //     //         expiration: None,
-                //     //         memo: None,
-                //     //         decoys: todo!(),
-                //     //     }],
-                //     // ),
-                //     entropy: None,
-                //     padding: None,
-                // };
+            // mint headstash amount to heady wallet. set allowance for circuitboard
+            let mint_msg = crate::msg::snip::mint_msg(
+                deps.api.addr_validate(&heady_wallet)?.to_string(),
+                headstash_amount,
+                vec![AllowanceAction {
+                    spender: config.circuitboard.clone(),
+                    amount: headstash_amount.clone(),
+                    expiration: None,
+                    memo: None,
+                    decoys: None,
+                }],
+                None,
+                None,
+                1usize,
+                config.snip_hash.clone(),
+                snip.addr.to_string(),
+            )?;
 
-                msgs.push(CosmosMsg::Stargate {
-                    type_url: "/secret.compute.v1beta1.MsgExecuteContract".into(),
-                    value: Anybuf::new()
-                        .append_string(1, env.contract.address.to_string()) // sender (This contract)
-                        .append_string(2, addr.clone()) // SNIP25 contract addr
-                        .append_bytes(3, to_binary(&mint_msg)?.to_vec()) // msg-bytes
-                        .append_repeated_message::<Anybuf>(5, &[]) // empty native tokens sent for now.
-                        .into_vec()
-                        .into(),
-                });
-                // Update total claimed for specific snip20
-                TOTAL_CLAIMED.insert(deps.storage, &addr.to_string(), &headstash_amount)?;
-            }
+            msgs.push(mint_msg);
+            // Update total claimed for specific snip20
+            TOTAL_CLAIMED.insert(deps.storage, &snip.addr.to_string(), &headstash_amount)?;
         }
+
         Ok(Response::default().add_messages(msgs))
     }
 }

@@ -7,9 +7,10 @@ use crate::state::{Config, Headstash};
 
 #[derive(Serialize, Deserialize, Clone, Debug, Eq, PartialEq, JsonSchema)]
 pub struct Snip120u {
-    pub token: String,
-    pub name: String,
-    pub addr: Option<Addr>,
+    // native x/bank token for this snip120u
+    pub native_token: String,
+    // pub name: String,
+    pub addr: Addr,
     pub total_amount: Uint128,
 }
 
@@ -82,8 +83,20 @@ pub enum MigrateMsg {
 }
 
 pub mod snip {
+    use cosmwasm_std::{to_binary, Coin, CosmosMsg, StdResult, WasmMsg};
+
+    use crate::{contract::utils::space_pad, state::AllowanceAction};
+
     use super::*;
 
+    #[derive(Serialize, Deserialize, Clone, Debug, Eq, PartialEq, JsonSchema)]
+    pub struct MintMsg {
+        pub recipient: String,
+        pub amount: Uint128,
+        pub allowance: Option<Vec<AllowanceAction>>,
+        pub memo: Option<String>,
+        pub padding: Option<String>,
+    }
     #[derive(Serialize, Deserialize, Clone, Debug, Eq, PartialEq, JsonSchema)]
     pub struct Snip25InitMsg {
         pub name: String,
@@ -116,5 +129,59 @@ pub mod snip {
         /// Indicated whether an admin can modify supported denoms
         /// default: False
         can_modify_denoms: Option<bool>,
+    }
+
+    pub fn mint_msg(
+        recipient: String,
+        amount: Uint128,
+        allowance: Vec<AllowanceAction>,
+        memo: Option<String>,
+        padding: Option<String>,
+        block_size: usize,
+        callback_code_hash: String,
+        contract_addr: String,
+    ) -> StdResult<CosmosMsg> {
+        to_cosmos_msg(
+            MintMsg {
+                recipient,
+                amount,
+                allowance: Some(allowance),
+                memo,
+                padding,
+            },
+            block_size,
+            callback_code_hash,
+            contract_addr,
+            None,
+        )
+    }
+
+    pub fn to_cosmos_msg(
+        msg: MintMsg,
+        mut block_size: usize,
+        code_hash: String,
+        contract_addr: String,
+        send_amount: Option<Uint128>,
+    ) -> StdResult<CosmosMsg> {
+        // can not have block size of 0
+        if block_size == 0 {
+            block_size = 1;
+        }
+        let mut msg = to_binary(&msg)?;
+        space_pad(block_size, &mut msg.0);
+        let mut funds = Vec::new();
+        if let Some(amount) = send_amount {
+            funds.push(Coin {
+                amount,
+                denom: String::from("uscrt"),
+            });
+        }
+        let execute = WasmMsg::Execute {
+            contract_addr,
+            code_hash,
+            msg,
+            funds,
+        };
+        Ok(execute.into())
     }
 }

@@ -1,12 +1,10 @@
 [workspace]
 resolver = "2"
 members = [
-  # Packages
-  # "packages/headstash_library",
-  # "packages/contract_derive",
 
   # Secret Headstash Contract
-  "contract/airdrop",
+  "contract/headstash",
+  # "scripts"
 ]
 
 [profile.release]

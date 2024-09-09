@@ -2,7 +2,51 @@
 
 Transparency-minimized airdrop contract for cosmos bech32 addresses to claim via ownership verification of an ethereum account.
 
-## Content
+
+## Creating a Headstash 
+To create a headstash contract instance, you will need to have ready the following:
+| value | description| 
+|-|-|
+| `owner` | owner of the headstash instance |
+| `claim_msg_plaintext` | plaintext message used in eth signature
+| `start_date` | optional, start date where headstash claims can begin
+| `end_date` | option, end date where headstash claims are available
+| `snip120u_code_id` | code-id of the custom snip20 contract
+| `snip120u_code_hash` | code-hash of the custom snip20 contract
+| `snips` | define each  `Snip120u` token included in a headstash instance
+| `circuitboard` | contract address of the circuitboard for this contract instance
+| `viewing_key` | a viewing key (may be used in future, not now)
+
+### Snip120u
+Snip120u is a custom snip20 contract,with support to now set allowances when minting new tokens. It must be deployed before creating a headstash instance, for each token included. for each `Snip120u` defined when creating a headstash, there must be no duplicate snip120u addresses. There may be duplicate snip120u instances for the same token.
+
+### Headstash-Circuitboard
+The headstash circuitboard serves to broadcast the messages that will convert snip120u's into their public version, and proceed to ibc-transfer tokens to a destination determined by the headstash claimer.
+
+This contract is given the allowance during the snip120u mint that happens when a headstash allocation is claimed, so it can redeem tokens on behalf of headstash claimers, without revealing their pubkeys.
+
+
+## Contract Functions
+
+### Add
+Contract owner function that will add an eligible address that can verify & claim their headstash allocation.
+| value | description| 
+|-|-|
+| `headstash` | an `eth_addr` starting with 0x1, along with a list of `snip`'s, with the `addr` and the respective `amount` eligible to claim |
+
+### Claim 
+| value | description| 
+|-|-|
+| `eth_pubkey` | the eth wallet address starting with 0x1 that was used to create the offiline signature |
+| `eth_sig` | the offline signature hash generated from the message signers wallet |
+| `heady_wallet` | a wallet account that snip120u balance will mint to, but not reveal to the public. |
+
+### Clawback
+Contract owner function that will clawback any balance this contract has, into the snip120u token form.
+
+
+
+<!-- ## Content
 
 - [Headstash Contract](./contract/airdrop/) - CosmWasm contract that verifies eth signatures and distirbutes snip20 tokens.
 - [Headstash Tools](./tools/headstash/README.md) - `secretjs` scripts to deploy & interact with headstash instances.
@@ -31,15 +75,15 @@ Inside of [`main.js`](./tools/headstash/main.js), there are various constant val
 | `scrtHeadstashContractAddr` | contract address of headstash contract |
 | `scrtIBCDenom1` | native or ibc denom |
 | `scrtIBCDenom2` | native or ibc denom |
-| `ethPubkeysToAdd` | file location of eth pubkeys included in headstash instance. see [#6](README.md#6-add-eth-address-able-to-claim) |
+| `ethPubkeysToAdd` | file location of eth pubkeys included in headstash instance. see [#6](README.md#6-add-eth-address-able-to-claim) | -->
 
 
-## Usage Guidelines 
+<!-- ## Usage Guidelines 
 ### 1. Build The Contract Code 
 ```sh
 make build
-```
-### 2. Deploy Wasm Blob To Secret Network 
+``` -->
+<!-- ### 2. Deploy Wasm Blob To Secret Network 
 We can deploy using the [headstash tools](./tools/headstash/) scripts. Make sure you have build the contract locally, or else the scripts will not work properly.\
 To deploy, navigate to the headstash tools, install the node dependencies, and run:
 ```sh
@@ -126,12 +170,12 @@ And thats it! Weve successfully claimed our headstash privately.
 We can query the snip20 contract to confirm our new balance
 ```sh
 node main.js -q-snip1-bal
-```
+``` -->
 
 
-## Additional Information 
+<!-- ## Additional Information 
 ### Gas Cost 
-The cost to add 200 addresses to the contract map is  ~ 1 SCRT token @ `0.1 SCRT` for Fee Price  [example tx](https://testnet.ping.pub/secret/tx/C54BBEBE5360E98E200DDDA21E69278A05A11C342EDA8798011CA10BB8F0C320)
+The cost to add 200 addresses to the contract map is  ~ 1 SCRT token @ `0.1 SCRT` for Fee Price  [example tx](https://testnet.ping.pub/secret/tx/C54BBEBE5360E98E200DDDA21E69278A05A11C342EDA8798011CA10BB8F0C320) -->
 
 ### Future Goals
 - ~~On contract init, create snip120u contract for each token sent.~~
