@@ -11,6 +11,7 @@ use crate::msg::Snip120u;
 
 pub static CONFIG_KEY: &[u8] = b"ck";
 pub static ETH_PUBKEY_CLAIMED_KEY: &[u8] = b"epck";
+pub static IBC_BLOOM_CLAIMED_KEY: &[u8] = b"ibck";
 pub static TOTAL_CLAIMED_KEY: &[u8] = b"tck";
 pub static DECAY_CLAIMED_KEY: &[u8] = b"dck";
 // key = (owner, snip-addr)
@@ -40,6 +41,7 @@ pub struct Config {
     pub snip_hash: String,
     pub circuitboard: String,
     pub viewing_key: String,
+    pub channel_id: String,
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug, Eq, PartialEq, JsonSchema)]
@@ -49,6 +51,12 @@ pub struct AllowanceAction {
     pub expiration: Option<u64>,
     pub memo: Option<String>,
     pub decoys: Option<Vec<Addr>>,
+}
+
+#[derive(Serialize, Deserialize, Clone, Debug, Eq, PartialEq, JsonSchema)]
+pub struct BloomSnip120u {
+    pub amount: Uint128,
+    pub address: Addr,
 }
 
 pub fn config(storage: &mut dyn Storage) -> Singleton<Config> {
@@ -75,4 +83,14 @@ pub fn decay_claimed_r(storage: &dyn Storage) -> ReadonlySingleton<bool> {
 // decayed state
 pub fn decay_claimed_w(storage: &mut dyn Storage) -> Singleton<bool> {
     singleton(storage, DECAY_CLAIMED_KEY)
+}
+
+// If not found then ibc_bloom have not been run; if true then snip120u tokens
+pub fn ibc_bloom_status_r(storage: &dyn Storage) -> ReadonlyBucket<bool> {
+    bucket_read(storage, IBC_BLOOM_CLAIMED_KEY)
+}
+
+// If not found then ibc_bloom has not been run; if true then snip120u tokens
+pub fn ibc_bloom_status_w(storage: &mut dyn Storage) -> Bucket<bool> {
+    bucket(storage, IBC_BLOOM_CLAIMED_KEY)
 }

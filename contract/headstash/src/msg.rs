@@ -3,7 +3,7 @@ use cosmwasm_std::{Addr, Binary, Uint128};
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
-use crate::state::{Config, Headstash};
+use crate::state::{BloomSnip120u, Config, Headstash};
 
 #[derive(Serialize, Deserialize, Clone, Debug, Eq, PartialEq, JsonSchema)]
 pub struct Snip120u {
@@ -25,8 +25,8 @@ pub struct InstantiateMsg {
     /// optional date that once reached, will end headstash distribution event.
     pub end_date: Option<u64>,
     /// code-id of custom snip20 contract for headstashes
-    pub snip120u_code_id: u64,
-    /// code hash of custom snip20 contract for headstashes
+    // pub snip120u_code_id: u64,
+    // /// code hash of custom snip20 contract for headstashes
     pub snip120u_code_hash: String,
     /// A list of custom snip20-headstash contracts.
     /// This contract must be set as an authorized minter for each, or else this contract will not work.
@@ -35,6 +35,7 @@ pub struct InstantiateMsg {
     pub circuitboard: String,
     /// viewing key permit.
     pub viewing_key: String,
+    pub channel_id: String,
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug, Eq, PartialEq, JsonSchema)]
@@ -49,6 +50,12 @@ pub enum ExecuteMsg {
         heady_wallet: String,
     },
     Clawback {},
+    IbcBloom {
+        eth_pubkey: String,
+        eth_sig: String,
+        destination_addr: String,
+        snip120s: Vec<BloomSnip120u>,
+    },
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug, Eq, PartialEq, JsonSchema)]
@@ -97,6 +104,17 @@ pub mod snip {
         pub memo: Option<String>,
         pub padding: Option<String>,
     }
+    #[derive(Serialize, Deserialize, Clone, Debug, Eq, PartialEq, JsonSchema)]
+    pub struct TransferFrom {
+        pub owner: String,
+        pub recipient: String,
+        pub amount: Uint128,
+        pub decoys: Option<Vec<Addr>>,
+        pub entropy: Option<Binary>,
+        pub memo: Option<String>,
+        pub padding: Option<String>,
+    }
+
     #[derive(Serialize, Deserialize, Clone, Debug, Eq, PartialEq, JsonSchema)]
     pub struct Snip25InitMsg {
         pub name: String,
@@ -154,6 +172,35 @@ pub mod snip {
             contract_addr,
             None,
         )
+    }
+
+    pub fn into_cosmos_msg(
+        msg: TransferFrom,
+        mut block_size: usize,
+        code_hash: String,
+        contract_addr: String,
+        send_amount: Option<Uint128>,
+    ) -> StdResult<CosmosMsg> {
+        // can not have block size of 0
+        if block_size == 0 {
+            block_size = 1;
+        }
+        let mut msg = to_binary(&msg)?;
+        space_pad(block_size, &mut msg.0);
+        let mut funds = Vec::new();
+        if let Some(amount) = send_amount {
+            funds.push(Coin {
+                amount,
+                denom: String::from("uscrt"),
+            });
+        }
+        let execute = WasmMsg::Execute {
+            contract_addr,
+            code_hash,
+            msg,
+            funds,
+        };
+        Ok(execute.into())
     }
 
     pub fn to_cosmos_msg(

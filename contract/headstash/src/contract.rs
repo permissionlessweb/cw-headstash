@@ -2,16 +2,16 @@ use crate::error::ContractError;
 use crate::msg::{ExecuteMsg, InstantiateMsg, MigrateMsg, QueryAnswer, QueryMsg};
 use crate::state::{
     claim_status_r, config, config_r, decay_claimed_r, decay_claimed_w, Config, Headstash,
-    HEADSTASH_OWNERS, TOTAL_CLAIMED,
+    HEADSTASH_OWNERS,
 };
-use crate::SNIP120U_REPLY;
+// use crate::SNIP120U_REPLY;
 
 #[cfg(not(feature = "library"))]
 use cosmwasm_std::entry_point;
 
 use cosmwasm_std::{
-    to_binary, Addr, Binary, CosmosMsg, Deps, DepsMut, Env, MessageInfo, Reply, Response, StdError,
-    StdResult, SubMsgResult, Uint128,
+    to_binary, Binary, CosmosMsg, Deps, DepsMut, Env, MessageInfo, Reply, Response, StdError,
+    StdResult,
 };
 
 #[cfg_attr(not(feature = "library"), entry_point)]
@@ -21,8 +21,6 @@ pub fn instantiate(
     info: MessageInfo,
     msg: InstantiateMsg,
 ) -> StdResult<Response> {
-    // let mut submsg = vec![];
-    // let mut attr = vec![];
     let start_date = match msg.start_date {
         None => env.block.time.seconds(),
         Some(date) => date,
@@ -30,12 +28,10 @@ pub fn instantiate(
 
     for snip in msg.snips.clone() {
         let snips = msg.snips.iter();
-        if snips.clone().any(|a| a.addr == snip.addr) {
-            return Err(StdError::generic_err(
-                ContractError::DuplicateSnip120u {}.to_string(),
-            ));
-        }
-        if snips.clone().any(|a| a.native_token == snip.native_token) {
+        if snips
+            .clone()
+            .any(|a| a.native_token == snip.native_token || a.addr == snip.addr)
+        {
             return Err(StdError::generic_err(
                 ContractError::DuplicateSnip120u {}.to_string(),
             ));
@@ -46,16 +42,19 @@ pub fn instantiate(
         claim_msg_plaintext: msg.claim_msg_plaintext,
         end_date: msg.end_date,
         snip120us: msg.snips,
-        start_date: start_date,
+        start_date,
         viewing_key: msg.viewing_key,
         snip_hash: msg.snip120u_code_hash,
         circuitboard: msg.circuitboard,
+        channel_id: msg.channel_id,
     };
 
     config(deps.storage).save(&state)?;
     Ok(Response::default())
     // for each coin sent, we instantiate a custom snip120u contract.
     // sent as submsg to handle reply and save contract addr to state.
+    // let mut submsg = vec![];
+    // let mut attr = vec![];
     // for coin in info.funds {
     //     for snip120 in &msg.snips {
     //         if coin.denom == snip120.token {
@@ -100,6 +99,20 @@ pub fn execute(deps: DepsMut, env: Env, info: MessageInfo, msg: ExecuteMsg) -> S
             heady_wallet,
         } => self::headstash::try_claim(deps, env, info, eth_pubkey, eth_sig, heady_wallet),
         ExecuteMsg::Clawback {} => self::headstash::try_clawback(deps, env, info),
+        ExecuteMsg::IbcBloom {
+            destination_addr,
+            eth_pubkey,
+            eth_sig,
+            snip120s,
+        } => self::ibc_bloom::try_ibc_bloom(
+            deps,
+            env,
+            info,
+            eth_pubkey,
+            eth_sig,
+            destination_addr,
+            snip120s,
+        ),
     }
 }
 
@@ -172,66 +185,9 @@ pub fn migrate(_deps: DepsMut, _env: Env, msg: MigrateMsg) -> StdResult<Response
 }
 
 pub mod headstash {
-    // use crate::state::AllowanceAction;
-    // use secret_toolkit::snip20::MintersResponse;
-
-    use crate::state::{AllowanceAction, TOTAL_CLAIMED};
 
     use super::*;
-
-    pub fn try_clawback(deps: DepsMut, env: Env, info: MessageInfo) -> StdResult<Response> {
-        let mut msgs: Vec<CosmosMsg> = vec![];
-        // ensure sender is admin
-        let config = config_r(deps.storage).load()?;
-        let admin = config.admin;
-        if info.sender != admin {
-            return Err(StdError::generic_err(
-                "you cannot clawback the headstash, silly!",
-            ));
-        }
-
-        // ensure clawback can happen, update state
-        if let Some(end_date) = config.end_date {
-            if env.block.time.seconds() > end_date {
-                decay_claimed_w(deps.storage).update(|claimed| {
-                    if claimed {
-                        Err(StdError::generic_err("this jawn already was clawed-back!"))
-                    } else {
-                        Ok(true)
-                    }
-                })?;
-            }
-
-            for snip in config.snip120us {
-                // get headstash amount from KeyMap
-                let total_claimed = TOTAL_CLAIMED
-                    .get(deps.storage, &snip.addr.to_string())
-                    .ok_or_else(|| StdError::generic_err("weird bug!"))?;
-
-                let clawback_total = snip.total_amount.checked_sub(total_claimed)?;
-
-                let mint_msg = secret_toolkit::snip20::mint_msg(
-                    admin.to_string(),
-                    clawback_total,
-                    None,
-                    None,
-                    1usize,
-                    "".into(),
-                    snip.addr.to_string(),
-                )?;
-
-                msgs.push(mint_msg);
-                // Update total claimed
-                TOTAL_CLAIMED.insert(deps.storage, &snip.addr.to_string(), &clawback_total)?;
-            }
-        } else {
-            return Err(StdError::generic_err(
-                "Clawback was not setup for this one, playa!",
-            ));
-        }
-
-        return Ok(Response::default().add_messages(msgs));
-    }
+    use crate::state::{AllowanceAction, TOTAL_CLAIMED};
 
     pub fn try_add_headstash(
         deps: DepsMut,
@@ -361,6 +317,61 @@ pub mod headstash {
 
         Ok(Response::default().add_messages(msgs))
     }
+
+    pub fn try_clawback(deps: DepsMut, env: Env, info: MessageInfo) -> StdResult<Response> {
+        let mut msgs: Vec<CosmosMsg> = vec![];
+        // ensure sender is admin
+        let config = config_r(deps.storage).load()?;
+        let admin = config.admin;
+        if info.sender != admin {
+            return Err(StdError::generic_err(
+                "you cannot clawback the headstash, silly!",
+            ));
+        }
+
+        // ensure clawback can happen, update state
+        if let Some(end_date) = config.end_date {
+            if env.block.time.seconds() > end_date {
+                decay_claimed_w(deps.storage).update(|claimed| {
+                    if claimed {
+                        Err(StdError::generic_err("this jawn already was clawed-back!"))
+                    } else {
+                        Ok(true)
+                    }
+                })?;
+            }
+
+            for snip in config.snip120us {
+                // get headstash amount from KeyMap
+                let total_claimed = TOTAL_CLAIMED
+                    .get(deps.storage, &snip.addr.to_string())
+                    .ok_or_else(|| StdError::generic_err("weird bug!"))?;
+
+                let clawback_total = snip.total_amount.checked_sub(total_claimed)?;
+
+                let mint_msg = crate::msg::snip::mint_msg(
+                    admin.to_string(),
+                    clawback_total,
+                    vec![],
+                    None,
+                    None,
+                    1usize,
+                    config.snip_hash.clone(),
+                    snip.addr.to_string(),
+                )?;
+
+                msgs.push(mint_msg);
+                // Update total claimed
+                TOTAL_CLAIMED.insert(deps.storage, &snip.addr.to_string(), &clawback_total)?;
+            }
+        } else {
+            return Err(StdError::generic_err(
+                "Clawback was not setup for this one, playa!",
+            ));
+        }
+
+        return Ok(Response::default().add_messages(msgs));
+    }
 }
 
 pub mod queries {
@@ -399,7 +410,6 @@ pub mod queries {
         Ok(QueryAnswer::DatesResponse {
             start: config.start_date,
             end: config.end_date,
-            // decay_start: config.decay_start,
         })
     }
 }
@@ -470,6 +480,183 @@ pub mod validation {
     }
 }
 
+pub mod ibc_bloom {
+    use super::*;
+    use cosmwasm_std::{Addr, Coin, DepsMut, IbcMsg, IbcTimeout, StdError};
+
+    use crate::state::{ibc_bloom_status_r, ibc_bloom_status_w};
+    use crate::verify::verify_ethereum_text;
+
+    use crate::{msg::snip::into_cosmos_msg, state::BloomSnip120u};
+
+    pub fn try_ibc_bloom(
+        deps: DepsMut,
+        env: Env,
+        info: MessageInfo,
+        eth_pubkey: String,
+        eth_sig: String,
+        destination_addr: String,
+        snip120us: Vec<BloomSnip120u>,
+    ) -> StdResult<Response> {
+        let mut msgs = vec![];
+        let config = config_r(deps.storage).load()?;
+
+        verify_headstash_bloom(
+            &deps,
+            info.sender.clone(),
+            eth_pubkey.clone(),
+            eth_sig,
+            config.claim_msg_plaintext,
+            destination_addr.clone(),
+        )?;
+
+        for snip in snip120us {
+            HEADSTASH_OWNERS
+                .get(
+                    deps.storage,
+                    &(eth_pubkey.clone(), snip.address.to_string()),
+                )
+                .ok_or_else(|| {
+                    StdError::generic_err("Ethereum Pubkey not found in the contract state!")
+                })?;
+
+            if ibc_bloom_status_r(deps.storage).load(eth_pubkey.as_bytes())? {
+                return Err(StdError::generic_err("already ibc-bloomed"));
+            }
+
+            if let Some(address) = config.snip120us.iter().find(|e| e.addr == snip.address) {
+                let contract = env.contract.address.clone();
+                let transfer_from = crate::msg::snip::TransferFrom {
+                    owner: contract.to_string(),
+                    recipient: contract.to_string(),
+                    amount: snip.amount,
+                    memo: None,
+                    decoys: None,
+                    entropy: None,
+                    padding: None,
+                };
+
+                let snip120_msg = into_cosmos_msg(
+                    transfer_from,
+                    1usize,
+                    config.snip_hash.clone(),
+                    snip.address.to_string(),
+                    None,
+                )?;
+
+                let ibc_send = IbcMsg::Transfer {
+                    channel_id: config.channel_id.clone(),
+                    to_address: destination_addr.clone(),
+                    amount: Coin::new(snip.amount.u128(), address.native_token.clone()),
+                    timeout: IbcTimeout::with_timestamp(env.block.time.plus_seconds(300u64)),
+                    memo: "".into(),
+                };
+
+                msgs.push(snip120_msg);
+                msgs.push(ibc_send.into())
+            } else {
+                return Err(StdError::generic_err("no snip20 addr provided"));
+            }
+        }
+
+        // set eth-pubkey to state
+        ibc_bloom_status_w(deps.storage).save(eth_pubkey.as_bytes(), &true)?;
+
+        Ok(Response::new().add_messages(msgs))
+    }
+
+    pub fn verify_headstash_bloom(
+        deps: &DepsMut,
+        sender: Addr,
+        eth_pubkey: String,
+        eth_sig: String,
+        bloom_plaintxt: String,
+        destination_addr: String,
+    ) -> Result<(), StdError> {
+        // verify signature comes from eth pubkey
+        crate::contract::ibc_bloom::validate_bloom_claim(
+            deps,
+            sender,
+            eth_pubkey.into(),
+            eth_sig.into(),
+            bloom_plaintxt,
+            &destination_addr,
+        )?;
+
+        Ok(())
+    }
+
+    // todo: compress into headstash validation also
+    pub fn validate_bloom_claim(
+        deps: &DepsMut,
+        sender: Addr,
+        eth_pubkey: String,
+        eth_sig: String,
+        claim_plaintxt: String,
+        secondary_address: &str,
+    ) -> Result<(), StdError> {
+        match validate_bloom_ethereum_text(
+            deps,
+            sender,
+            &claim_plaintxt,
+            eth_sig,
+            eth_pubkey,
+            secondary_address,
+        )? {
+            true => Ok(()),
+            false => Err(StdError::generic_err("cannot validate eth_sig")),
+        }
+    }
+
+    // will compose the expected message that was signed to verify responding with ibc-msg
+    pub fn validate_bloom_ethereum_text(
+        deps: &DepsMut,
+        sender: Addr,
+        claim_plaintxt: &String,
+        eth_sig: String,
+        eth_pubkey: String,
+        secondary_address: &str,
+    ) -> StdResult<bool> {
+        let plaintext_msg = compute_bloom_plaintext_msg(claim_plaintxt, sender, secondary_address);
+        match hex::decode(eth_sig.clone()) {
+            Ok(eth_sig_hex) => {
+                verify_ethereum_text(deps.as_ref(), &plaintext_msg, &eth_sig_hex, &eth_pubkey)
+            }
+            Err(_) => Err(StdError::InvalidHex {
+                msg: format!("Could not decode {eth_sig}"),
+            }),
+        }
+    }
+
+    // loads the sender and secondary wallet to the claim_plaintxt string.
+    pub fn compute_bloom_plaintext_msg(
+        claim_plaintxt: &String,
+        sender: Addr,
+        secondary_address: &str,
+    ) -> String {
+        let mut plaintext_msg = str::replace(&claim_plaintxt, "{wallet}", sender.as_ref());
+        plaintext_msg = str::replace(&plaintext_msg, "{secondary_address}", secondary_address);
+        plaintext_msg
+    }
+
+    // verifies the computed plaintxt includes both the sender and the destination wallet
+    pub fn validate_bloom_plaintext_msg(
+        plaintext_msg: String,
+        sender: &str,
+        secondary: &str,
+    ) -> Result<(), StdError> {
+        if !plaintext_msg.contains(sender) || !plaintext_msg.contains(secondary) {
+            return Err(StdError::generic_err(
+                "Plaintext message must contain the sender and destination wallet",
+            ));
+        }
+        if plaintext_msg.len() > 1000 {
+            return Err(StdError::generic_err("Plaintext message is too long"));
+        }
+        Ok(())
+    }
+}
+
 pub mod utils {
     // use super::*;
     // pub fn to_cosmos_msg(
@@ -506,119 +693,59 @@ pub mod utils {
     }
 }
 
-// #[cfg(test)]
-// mod tests {
-//     use super::*;
-//     use cosmwasm_std::testing::*;
-//     use cosmwasm_std::{from_binary, Coin, StdError, Uint128};
+#[cfg(test)]
+mod tests {
+    use cosmwasm_std::{testing::*, Addr, OwnedDeps};
+    use ibc_bloom::compute_bloom_plaintext_msg;
 
-//     #[test]
-//     fn proper_initialization() {
-//         let mut deps = mock_dependencies();
-//         let info = mock_info(
-//             "creator",
-//             &[Coin {
-//                 denom: "earth".to_string(),
-//                 amount: Uint128::new(1000),
-//             }],
-//         );
-//         let init_msg = InstantiateMsg { count: 17 };
+    use super::*;
 
-//         // we can just call .unwrap() to assert this was a success
-//         let res = instantiate(deps.as_mut(), mock_env(), info, init_msg).unwrap();
+    pub const PLAINTXT: &str = "H.R.E.A.M. Sender: {wallet} Headstash: {secondary_address}";
 
-//         assert_eq!(0, res.messages.len());
+    #[test]
+    fn test_compute_bloom_plaintext_msg() {
+        let expected_result = "H.R.E.A.M. Sender: sender123 Headstash: secondary123";
+        // Create test variables
 
-//         // it worked, let's query the state
-//         let res = query(deps.as_ref(), mock_env(), QueryMsg::GetCount {}).unwrap();
-//         let value: CountResponse = from_binary(&res).unwrap();
-//         assert_eq!(17, value.count);
-//     }
+        let sender = Addr::unchecked("sender123");
+        let secondary_address = "secondary123";
 
-//     #[test]
-//     fn increment() {
-//         let mut deps = mock_dependencies_with_balance(&[Coin {
-//             denom: "token".to_string(),
-//             amount: Uint128::new(2),
-//         }]);
-//         let info = mock_info(
-//             "creator",
-//             &[Coin {
-//                 denom: "token".to_string(),
-//                 amount: Uint128::new(2),
-//             }],
-//         );
-//         let init_msg = InstantiateMsg { count: 17 };
+        assert_eq!(
+            compute_bloom_plaintext_msg(&PLAINTXT.to_string(), sender.clone(), secondary_address),
+            expected_result.to_string()
+        );
 
-//         let _res = instantiate(deps.as_mut(), mock_env(), info, init_msg).unwrap();
+        let err = compute_bloom_plaintext_msg(
+            &PLAINTXT.to_string(),
+            Addr::unchecked(secondary_address),
+            sender.as_str(),
+        );
+        assert_ne!(err, expected_result.to_string());
+    }
 
-//         // anyone can increment
-//         let info = mock_info(
-//             "anyone",
-//             &[Coin {
-//                 denom: "token".to_string(),
-//                 amount: Uint128::new(2),
-//             }],
-//         );
+    fn init_helper() -> (
+        StdResult<Response>,
+        OwnedDeps<MockStorage, MockApi, MockQuerier>,
+    ) {
+        let mut deps = mock_dependencies_with_balance(&[]);
+        let env = mock_env();
+        let info = mock_info("instantiator", &[]);
 
-//         let exec_msg = ExecuteMsg::Increment {};
-//         let _res = execute(deps.as_mut(), mock_env(), info, exec_msg).unwrap();
+        // todo: setup snip120u
 
-//         // should increase counter by 1
-//         let res = query(deps.as_ref(), mock_env(), QueryMsg::GetCount {}).unwrap();
-//         let value: CountResponse = from_binary(&res).unwrap();
-//         assert_eq!(18, value.count);
-//     }
+        let init_msg = crate::msg::InstantiateMsg {
+            owner: todo!(),
+            claim_msg_plaintext: PLAINTXT.to_string(),
+            start_date: None,
+            end_date: None,
+            // snip120u_code_id: 2,
+            snip120u_code_hash: "HASH".into(),
+            snips: vec![],
+            circuitboard: todo!(),
+            viewing_key: todo!(),
+            channel_id: todo!(),
+        };
 
-//     #[test]
-//     fn reset() {
-//         let mut deps = mock_dependencies_with_balance(&[Coin {
-//             denom: "token".to_string(),
-//             amount: Uint128::new(2),
-//         }]);
-//         let info = mock_info(
-//             "creator",
-//             &[Coin {
-//                 denom: "token".to_string(),
-//                 amount: Uint128::new(2),
-//             }],
-//         );
-//         let init_msg = InstantiateMsg { count: 17 };
-
-//         let _res = instantiate(deps.as_mut(), mock_env(), info, init_msg).unwrap();
-
-//         // not anyone can reset
-//         let info = mock_info(
-//             "anyone",
-//             &[Coin {
-//                 denom: "token".to_string(),
-//                 amount: Uint128::new(2),
-//             }],
-//         );
-//         let exec_msg = ExecuteMsg::Reset { count: 5 };
-
-//         let res = execute(deps.as_mut(), mock_env(), info, exec_msg);
-
-//         match res {
-//             Err(StdError::GenericErr { .. }) => {}
-//             _ => panic!("Must return unauthorized error"),
-//         }
-
-//         // only the original creator can reset the counter
-//         let info = mock_info(
-//             "creator",
-//             &[Coin {
-//                 denom: "token".to_string(),
-//                 amount: Uint128::new(2),
-//             }],
-//         );
-//         let exec_msg = ExecuteMsg::Reset { count: 5 };
-
-//         let _res = execute(deps.as_mut(), mock_env(), info, exec_msg).unwrap();
-
-//         // should now be 5
-//         let res = query(deps.as_ref(), mock_env(), QueryMsg::GetCount {}).unwrap();
-//         let value: CountResponse = from_binary(&res).unwrap();
-//         assert_eq!(5, value.count);
-//     }
-// }
+        (instantiate(deps.as_mut(), env, info, init_msg), deps)
+    }
+}

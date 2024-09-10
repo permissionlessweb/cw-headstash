@@ -187,3 +187,4 @@ The cost to add 200 addresses to the contract map is  ~ 1 SCRT token @ `0.1 SCRT
 - Configure claim hooks 
 - ~~Entropy generation contracts for post-claim distortion~~
 - Skip over duplicates when adding new addresses, add config to add or replace value if duplicate is added
+- Implement IBC version, handle callbacks for ibc packet transfer success.
