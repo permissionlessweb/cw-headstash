@@ -4,6 +4,8 @@ use crate::state::{
     claim_status_r, config, config_r, decay_claimed_r, decay_claimed_w, Config, Headstash,
     HEADSTASH_OWNERS,
 };
+use base64::engine::general_purpose;
+use base64::Engine;
 // use crate::SNIP120U_REPLY;
 
 #[cfg(not(feature = "library"))]
@@ -25,6 +27,8 @@ pub fn instantiate(
         None => env.block.time.seconds(),
         Some(date) => date,
     };
+
+    validation::validate_plaintext_msg(msg.claim_msg_plaintext.clone())?;
 
     for snip in msg.snips.clone() {
         let snips = msg.snips.iter();
@@ -237,8 +241,8 @@ pub mod headstash {
         deps: DepsMut,
         env: Env,
         info: MessageInfo,
-        eth_pubkey: String,
-        eth_sig: String,
+        pubkey: String,
+        sig: String,
         heady_wallet: String,
     ) -> StdResult<Response> {
         let mut msgs: Vec<CosmosMsg> = vec![];
@@ -247,18 +251,27 @@ pub mod headstash {
         // make sure airdrop has not ended
         queries::available(&config, &env)?;
 
-        // validate eth_signature comes from eth pubkey.
-        // Occurs before claim check to prevent data leak of eth_pubkey claim status.
-        validation::validate_claim(
-            &deps,
-            info.clone(),
-            eth_pubkey.to_string(),
-            eth_sig.clone(),
-            config.clone(),
-        )?;
+        // if pubkey does not start with 0x1, we expect it is a solana wallet and we must verify
+        if pubkey.starts_with("0x1") {
+            validation::verify_ethereum_claim(
+                &deps,
+                info.sender.clone(),
+                pubkey.to_string(),
+                sig.clone(),
+                config.claim_msg_plaintext.clone(),
+            )?;
+        } else {
+            validation::verify_solana_wallet(
+                &deps,
+                info.sender.clone(),
+                pubkey.clone(),
+                sig,
+                config.claim_msg_plaintext,
+            )?;
+        }
 
         // check if address has already claimed
-        let state = claim_status_r(deps.storage).may_load(eth_pubkey.as_bytes())?;
+        let state = claim_status_r(deps.storage).may_load(pubkey.as_bytes())?;
         if state == Some(true) {
             return Err(StdError::generic_err(
                 "You have already claimed your headstash, homie!",
@@ -287,7 +300,7 @@ pub mod headstash {
 
             // get headstash amount from KeyMap
             let headstash_amount = HEADSTASH_OWNERS
-                .get(deps.storage, &(eth_pubkey.clone(), snip.addr.to_string()))
+                .get(deps.storage, &(pubkey.clone(), snip.addr.to_string()))
                 .ok_or_else(|| {
                     StdError::generic_err("Ethereum Pubkey not found in the contract state!")
                 })?;
@@ -415,6 +428,8 @@ pub mod queries {
 }
 // src: https://github.com/public-awesome/launchpad/blob/main/contracts/sg-eth-airdrop/src/claim_airdrop.rs#L85
 pub mod validation {
+    use cosmwasm_std::Addr;
+
     use super::*;
     use crate::verify_ethereum_text;
 
@@ -424,47 +439,6 @@ pub mod validation {
     ) -> Result<(), StdError> {
         validate_plaintext_msg(msg.claim_msg_plaintext)?;
         Ok(())
-    }
-
-    /// Validates an ethereum signature comes from a given pubkey.
-    pub fn validate_claim(
-        deps: &DepsMut,
-        info: MessageInfo,
-        eth_pubkey: String,
-        eth_sig: String,
-        config: Config,
-    ) -> Result<(), StdError> {
-        match validate_ethereum_text(deps, info, &config, eth_sig, eth_pubkey.clone())? {
-            true => Ok(()),
-            false => Err(StdError::generic_err("cannot validate eth_sig")),
-        }
-    }
-
-    pub fn validate_ethereum_text(
-        deps: &DepsMut,
-        info: MessageInfo,
-        config: &Config,
-        eth_sig: String,
-        eth_pubkey: String,
-    ) -> StdResult<bool> {
-        let plaintext_msg = compute_plaintext_msg(config, info);
-        match hex::decode(eth_sig.clone()) {
-            Ok(eth_sig_hex) => {
-                verify_ethereum_text(deps.as_ref(), &plaintext_msg, &eth_sig_hex, &eth_pubkey)
-            }
-            Err(_) => Err(StdError::InvalidHex {
-                msg: format!("Could not decode {eth_sig}"),
-            }),
-        }
-    }
-
-    /// Replaces the compute plain text with the message sender.
-    pub fn compute_plaintext_msg(config: &Config, info: MessageInfo) -> String {
-        str::replace(
-            &config.claim_msg_plaintext,
-            "{wallet}",
-            info.sender.as_ref(),
-        )
     }
 
     pub fn validate_plaintext_msg(plaintext_msg: String) -> Result<(), StdError> {
@@ -478,10 +452,83 @@ pub mod validation {
         }
         Ok(())
     }
+
+    /// Validates an ethereum signature comes from a given pubkey.
+    pub fn verify_ethereum_claim(
+        deps: &DepsMut,
+        sender: Addr,
+        eth_pubkey: String,
+        eth_sig: String,
+        plaintxt: String,
+    ) -> Result<(), StdError> {
+        match validate_ethereum_text(deps, sender, plaintxt, eth_sig, eth_pubkey.clone())? {
+            true => Ok(()),
+            false => Err(StdError::generic_err("cannot validate eth_sig")),
+        }
+    }
+
+    pub fn validate_ethereum_text(
+        deps: &DepsMut,
+        sender: Addr,
+        plaintxt: String,
+        eth_sig: String,
+        eth_pubkey: String,
+    ) -> StdResult<bool> {
+        let plaintext_msg = compute_plaintext_msg(plaintxt, sender);
+        match hex::decode(eth_sig.clone()) {
+            Ok(eth_sig_hex) => {
+                verify_ethereum_text(deps.as_ref(), &plaintext_msg, &eth_sig_hex, &eth_pubkey)
+            }
+            Err(_) => Err(StdError::InvalidHex {
+                msg: format!("Could not decode the eth signature"),
+            }),
+        }
+    }
+
+    /// Replaces the compute plain text with the message sender.
+    pub fn compute_plaintext_msg(plaintxt: String, sender: Addr) -> String {
+        str::replace(&plaintxt, "{wallet}", sender.as_ref())
+    }
+
+    // source: https://github.com/SecretSaturn/SecretPath/blob/aae6c61ff755aa22112945eab308e9037044980b/TNLS-Gateways/secret/src/msg.rs#L101
+    pub fn verify_solana_wallet(
+        deps: &DepsMut,
+        sender: Addr,
+        pubkey: String,
+        signature: String,
+        plaintxt: String,
+    ) -> Result<(), StdError> {
+        let computed_plaintxt = compute_plaintext_msg(plaintxt, sender);
+        match deps.api.secp256k1_verify(
+            computed_plaintxt.clone().into_bytes().as_slice(),
+            signature.clone().into_bytes().as_slice(),
+            pubkey.clone().into_bytes().as_slice(),
+        ) {
+            Ok(true) => Ok(()),
+            Ok(false) | Err(_) => deps
+                .api
+                .ed25519_verify(
+                    &general_purpose::STANDARD
+                        .encode(computed_plaintxt.into_bytes().as_slice())
+                        .as_bytes(),
+                    signature.into_bytes().as_slice(),
+                    pubkey.into_bytes().as_slice(),
+                )
+                .map_err(|err| StdError::generic_err(err.to_string()))
+                .and_then(|verified| {
+                    if verified {
+                        Ok(())
+                    } else {
+                        Err(StdError::generic_err("Verification failed"))
+                    }
+                }),
+        }
+    }
 }
 
 pub mod ibc_bloom {
     use super::*;
+
     use cosmwasm_std::{Addr, Coin, DepsMut, IbcMsg, IbcTimeout, StdError};
 
     use crate::state::{ibc_bloom_status_r, ibc_bloom_status_w};
@@ -493,34 +540,34 @@ pub mod ibc_bloom {
         deps: DepsMut,
         env: Env,
         info: MessageInfo,
-        eth_pubkey: String,
-        eth_sig: String,
+        pubkey: String,
+        sig: String,
         destination_addr: String,
         snip120us: Vec<BloomSnip120u>,
     ) -> StdResult<Response> {
         let mut msgs = vec![];
         let config = config_r(deps.storage).load()?;
-
-        verify_headstash_bloom(
-            &deps,
-            info.sender.clone(),
-            eth_pubkey.clone(),
-            eth_sig,
-            config.claim_msg_plaintext,
-            destination_addr.clone(),
-        )?;
+        // if pubkey does not start with 0x1, we expect it is a solana wallet and we must verify
+        if pubkey.starts_with("0x1") {
+            verify_bloom_claim(
+                &deps,
+                info.sender.clone(),
+                pubkey.clone(),
+                sig.clone(),
+                config.claim_msg_plaintext,
+                destination_addr.clone(),
+            )?;
+        } else {
+        }
 
         for snip in snip120us {
             HEADSTASH_OWNERS
-                .get(
-                    deps.storage,
-                    &(eth_pubkey.clone(), snip.address.to_string()),
-                )
+                .get(deps.storage, &(pubkey.clone(), snip.address.to_string()))
                 .ok_or_else(|| {
                     StdError::generic_err("Ethereum Pubkey not found in the contract state!")
                 })?;
 
-            if ibc_bloom_status_r(deps.storage).load(eth_pubkey.as_bytes())? {
+            if ibc_bloom_status_r(deps.storage).load(sig.as_bytes())? {
                 return Err(StdError::generic_err("already ibc-bloomed"));
             }
 
@@ -560,40 +607,19 @@ pub mod ibc_bloom {
         }
 
         // set eth-pubkey to state
-        ibc_bloom_status_w(deps.storage).save(eth_pubkey.as_bytes(), &true)?;
+        ibc_bloom_status_w(deps.storage).save(pubkey.as_bytes(), &true)?;
 
         Ok(Response::new().add_messages(msgs))
     }
 
-    pub fn verify_headstash_bloom(
-        deps: &DepsMut,
-        sender: Addr,
-        eth_pubkey: String,
-        eth_sig: String,
-        bloom_plaintxt: String,
-        destination_addr: String,
-    ) -> Result<(), StdError> {
-        // verify signature comes from eth pubkey
-        crate::contract::ibc_bloom::validate_bloom_claim(
-            deps,
-            sender,
-            eth_pubkey.into(),
-            eth_sig.into(),
-            bloom_plaintxt,
-            &destination_addr,
-        )?;
-
-        Ok(())
-    }
-
     // todo: compress into headstash validation also
-    pub fn validate_bloom_claim(
+    pub fn verify_bloom_claim(
         deps: &DepsMut,
         sender: Addr,
         eth_pubkey: String,
         eth_sig: String,
         claim_plaintxt: String,
-        secondary_address: &str,
+        secondary_address: String,
     ) -> Result<(), StdError> {
         match validate_bloom_ethereum_text(
             deps,
@@ -615,9 +641,9 @@ pub mod ibc_bloom {
         claim_plaintxt: &String,
         eth_sig: String,
         eth_pubkey: String,
-        secondary_address: &str,
+        secondary_address: String,
     ) -> StdResult<bool> {
-        let plaintext_msg = compute_bloom_plaintext_msg(claim_plaintxt, sender, secondary_address);
+        let plaintext_msg = compute_bloom_plaintext_msg(claim_plaintxt, sender, &secondary_address);
         match hex::decode(eth_sig.clone()) {
             Ok(eth_sig_hex) => {
                 verify_ethereum_text(deps.as_ref(), &plaintext_msg, &eth_sig_hex, &eth_pubkey)
@@ -632,7 +658,7 @@ pub mod ibc_bloom {
     pub fn compute_bloom_plaintext_msg(
         claim_plaintxt: &String,
         sender: Addr,
-        secondary_address: &str,
+        secondary_address: &String,
     ) -> String {
         let mut plaintext_msg = str::replace(&claim_plaintxt, "{wallet}", sender.as_ref());
         plaintext_msg = str::replace(&plaintext_msg, "{secondary_address}", secondary_address);
@@ -654,6 +680,42 @@ pub mod ibc_bloom {
             return Err(StdError::generic_err("Plaintext message is too long"));
         }
         Ok(())
+    }
+
+    // source: https://github.com/SecretSaturn/SecretPath/blob/aae6c61ff755aa22112945eab308e9037044980b/TNLS-Gateways/secret/src/msg.rs#L101
+    pub fn verify_solana_wallet(
+        deps: &DepsMut,
+        sender: Addr,
+        pubkey: String,
+        signature: String,
+        plaintxt: String,
+        secondary_address: &String,
+    ) -> Result<(), StdError> {
+        let computed_plaintxt = compute_bloom_plaintext_msg(&plaintxt, sender, secondary_address);
+        match deps.api.secp256k1_verify(
+            computed_plaintxt.clone().into_bytes().as_slice(),
+            signature.clone().into_bytes().as_slice(),
+            pubkey.clone().into_bytes().as_slice(),
+        ) {
+            Ok(true) => Ok(()),
+            Ok(false) | Err(_) => deps
+                .api
+                .ed25519_verify(
+                    &general_purpose::STANDARD
+                        .encode(computed_plaintxt.into_bytes().as_slice())
+                        .as_bytes(),
+                    signature.into_bytes().as_slice(),
+                    pubkey.into_bytes().as_slice(),
+                )
+                .map_err(|err| StdError::generic_err(err.to_string()))
+                .and_then(|verified| {
+                    if verified {
+                        Ok(())
+                    } else {
+                        Err(StdError::generic_err("Verification failed"))
+                    }
+                }),
+        }
     }
 }
 
@@ -708,18 +770,19 @@ mod tests {
         // Create test variables
 
         let sender = Addr::unchecked("sender123");
-        let secondary_address = "secondary123";
+        let secondary_address = "secondary123".to_string();
 
         assert_eq!(
-            compute_bloom_plaintext_msg(&PLAINTXT.to_string(), sender.clone(), secondary_address),
+            compute_bloom_plaintext_msg(&PLAINTXT.to_string(), sender.clone(), &secondary_address),
             expected_result.to_string()
         );
 
         let err = compute_bloom_plaintext_msg(
             &PLAINTXT.to_string(),
             Addr::unchecked(secondary_address),
-            sender.as_str(),
+            &sender.to_string(),
         );
+
         assert_ne!(err, expected_result.to_string());
     }
 

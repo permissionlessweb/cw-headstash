@@ -11,6 +11,7 @@ pub struct Snip120u {
     pub native_token: String,
     // pub name: String,
     pub addr: Addr,
+    // total amount of this to be distributed during this headstash
     pub total_amount: Uint128,
 }
 
@@ -35,6 +36,7 @@ pub struct InstantiateMsg {
     pub circuitboard: String,
     /// viewing key permit.
     pub viewing_key: String,
+    /// channel-id used to IBC transfer tokens back to a destination chain.
     pub channel_id: String,
 }
 
