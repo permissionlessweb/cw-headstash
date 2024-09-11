@@ -42,9 +42,9 @@ pub const TERP_MAINNET: ChainInfo = ChainInfo {
 pub const TERP_TESTNET: ChainInfo = ChainInfo {
     kind: ChainKind::Testnet,
     chain_id: "90u-4",
-    gas_denom: "ubtsg",
+    gas_denom: "uthiolx",
     gas_price: 0.025,
-    grpc_urls: &["http://"],
+    grpc_urls: &["http://terp-testnet-grpc.itrocket.net:443"],
     network_info: TERP_NETWORK,
     lcd_url: None,
     fcd_url: None,
@@ -72,18 +72,18 @@ pub const SECRET_TESTNET: ChainInfo = ChainInfo {
     chain_id: "",
     gas_denom: "uscrt",
     gas_price: 0.025,
-    grpc_urls: &["http://"],
+    grpc_urls: &["https://grpc.mainnet.secretsaturn.net"],
     network_info: TERP_NETWORK,
     lcd_url: None,
     fcd_url: None,
 };
 
-// Localnet: <https://github.com/cosmos/chain-registry/blob/master/bitsong/chain.json>
 const LOCAL_NET: NetworkInfo = NetworkInfo {
     chain_name: "Local Network",
     pub_address_prefix: "mock",
     coin_type: 114u32,
 };
+
 pub const LOCAL_NETWORK1: ChainInfo = ChainInfo {
     kind: ChainKind::Testnet,
     chain_id: "local-1",
@@ -94,6 +94,7 @@ pub const LOCAL_NETWORK1: ChainInfo = ChainInfo {
     lcd_url: None,
     fcd_url: None,
 };
+
 pub const LOCAL_NETWORK2: ChainInfo = ChainInfo {
     kind: ChainKind::Testnet,
     chain_id: "local-2",

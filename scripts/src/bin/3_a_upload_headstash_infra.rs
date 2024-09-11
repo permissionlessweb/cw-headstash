@@ -128,7 +128,7 @@ fn upload_headstash_contracts_as_secret_ica(
                     type_url: "/secret.compute.v1beta1.MsgStoreCode".into(),
                     value: Anybuf::new()
                         .append_string(1, secret.sender().address())
-                        .append_bytes(2, include_bytes!("../../artifacts/snip120u.wasm"))
+                        .append_bytes(2, include_bytes!("../../artifacts/snip120u.wasm.gz"))
                         .into_vec()
                         .into(),
                     }],

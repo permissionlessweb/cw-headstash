@@ -14,17 +14,10 @@ To create a headstash contract instance, you will need to have ready the followi
 | `snip120u_code_id` | code-id of the custom snip20 contract
 | `snip120u_code_hash` | code-hash of the custom snip20 contract
 | `snips` | define each  `Snip120u` token included in a headstash instance
-| `circuitboard` | contract address of the circuitboard for this contract instance
 | `viewing_key` | a viewing key (may be used in future, not now)
 
 ### Snip120u
 Snip120u is a custom snip20 contract,with support to now set allowances when minting new tokens. It must be deployed before creating a headstash instance, for each token included. for each `Snip120u` defined when creating a headstash, there must be no duplicate snip120u addresses. There may be duplicate snip120u instances for the same token.
-
-### Headstash-Circuitboard
-The headstash circuitboard serves to broadcast the messages that will convert snip120u's into their public version, and proceed to ibc-transfer tokens to a destination determined by the headstash claimer.
-
-This contract is given the allowance during the snip120u mint that happens when a headstash allocation is claimed, so it can redeem tokens on behalf of headstash claimers, without revealing their pubkeys.
-
 
 ## Contract Functions
 
@@ -44,7 +37,24 @@ Contract owner function that will add an eligible address that can verify & clai
 ### Clawback
 Contract owner function that will clawback any balance this contract has, into the snip120u token form.
 
+## Headstash Lifecycle 
 
+### Allocation distribution is prepared 
+### IBC infrastructure is prepared
+### ICA is deployed on controller network
+### Necessary Authorizations are granted
+### Headstash Infrastructure is deployed on host network
+
+## Cw-Orchestrator Scripts
+| value | description| 
+|-|-|
+| `deploy-cw-ica` | - |
+| `grant-authz-as-ica` | - |
+| `upload-headstash-infra` | - |
+| `create-snip120u` | - |
+| `create-headstash` | - |
+| `authorize-headstash-as-minter` | - |
+| `add-eligible-addrs` | - |
 
 <!-- ## Content
 
@@ -57,25 +67,9 @@ Contract owner function that will clawback any balance this contract has, into t
 
 ## Dashboard
 
-## Setup Instructions
+<!-- ## Setup Instructions -->
 
-#### Constants
-Inside of [`main.js`](./tools/headstash/main.js), there are various constant values that we can define for our deployment.
 
-| value | description| 
-|-|-|
-| `chain_id` | network to deploy to |
-| `wallet` | private seed being used to sign & broadcast msgs |
-| `scrt20codeId` | code id of snip20 |
-| `scrt20CodeHash` | code hash of snip20 |
-| `scrtContractAddr1` | snip20 contract addr to be distributed by headstash contract |
-| `scrtContractAddr2` | optional second snip20 contract addr to be distributed by headstash contract |
-| `scrtHeadstashCodeId` | code id of headstash contract |
-| `scrtHeadstashCodeHash` | code hash of headstash contract |
-| `scrtHeadstashContractAddr` | contract address of headstash contract |
-| `scrtIBCDenom1` | native or ibc denom |
-| `scrtIBCDenom2` | native or ibc denom |
-| `ethPubkeysToAdd` | file location of eth pubkeys included in headstash instance. see [#6](README.md#6-add-eth-address-able-to-claim) | -->
 
 
 <!-- ## Usage Guidelines 

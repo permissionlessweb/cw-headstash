@@ -33,3 +33,25 @@ secret-cosmwasm-std = { version = "1.1.11", default-features = false,features = 
   "stargate",
 ] }
 cosmwasm-schema = "1.1.8"
+
+[[bin]]
+name = "deploy-cw-ica"
+path = "src/bin/1_create_ica_account_on_secret.rs"
+[[bin]]
+name = "grant-authz-as-ica"
+path = "src/bin/2_authz_secret_ica_w_uploads.rs"
+[[bin]]
+name = "upload-headstash-infra"
+path = "src/bin/3_a_upload_headstash_infra.rs"
+[[bin]]
+name = "create-snip120u"
+path = "src/bin/3_b_init_snip120u.rs"
+[[bin]]
+name = "create-headstash"
+path = "src/bin/3_c_init_headstash.rs"
+[[bin]]
+name = "authorize-headstash-as-minter"
+path = "src/bin/3_d_authorize_minters.rs"
+[[bin]]
+name = "add-eligible-addrs"
+path = "src/bin/3_d_authorize_minters.rs"
