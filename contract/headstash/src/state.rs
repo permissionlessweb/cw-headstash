@@ -27,7 +27,7 @@ pub struct Snip {
 }
 #[derive(Serialize, Deserialize, Clone, Debug, Eq, PartialEq, JsonSchema)]
 pub struct Headstash {
-    pub eth_addr: String,
+    pub pubkey: String,
     pub snip: Vec<Snip>,
 }
 
@@ -39,7 +39,6 @@ pub struct Config {
     pub end_date: Option<u64>,
     pub snip120us: Vec<Snip120u>,
     pub snip_hash: String,
-    pub circuitboard: String,
     pub viewing_key: String,
     pub channel_id: String,
 }

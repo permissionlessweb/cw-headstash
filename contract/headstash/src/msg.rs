@@ -32,8 +32,6 @@ pub struct InstantiateMsg {
     /// A list of custom snip20-headstash contracts.
     /// This contract must be set as an authorized minter for each, or else this contract will not work.
     pub snips: Vec<Snip120u>,
-    /// Contract addr of headstash circuitboard.
-    pub circuitboard: String,
     /// viewing key permit.
     pub viewing_key: String,
     /// channel-id used to IBC transfer tokens back to a destination chain.
@@ -43,7 +41,7 @@ pub struct InstantiateMsg {
 #[derive(Serialize, Deserialize, Clone, Debug, Eq, PartialEq, JsonSchema)]
 #[serde(rename_all = "snake_case")]
 pub enum ExecuteMsg {
-    Add {
+    AddEligibleHeadStash {
         headstash: Vec<Headstash>,
     },
     Claim {
@@ -99,6 +97,23 @@ pub mod snip {
     use super::*;
 
     #[derive(Serialize, Deserialize, Clone, Debug, Eq, PartialEq, JsonSchema)]
+    pub struct Snip120uInitMsg {
+        pub name: String,
+        pub admin: Option<String>,
+        pub symbol: String,
+        pub decimals: u8,
+        pub prng_seed: Binary,
+        pub config: Option<InitConfig>,
+        pub supported_denoms: Option<Vec<String>>,
+    }
+
+    #[derive(Serialize, Deserialize, Clone, Debug, Eq, PartialEq, JsonSchema)]
+    pub struct SetMinters {
+        pub minters: Vec<String>,
+        pub padding: Option<String>,
+    }
+
+    #[derive(Serialize, Deserialize, Clone, Debug, Eq, PartialEq, JsonSchema)]
     pub struct MintMsg {
         pub recipient: String,
         pub amount: Uint128,
@@ -106,6 +121,7 @@ pub mod snip {
         pub memo: Option<String>,
         pub padding: Option<String>,
     }
+
     #[derive(Serialize, Deserialize, Clone, Debug, Eq, PartialEq, JsonSchema)]
     pub struct TransferFrom {
         pub owner: String,
@@ -115,17 +131,6 @@ pub mod snip {
         pub entropy: Option<Binary>,
         pub memo: Option<String>,
         pub padding: Option<String>,
-    }
-
-    #[derive(Serialize, Deserialize, Clone, Debug, Eq, PartialEq, JsonSchema)]
-    pub struct Snip25InitMsg {
-        pub name: String,
-        pub admin: Option<String>,
-        pub symbol: String,
-        pub decimals: u8,
-        pub prng_seed: Binary,
-        pub config: Option<InitConfig>,
-        pub supported_denoms: Option<Vec<String>>,
     }
 
     #[derive(Serialize, Deserialize, Clone, Debug, Eq, PartialEq, JsonSchema)]

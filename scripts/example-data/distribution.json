@@ -1,0 +1,16 @@
+[
+    {
+      "address": "0x0000000000000000000000000000000",
+      "headstashes": [
+        {"name": "", "amount": 0},
+        {"name": "", "amount": 1}
+      ]
+    },
+    {
+      "address": "0x1111111111111111111111111111111",
+      "headstashes": [
+        {"name": "", "amount": 2},
+        {"name": "", "amount": 3}
+      ]
+    }
+  ]

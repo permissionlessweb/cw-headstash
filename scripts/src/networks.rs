@@ -50,6 +50,34 @@ pub const TERP_TESTNET: ChainInfo = ChainInfo {
     fcd_url: None,
 };
 
+/// Secret Network: <https://github.com/cosmos/chain-registry/blob/master/secretnetwork/chain.json>
+pub const SECRET_NETWORK: NetworkInfo = NetworkInfo {
+    chain_name: "Secret Network",
+    pub_address_prefix: "secret",
+    coin_type: 529u32,
+};
+pub const SECRET_MAINNET: ChainInfo = ChainInfo {
+    kind: ChainKind::Mainnet,
+    chain_id: "secret-1",
+    gas_denom: "uscrt",
+    gas_price: 0.025,
+    grpc_urls: &["http://grpc"],
+    network_info: SECRET_NETWORK,
+    lcd_url: None,
+    fcd_url: None,
+};
+
+pub const SECRET_TESTNET: ChainInfo = ChainInfo {
+    kind: ChainKind::Testnet,
+    chain_id: "",
+    gas_denom: "uscrt",
+    gas_price: 0.025,
+    grpc_urls: &["http://"],
+    network_info: TERP_NETWORK,
+    lcd_url: None,
+    fcd_url: None,
+};
+
 // Localnet: <https://github.com/cosmos/chain-registry/blob/master/bitsong/chain.json>
 const LOCAL_NET: NetworkInfo = NetworkInfo {
     chain_name: "Local Network",

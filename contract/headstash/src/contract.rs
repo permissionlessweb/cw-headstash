@@ -49,7 +49,6 @@ pub fn instantiate(
         start_date,
         viewing_key: msg.viewing_key,
         snip_hash: msg.snip120u_code_hash,
-        circuitboard: msg.circuitboard,
         channel_id: msg.channel_id,
     };
 
@@ -94,7 +93,7 @@ pub fn instantiate(
 #[cfg_attr(not(feature = "library"), entry_point)]
 pub fn execute(deps: DepsMut, env: Env, info: MessageInfo, msg: ExecuteMsg) -> StdResult<Response> {
     match msg {
-        ExecuteMsg::Add { headstash } => {
+        ExecuteMsg::AddEligibleHeadStash { headstash } => {
             self::headstash::try_add_headstash(deps, env, info, headstash)
         }
         ExecuteMsg::Claim {
@@ -218,7 +217,7 @@ pub mod headstash {
 
         // ensure eth_pubkey is not already in KeyMap
         for hs in headstash.into_iter() {
-            let key = hs.eth_addr;
+            let key = hs.pubkey;
             for snip in hs.snip.into_iter() {
                 if HEADSTASH_OWNERS.contains(deps.storage, &(key.clone(), snip.addr.clone())) {
                     return Err(StdError::generic_err(
@@ -310,7 +309,7 @@ pub mod headstash {
                 deps.api.addr_validate(&heady_wallet)?.to_string(),
                 headstash_amount,
                 vec![AllowanceAction {
-                    spender: config.circuitboard.clone(),
+                    spender: env.contract.address.to_string(),
                     amount: headstash_amount.clone(),
                     expiration: None,
                     memo: None,
@@ -804,7 +803,6 @@ mod tests {
             // snip120u_code_id: 2,
             snip120u_code_hash: "HASH".into(),
             snips: vec![],
-            circuitboard: todo!(),
             viewing_key: todo!(),
             channel_id: todo!(),
         };

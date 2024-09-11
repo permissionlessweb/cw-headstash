@@ -179,12 +179,13 @@ The cost to add 200 addresses to the contract map is  ~ 1 SCRT token @ `0.1 SCRT
 
 ### Future Goals
 - ~~On contract init, create snip120u contract for each token sent.~~
-- Allow cosmos, eth pubkeys, or solana addr to verify ownership and claim headstash.
-- Update total_amount when additional accepted token is sent, allow claim proportional to distribution amount after each claim.
-- Add optional randomness multiplier to airdrop claim.
-- Reimplement merkle tree implementation 
+- ~~Allow cosmos, eth pubkeys, or solana addr to verify ownership and claim headstash.~~
 - ~~Define custom value for each token denomination~~
-- Configure claim hooks 
 - ~~Entropy generation contracts for post-claim distortion~~
+- Reimplement merkle tree 
 - Skip over duplicates when adding new addresses, add config to add or replace value if duplicate is added
 - Implement IBC version, handle callbacks for ibc packet transfer success.
+- Update total_amount when additional accepted token is sent, allow claim proportional to distribution amount after each claim.
+- Add optional randomness multiplier to airdrop claim.
+- Configure claim hooks 
+    

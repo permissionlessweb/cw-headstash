@@ -4,7 +4,7 @@ members = [
 
   # Secret Headstash Contract
   "contract/headstash",
-  # "scripts"
+   "scripts"
 ]
 
 [profile.release]
