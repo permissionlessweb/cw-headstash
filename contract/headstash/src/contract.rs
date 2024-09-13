@@ -15,6 +15,8 @@ use cosmwasm_std::{
     to_binary, Binary, CosmosMsg, Deps, DepsMut, Env, MessageInfo, Reply, Response, StdError,
     StdResult,
 };
+use rand_core::RngCore;
+use secret_toolkit::crypto::ContractPrng;
 
 #[cfg_attr(not(feature = "library"), entry_point)]
 pub fn instantiate(
@@ -189,6 +191,8 @@ pub fn migrate(_deps: DepsMut, _env: Env, msg: MigrateMsg) -> StdResult<Response
 
 pub mod headstash {
 
+    use cosmwasm_std::Decimal;
+
     use super::*;
     use crate::state::{AllowanceAction, TOTAL_CLAIMED};
 
@@ -245,6 +249,7 @@ pub mod headstash {
         heady_wallet: String,
     ) -> StdResult<Response> {
         let mut msgs: Vec<CosmosMsg> = vec![];
+        let mut bonus: Decimal = Decimal::zero();
         let config = config_r(deps.storage).load()?;
 
         // make sure airdrop has not ended
@@ -275,6 +280,18 @@ pub mod headstash {
             return Err(StdError::generic_err(
                 "You have already claimed your headstash, homie!",
             ));
+        }
+
+        // // check if we apply bonus to claim
+        let mut prng = ContractPrng::from_env(&env);
+        let mut random_numbers = vec![0u8; (7 * 32) as usize];
+        prng.fill_bytes(&mut random_numbers);
+        let rand1 = prng.rand_bytes();
+
+        if let Some(x) = rand1.get(10) {
+            if x % 3 == 0 {
+                bonus = Decimal::percent(30)
+            }
         }
 
         for snip in config.snip120us {
@@ -310,7 +327,7 @@ pub mod headstash {
                 headstash_amount,
                 vec![AllowanceAction {
                     spender: env.contract.address.to_string(),
-                    amount: headstash_amount.clone(),
+                    amount: headstash_amount.clone() * (Decimal::one() + bonus), // 1/3 chance for 30% bonus multiplier
                     expiration: None,
                     memo: None,
                     decoys: None,
@@ -785,7 +802,31 @@ mod tests {
         assert_ne!(err, expected_result.to_string());
     }
 
-    fn init_helper() -> (
+    #[test]
+    fn test_randomness() {
+        let mut env = mock_env();
+
+        // get first randomness value
+        let mut prng = ContractPrng::from_env(&env);
+        let mut random_numbers = vec![0u8; (7 * 32) as usize];
+        prng.fill_bytes(&mut random_numbers);
+        let rand1 = prng.rand_bytes();
+        let result = general_purpose::STANDARD.encode(random_numbers.clone());
+
+        // simulate new randomness seed from environment
+        env.block.random = Some(Binary::from_base64(&result).unwrap());
+
+        // get second randomness value, should be different with new seed
+        let mut prng = ContractPrng::from_env(&env);
+        let mut random_numbers = vec![0u8; (5 * 32) as usize];
+        prng.fill_bytes(&mut random_numbers);
+        let rand2 = prng.rand_bytes();
+
+        // assert not equal
+        assert_ne!(rand1, rand2);
+    }
+
+    fn _init_helper() -> (
         StdResult<Response>,
         OwnedDeps<MockStorage, MockApi, MockQuerier>,
     ) {
