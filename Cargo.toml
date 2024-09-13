@@ -4,8 +4,8 @@ members = [
 
   # Secret Headstash Contract
   "contract/headstash",
-   "scripts"
 ]
+exclude = ["scripts"]
 
 [profile.release]
 opt-level = 3

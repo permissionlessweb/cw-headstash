@@ -191,8 +191,6 @@ pub fn migrate(_deps: DepsMut, _env: Env, msg: MigrateMsg) -> StdResult<Response
 
 pub mod headstash {
 
-    use cosmwasm_std::Decimal;
-
     use super::*;
     use crate::state::{AllowanceAction, TOTAL_CLAIMED};
 
@@ -249,7 +247,6 @@ pub mod headstash {
         heady_wallet: String,
     ) -> StdResult<Response> {
         let mut msgs: Vec<CosmosMsg> = vec![];
-        let mut bonus: Decimal = Decimal::zero();
         let config = config_r(deps.storage).load()?;
 
         // make sure airdrop has not ended
@@ -283,16 +280,7 @@ pub mod headstash {
         }
 
         // // check if we apply bonus to claim
-        let mut prng = ContractPrng::from_env(&env);
-        let mut random_numbers = vec![0u8; (7 * 32) as usize];
-        prng.fill_bytes(&mut random_numbers);
-        let rand1 = prng.rand_bytes();
-
-        if let Some(x) = rand1.get(10) {
-            if x % 3 == 0 {
-                bonus = Decimal::percent(30)
-            }
-        }
+        let bonus = self::validation::random_multiplier(env.clone());
 
         for snip in config.snip120us {
             // // ensure each snip configured has this contract set as minter.
@@ -327,7 +315,7 @@ pub mod headstash {
                 headstash_amount,
                 vec![AllowanceAction {
                     spender: env.contract.address.to_string(),
-                    amount: headstash_amount.clone() * (Decimal::one() + bonus), // 1/3 chance for 30% bonus multiplier
+                    amount: headstash_amount.clone() * bonus, // 1/3 chance for 30% bonus multiplier
                     expiration: None,
                     memo: None,
                     decoys: None,
@@ -444,7 +432,7 @@ pub mod queries {
 }
 // src: https://github.com/public-awesome/launchpad/blob/main/contracts/sg-eth-airdrop/src/claim_airdrop.rs#L85
 pub mod validation {
-    use cosmwasm_std::Addr;
+    use cosmwasm_std::{Addr, Decimal};
 
     use super::*;
     use crate::verify_ethereum_text;
@@ -481,6 +469,20 @@ pub mod validation {
             true => Ok(()),
             false => Err(StdError::generic_err("cannot validate eth_sig")),
         }
+    }
+
+    pub fn random_multiplier(env: Env) -> Decimal {
+        let mut bonus: Decimal = Decimal::one();
+        let mut prng = ContractPrng::from_env(&env);
+        let mut random_numbers = vec![0u8; (7 * 32) as usize];
+        prng.fill_bytes(&mut random_numbers);
+        let r = prng.rand_bytes();
+        if let Some(x) = r.get(10) {
+            if x % 3 == 0 {
+                bonus = bonus + Decimal::percent(30) // 1.3x multiplier
+            }
+        }
+        bonus
     }
 
     pub fn validate_ethereum_text(
@@ -807,23 +809,23 @@ mod tests {
         let mut env = mock_env();
 
         // get first randomness value
-        let mut prng = ContractPrng::from_env(&env);
-        let mut random_numbers = vec![0u8; (7 * 32) as usize];
-        prng.fill_bytes(&mut random_numbers);
+        let mut prng = ContractPrng::from_env(&env.clone());
         let rand1 = prng.rand_bytes();
-        let result = general_purpose::STANDARD.encode(random_numbers.clone());
+        let result = general_purpose::STANDARD.encode(rand1.clone());
+
+        let dec1 = self::validation::random_multiplier(env.clone());
 
         // simulate new randomness seed from environment
         env.block.random = Some(Binary::from_base64(&result).unwrap());
 
         // get second randomness value, should be different with new seed
-        let mut prng = ContractPrng::from_env(&env);
-        let mut random_numbers = vec![0u8; (5 * 32) as usize];
-        prng.fill_bytes(&mut random_numbers);
+        let mut prng = ContractPrng::from_env(&env.clone());
         let rand2 = prng.rand_bytes();
 
+        let dec2 = self::validation::random_multiplier(env);
         // assert not equal
         assert_ne!(rand1, rand2);
+        assert_ne!(dec1, dec2);
     }
 
     fn _init_helper() -> (
