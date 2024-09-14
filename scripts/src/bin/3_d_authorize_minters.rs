@@ -8,6 +8,7 @@ use cw_ica_controller::types::msg::options::ChannelOpenInitOptions;
 use cw_orch::daemon::TxSender;
 use cw_orch::prelude::ChainInfoOwned;
 use cw_orch_interchain::{ChannelCreationValidator, DaemonInterchain, InterchainEnv};
+use headstash_scripts::constants::{COSMWASM_EXECUTE, SECRET_COMPUTE_EXECUTE};
 use tokio::runtime::Runtime;
 
 #[derive(Parser, Debug)]
@@ -105,7 +106,10 @@ fn authorize_headstash_as_as_snip120u_minter(
     let mut secret = interchain.get_chain(host.chain_id)?;
     // 5. upload headstash contract on Secret Network, as Terp Network ICA account.
 
-    terp.authz_granter(&Addr::unchecked(&gov_addr));
+    if let Some(addr) = gov_addr {
+        terp.authz_granter(&Addr::unchecked(&addr));
+    }
+    
     let secret_sender = secret.sender();
     let terp_sender = terp.sender();
 
@@ -118,7 +122,7 @@ fn authorize_headstash_as_as_snip120u_minter(
 
         let msg_for_ica = cw_ica_controller::types::msg::ExecuteMsg::SendCosmosMsgs {
             messages: vec![CosmosMsg::Stargate {
-                type_url: "/secret.compute.v1beta1.MsgExecuteContract".into(),
+                type_url: SECRET_COMPUTE_EXECUTE.into(),
                 value: Anybuf::new()
                     .append_string(1, terp_sender.address())
                     .append_string(2, snip)
@@ -134,7 +138,8 @@ fn authorize_headstash_as_as_snip120u_minter(
 
         rt.block_on(terp_sender.commit_tx_any(
             vec![cosmrs::Any {
-                    type_url: "/cosmwasm.wasm.v1.MsgExecuteContract".into(),
+                    type_url: COSMWASM_EXECUTE
+                    .into(),
                     value: Anybuf::new()
                         .append_string(1, terp_sender.address())
                         .append_string(2, cw_ica_addr.clone())

@@ -11,7 +11,9 @@ use cosmwasm_std::{to_json_binary, Addr, Binary, CosmosMsg};
 use cw_orch::daemon::TxSender;
 use cw_orch::prelude::ChainInfoOwned;
 use cw_orch_interchain::{ChannelCreationValidator, DaemonInterchain, InterchainEnv};
+use headstash_scripts::{constants::*, SECRET_COMPUTE_INSTANTIATE};
 use tokio::runtime::Runtime;
+
 
 #[derive(Parser, Debug)]
 #[clap(author, version, about, long_about = None)]
@@ -30,14 +32,14 @@ struct Args {
     deployer_addr: String,
     /// Addr of the controller chain x/gov module
     #[clap(short, long)]
-    gov_module: String,
+    gov_module: Option<String>,
 }
 
+/// helper function to grant a wallet authorization to perform functions on behalf of the ICA account, on the Host chain. 
+/// This is to avoid the need to include wasm blobs in ibc-packets, greatly increasing the size of packets to chains during ibc lifecycle.
 pub fn main() {
     println!("Step 2: Authorize a wallet to upload as the Terp Network ICA account on Secret...",);
-
     let args = Args::parse();
-    println!("Step 1: Upload and instantiate the cw-ica-controller account");
 
     let controller_chain = match args.network.as_str() {
         "main" => headstash_scripts::networks::TERP_MAINNET.to_owned(),
@@ -73,11 +75,12 @@ pub fn authorize_secret_addr_as_terp_ica(
     cw_ica_addr: String,
     ica_addr: String,
     deployer_addr: String,
-    gov_module: String,
+    gov_module: Option<String>,
 ) -> anyhow::Result<()> {
     let rt = Runtime::new()?;
-    // define env variables
+
     let mnemonic = env::var("MNEMONIC")?;
+    
     // create new cw-orch-interchain oobject with terp & secret.
     let controller = networks[0].clone();
     let host = networks[1].clone();
@@ -91,15 +94,18 @@ pub fn authorize_secret_addr_as_terp_ica(
     let terp_ica_addr = Addr::unchecked(ica_addr);
     let mut terp = interchain.get_chain(controller.chain_id)?;
 
-    // send message under authorization of governance module. we expect the sender to have been granted MsgExecuteContract, in order to send messages as ICA Account
-    terp.authz_granter(&Addr::unchecked(gov_module.clone()));
+    // handle if gov address is provided
+    if let Some(addr) = gov_addr {
+        terp.authz_granter(&Addr::unchecked(&addr));
+    }
     let terp_sender = terp.sender();
+        
 
     // 1. grant authorizations to secret network deployment address
     let grant_msgs: Vec<MsgGrant> = vec![
-        "/secret.compute.v1beta1.MsgStoreCode",
-        "/secret.compute.v1beta1.MsgInstantiateContract",
-        "/secret.compute.v1beta1.MsgExecuteContract",
+        SECRET_COMPUTE_STORE_CODE,
+        SECRET_COMPUTE_INSTANTIATE,
+        SECRET_COMPUTE_EXECUTE,
     ]
     .into_iter()
     .map(|msg| {
@@ -107,7 +113,7 @@ pub fn authorize_secret_addr_as_terp_ica(
             msg: msg.to_string(),
         };
         let any_authorization = Any {
-            type_url: "/cosmos.authz.v1beta1.GenericAuthorization".to_string(),
+            type_url: COSMOS_GENERIC_AUTHZ.to_string(),
             value: authorization.to_bytes().unwrap(),
         };
         let grant = Grant {
@@ -126,7 +132,7 @@ pub fn authorize_secret_addr_as_terp_ica(
         // define ica-controller msg
         let msg = cw_ica_controller::types::msg::ExecuteMsg::SendCosmosMsgs {
             messages: vec![CosmosMsg::Stargate {
-                type_url: "/cosmos.authz.v1beta1.MsgGrant".into(),
+                type_url: COSMOS_AUTHZ_GRANT.into(),
                 value: Binary::new(grant.to_bytes()?),
             }],
             packet_memo: None,
@@ -135,16 +141,16 @@ pub fn authorize_secret_addr_as_terp_ica(
 
         rt.block_on(terp_sender.commit_tx_any(
             vec![cosmrs::Any {
-                    type_url: "/cosmwasm.wasm.v1.MsgExecuteContract".into(),
+                    type_url: COSMWASM_EXECUTE.into(),
                     value: Anybuf::new()
-                        .append_string(1, terp.sender().address())
-                        .append_string(2, terp_ica_addr.to_string())
-                        .append_bytes(3, to_json_binary(&msg)?
-                    ).append_repeated_bytes::<Vec<u8>>(5, &[])
+                        .append_string(1, terp.sender().address()) // send as wallet authorized by gov
+                        .append_string(2, terp_ica_addr.to_string()) // call the ica-account
+                        .append_bytes(3, to_json_binary(&msg)? // cw-ica SendCosmosMsgs
+                    ).append_repeated_bytes::<Vec<u8>>(5, &[]) // funds
                         .into_vec()
                         .into(),
                 }],
-            "Grant headstash deployment controlled address authorization for deployment.".into(),
+            "Grant authorization for secret wasm actions, on behalf of the protocol owned ICA.".into(),
         ))?;
     }
 

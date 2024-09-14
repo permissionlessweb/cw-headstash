@@ -7,6 +7,7 @@ use cw_ica_controller::types::msg::options::ChannelOpenInitOptions;
 use cw_orch::daemon::TxSender;
 use cw_orch::prelude::ChainInfoOwned;
 use cw_orch_interchain::{ChannelCreationValidator, DaemonInterchain, InterchainEnv};
+use headstash_scripts::constants::*;
 use tokio::runtime::Runtime;
 
 #[derive(Parser, Debug)]
@@ -19,8 +20,8 @@ struct Args {
     #[clap(short, long)]
     step: String,
     /// Address of the x/gov module
-    // #[clap(short, long)]
-    // gov_addr: String,
+    #[clap(short, long)]
+    gov_addr: Option<String>,
     /// code-id of the cw-ica-controller. This is inferred prior to broadcasting only with permissioned cosmwasm networks.
     #[clap(long)]
     code_id: Option<u64>,
@@ -30,7 +31,7 @@ struct Args {
     host_connection_id: String,
 }
 
-/// Upload and instantiate a cw-instance
+/// Upload and instantiate a cw-instance of an interchain account, between two networks (controller & host)
 /// upload example: cargo run --bin ica-controller-deploy -- --network testnet --step upload  --controller-connection-id connection-04 --host-connection-id connection-95 --gov-addr terp123..
 pub fn main() {
     let args = Args::parse();
@@ -51,7 +52,7 @@ pub fn main() {
 
     if let Err(ref err) = deploy_cw_ica_controller(
         vec![controller_chain.into(), host_chain.into()],
-        // args.gov_addr,
+        args.gov_addr,
         args.code_id,
         args.step,
         args.controller_connection_id,
@@ -69,7 +70,7 @@ pub fn main() {
 
 pub fn deploy_cw_ica_controller(
     networks: Vec<ChainInfoOwned>,
-    // gov_addr: String,
+    gov_addr: Option<String>,
     cw_ica_code_id: Option<u64>,
     step: String,
     controller_connection_id: String,
@@ -90,8 +91,16 @@ pub fn deploy_cw_ica_controller(
 
     // define chain instance.
     let terp = interchain.get_chain(controller.chain_id)?;
-    // let mut secret = interchain.get_chain(host.chain_id)?;
-    // terp.authz_granter(&Addr::unchecked(&gov_addr));
+
+    // handle if gov address is provided
+    if let Some(addr) = gov_addr {
+        terp.authz_granter(&Addr::unchecked(&addr));
+    }
+
+    let owner = match gov_addr {
+        Some(addr) => Addr::unchecked(&addr),
+        None => terp_sender.address(),
+    };
 
     let terp_sender = terp.sender().clone();
 
@@ -99,9 +108,9 @@ pub fn deploy_cw_ica_controller(
         "upload" => {
             rt.block_on(terp_sender.commit_tx_any(
                 vec![cosmrs::Any {
-                    type_url: "/cosmwasm.wasm.v1.MsgStoreCode".into(),
+                    type_url: COSMWASM_STORE_CODE.into(),
                     value: Anybuf::new()
-                        .append_string(1, terp.sender().address())
+                        .append_string(1, terp_sender.address())
                         .append_bytes(2, include_bytes!("../../artifacts/cw_headstash.wasm"))
                         .into_vec()
                         .into(),
@@ -113,7 +122,7 @@ pub fn deploy_cw_ica_controller(
             if let Some(code_id) = cw_ica_code_id {
                 // create cw-ica-controller
                 let create_ica = cw_ica_controller::types::msg::InstantiateMsg {
-                    owner: Some(terp_sender.address().to_string()), // Some(gov_addr.clone()),
+                    owner: Some(owner.to_string()),
                     channel_open_init_options: ChannelOpenInitOptions {
                         connection_id: controller_connection_id,
                         counterparty_connection_id: host_connection_id,
@@ -124,7 +133,7 @@ pub fn deploy_cw_ica_controller(
                 };
 
                 let init = cosmrs::Any {
-                    type_url: "/cosmwasm.wasm.v1.MsgInstantiateContract".to_string(),
+                    type_url: COSMWASM_INSTANTIATE.to_string(),
                     value: Anybuf::new()
                         .append_string(1, terp.sender().address().to_string())
                         .append_string(2, terp.sender().address().to_string())

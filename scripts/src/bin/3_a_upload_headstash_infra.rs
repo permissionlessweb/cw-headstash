@@ -8,6 +8,7 @@ use cw_ica_controller::types::msg::options::ChannelOpenInitOptions;
 use cw_orch::daemon::TxSender;
 use cw_orch::prelude::ChainInfoOwned;
 use cw_orch_interchain::{ChannelCreationValidator, DaemonInterchain, InterchainEnv};
+use headstash_scripts::constants::{COSMWASM_STORE_CODE, SECRET_COMPUTE_STORE_CODE};
 use tokio::runtime::Runtime;
 
 #[derive(Parser, Debug)]
@@ -59,16 +60,8 @@ pub fn main() {
         _ => panic!("Invalid network"),
     };
 
-    //    let msg =  match args.step.as_str() {
-    //         "upload" => ,
-    //         "instantiate" => {}
-    //         "authorize" => {}
-    //         _ => panic!("Invalid step"),
-    //     }
-
     if let Err(ref err) = upload_headstash_contracts_as_secret_ica(
         &args.step,
-        args.gov_addr,
         vec![controller_chain.into(), host_chain.into()],
         args.cw_ica_addr,
         args.ica_addr,
@@ -84,7 +77,6 @@ pub fn main() {
 
 fn upload_headstash_contracts_as_secret_ica(
     step: &str,
-    gov_addr: Option<String>,
     networks: Vec<ChainInfoOwned>,
     cw_ica_addr: Option<String>,
     ica_addr: String,
@@ -113,7 +105,7 @@ fn upload_headstash_contracts_as_secret_ica(
 
     rt.block_on(secret_sender.commit_tx_any(
         vec![cosmrs::Any {
-                    type_url: "/secret.compute.v1beta1.MsgStoreCode".into(),
+                    type_url: COSMWASM_STORE_CODE.into(),
                     value: Anybuf::new()
                         .append_string(1, secret.sender().address())
                         .append_bytes(2, include_bytes!("../../artifacts/cw_headstash.wasm"))
@@ -125,7 +117,7 @@ fn upload_headstash_contracts_as_secret_ica(
 
     rt.block_on(secret_sender.commit_tx_any(
         vec![cosmrs::Any {
-                    type_url: "/secret.compute.v1beta1.MsgStoreCode".into(),
+                    type_url: SECRET_COMPUTE_STORE_CODE.into(),
                     value: Anybuf::new()
                         .append_string(1, secret.sender().address())
                         .append_bytes(2, include_bytes!("../../artifacts/snip120u.wasm.gz"))

@@ -8,6 +8,7 @@ use cw_ica_controller::types::msg::options::ChannelOpenInitOptions;
 use cw_orch::daemon::TxSender;
 use cw_orch::prelude::ChainInfoOwned;
 use cw_orch_interchain::{ChannelCreationValidator, DaemonInterchain, InterchainEnv};
+use headstash_scripts::constants::*;
 use tokio::runtime::Runtime;
 
 #[derive(Parser, Debug)]
@@ -24,7 +25,7 @@ struct Args {
     cw_ica_addr: String,
     /// x/gov module addresss, on the controller chain.
     #[clap(short, long)]
-    gov_addr: String,
+    gov_addr: Option<String>,
     /// ics20 transfer channel id on the host chain, for the controller chain.
     #[clap(short, long)]
     channel_id: String,
@@ -107,7 +108,7 @@ pub fn main() {
 
 fn init_headstash_contract_as_gov(
     networks: Vec<ChainInfoOwned>,
-    gov_addr: String,
+    gov_addr: Option<String>,
     channel_id: String,
     headstash_code_id: u64,
     headstash_code_hash: String,
@@ -134,7 +135,9 @@ fn init_headstash_contract_as_gov(
 
     let mut terp = interchain.get_chain(controller.chain_id)?;
     // wrap msgs with authz from x/gov addr
-    terp.authz_granter(&Addr::unchecked(gov_addr));
+    if let Some(addr) = gov_addr {
+        terp.authz_granter(&Addr::unchecked(&addr));
+    }
 
     let terp_sender = terp.sender();
 
@@ -153,7 +156,7 @@ fn init_headstash_contract_as_gov(
     // msg to run as ica on secret
     let msg_for_ica = cw_ica_controller::types::msg::ExecuteMsg::SendCosmosMsgs {
         messages: vec![CosmosMsg::Stargate {
-            type_url: "/secret.compute.v1beta1.MsgExecuteContract".into(),
+            type_url: SECRET_COMPUTE_EXECUTE.into(),
             value: Anybuf::new()
                 .append_string(1, terp.sender().address())
                 .append_uint64(3, headstash_code_id.clone())
@@ -170,7 +173,7 @@ fn init_headstash_contract_as_gov(
 
     rt.block_on(terp_sender.commit_tx_any(
         vec![cosmrs::Any {
-                type_url: "/cossmwasm.wasm.v1.MsgExecuteContract".into(),
+                type_url: COSMWASM_EXECUTE.into(),
                 value: Anybuf::new()
                     .append_string(1, terp.sender().address())
                     .append_string(2, cw_ica_addr.clone())

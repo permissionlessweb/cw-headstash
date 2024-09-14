@@ -8,6 +8,7 @@ use cw_ica_controller::types::msg::options::ChannelOpenInitOptions;
 use cw_orch::daemon::TxSender;
 use cw_orch::prelude::ChainInfoOwned;
 use cw_orch_interchain::{ChannelCreationValidator, DaemonInterchain, InterchainEnv};
+use headstash_scripts::constants::*;
 use tokio::runtime::Runtime;
 
 #[derive(Parser, Debug)]
@@ -24,7 +25,7 @@ struct Args {
     cw_ica_addr: String,
     /// x/gov module addresss, on the controller chain.
     #[clap(short, long)]
-    gov_addr: String,
+    gov_addr: Option<String>,
     /// code-id of headstash on secret network
     #[clap(short, long)]
     snip120u_code_id: u64,
@@ -90,7 +91,7 @@ pub fn main() {
 
 fn create_all_snip120u(
     networks: Vec<ChainInfoOwned>,
-    gov_addr: String,
+    gov_addr: Option<String>,
     snip120u_code_id: u64,
     snip120u_code_hash: String,
     cw_ica_addr: String,
@@ -115,15 +116,21 @@ fn create_all_snip120u(
 
     let mut terp = interchain.get_chain(controller.chain_id)?;
     let mut secret = interchain.get_chain(host.chain_id)?;
-    // wrap msgs with authz from x/gov addr
+
+    // wrap msgs with authz from the protocol owned ica-account
     secret.authz_granter(&Addr::unchecked(terp_ica_addr));
+    
+    // wrap the controller msg with authz from x/gov module
+    if let Some(addr) = gov_addr {
+        terp.authz_granter(&Addr::unchecked(&addr));
+    }
     let terp_sender = terp.sender();
 
     for init_msg in snip120u {
         // msg to run as ica on secret
         let msg_for_ica = cw_ica_controller::types::msg::ExecuteMsg::SendCosmosMsgs {
             messages: vec![CosmosMsg::Stargate {
-                type_url: "/secret.compute.v1beta1.MsgInstantiateContract".into(),
+                type_url: SECRET_COMPUTE_INSTANTIATE.into(),
                 value: Anybuf::new()
                     .append_string(1, secret.sender().address())
                     .append_uint64(3, snip120u_code_id.clone())
@@ -140,7 +147,7 @@ fn create_all_snip120u(
 
         rt.block_on(terp_sender.commit_tx_any(
             vec![cosmrs::Any {
-                type_url: "/cosmwasm.wasm.v1.MsgExecuteContract".into(),
+                type_url: COSMWASM_EXECUTE.into(),
                 value: Anybuf::new()
                     .append_string(1, terp_sender.address())
                     .append_string(2, cw_ica_addr.clone())

@@ -11,6 +11,7 @@ use cw_ica_controller::types::msg::options::ChannelOpenInitOptions;
 use cw_orch::daemon::TxSender;
 use cw_orch::prelude::ChainInfoOwned;
 use cw_orch_interchain::{ChannelCreationValidator, DaemonInterchain, InterchainEnv};
+use headstash_scripts::constants::{COSMWASM_EXECUTE, SECRET_COMPUTE_EXECUTE};
 use tokio::{runtime::Runtime, time};
 
 #[cosmwasm_schema::cw_serde]
@@ -32,7 +33,7 @@ struct Args {
     cw_ica_addr: String,
     /// code-id of the headstash contract. only used for step 2 (instantiate)
     #[clap(short, long)]
-    gov_addr: String,
+    gov_addr: Option<String>,
     /// path to JSON file containing eligible headstash claimers & their allocations.
     #[clap(short, long)]
     headstash_addr: String,
@@ -83,7 +84,7 @@ pub async fn main() {
 
 async fn batch_add_eligible_headstash_claimers(
     networks: Vec<ChainInfoOwned>,
-    gov_addr: String,
+    gov_addr: Option<String>,
     headstash_addr: String,
     cw_ica_addr: String,
     ica_addr: String,
@@ -108,7 +109,10 @@ async fn batch_add_eligible_headstash_claimers(
     let mut terp = interchain.get_chain(controller.chain_id)?;
     let mut secret = interchain.get_chain(host.chain_id)?;
 
-    terp.authz_granter(&Addr::unchecked(&gov_addr));
+    if let Some(addr) = gov_addr {
+        terp.authz_granter(&Addr::unchecked(&addr));
+    }
+    
     let secret_sender = secret.sender();
     let terp_sender = terp.sender();
 
@@ -142,7 +146,7 @@ async fn batch_add_eligible_headstash_claimers(
 
         let msg_for_ica = cw_ica_controller::types::msg::ExecuteMsg::SendCosmosMsgs {
             messages: vec![CosmosMsg::Stargate {
-                type_url: "/secret.compute.v1beta1.MsgExecuteContract".into(),
+                type_url: SECRET_COMPUTE_EXECUTE.into(),
                 value: Anybuf::new()
                     .append_string(1, secret_sender.address())
                     .append_string(2, headstash_addr.clone())
@@ -158,7 +162,7 @@ async fn batch_add_eligible_headstash_claimers(
 
         rt.block_on(terp_sender.commit_tx_any(
             vec![cosmrs::Any {
-                        type_url: "/cosmwasm.wasm.v1.MsgExecuteContract".into(),
+                        type_url: COSMWASM_EXECUTE.into(),
                         value: Anybuf::new()
                             .append_string(1, terp_sender.address())
                             .append_string(2, cw_ica_addr.clone())
