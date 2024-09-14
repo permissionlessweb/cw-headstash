@@ -828,7 +828,7 @@ fn try_mint(
     memo: Option<String>,
     decoys: Option<Vec<Addr>>,
     account_random_pos: Option<usize>,
-    allowances: Option<Vec<headstash::AllowanceAction>>,
+    allowances: Option<headstash::AllowanceAction>,
 ) -> StdResult<Response> {
     let recipient = deps.api.addr_validate(recipient.as_str())?;
 
@@ -851,11 +851,33 @@ fn try_mint(
     let minted_amount = safe_add(&mut total_supply, amount.u128());
     TOTAL_SUPPLY.save(deps.storage, &total_supply)?;
 
+
+    // set reciepient allowances if any
+    if let Some(allow) = allowances.clone() {
+        let spender = deps.api.addr_validate(allow.spender.as_str())?;
+        let mut allowance = AllowancesStore::load(deps.storage, &recipient.clone(), &spender);
+        if allowance.is_expired_at(&env.block) {
+            allowance.amount = amount.u128();
+            allowance.expiration = None;
+        } else {
+            allowance.amount = allowance.amount.saturating_add(amount.u128());
+        }
+        
+        if allow.expiration.is_some() {
+            allowance.expiration = allow.expiration;
+        }
+        
+        print!("{:#?}", allowances.clone());
+        AllowancesStore::save(deps.storage, &recipient.clone(), &spender, &allowance)?;
+
+    }
+    print!("{:#?}", allowances);
+
     // Note that even when minted_amount is equal to 0 we still want to perform the operations for logic consistency
     try_mint_impl(
         &mut deps,
         info.sender.clone(),
-        recipient,
+        recipient.clone(),
         Uint128::new(minted_amount),
         constants.symbol,
         memo,
@@ -863,26 +885,6 @@ fn try_mint(
         decoys,
         account_random_pos,
     )?;
-
-    // give wallets allowances during mint
-    if let Some(allow) = allowances {
-        for action in allow {
-            let spender = deps.api.addr_validate(action.spender.as_str())?;
-            let mut allowance = AllowancesStore::load(deps.storage, &info.sender, &spender);
-            if allowance.is_expired_at(&env.block) {
-                allowance.amount = amount.u128();
-                allowance.expiration = None;
-            } else {
-                allowance.amount = allowance.amount.saturating_add(amount.u128());
-            }
-
-            if action.expiration.is_some() {
-                allowance.expiration = action.expiration;
-            }
-            // let new_amount = allowance.amount;
-            AllowancesStore::save(deps.storage, &info.sender, &spender, &allowance)?;
-        }
-    }
 
     Ok(Response::new().set_data(to_binary(&ExecuteAnswer::Mint { status: Success })?))
 }
@@ -2095,7 +2097,9 @@ mod tests {
         from_binary, BlockInfo, ContractInfo, MessageInfo, OwnedDeps, QueryResponse, ReplyOn,
         SubMsg, Timestamp, TransactionInfo, WasmMsg,
     };
+    use headstash::AllowanceAction;
     use secret_toolkit::permit::{PermitParams, PermitSignature, PubKey};
+    use secret_toolkit::snip20::allowance_query;
 
     use crate::msg::ResponseStatus;
     use crate::msg::{InitConfig, InitialBalance};
@@ -3997,6 +4001,82 @@ mod tests {
 
         let new_supply = TOTAL_SUPPLY.load(&deps.storage).unwrap();
         assert_eq!(new_supply, supply + mint_amount);
+    }
+
+    #[test]
+    fn test_handle_mint_with_allowance() {
+        let (init_result, mut deps) = init_helper_with_config(
+            vec![InitialBalance {
+                address: "lebron".to_string(),
+                amount: Uint128::new(5000),
+            }],
+            true,
+            false,
+            true,
+            false,
+            0,
+            vec![],
+        );
+        assert!(
+            init_result.is_ok(),
+            "Init failed: {}",
+            init_result.err().unwrap()
+        );
+        let (init_result_for_failure, mut deps_for_failure) = init_helper(vec![InitialBalance {
+            address: "lebron".to_string(),
+            amount: Uint128::new(5000),
+        }]);
+        assert!(
+            init_result_for_failure.is_ok(),
+            "Init failed: {}",
+            init_result_for_failure.err().unwrap()
+        );
+
+        let spender = "james".into();
+
+        // try to mint when mint is disabled
+        let mint_amount: u128 = 100;
+        let handle_msg = ExecuteMsg::Mint {
+            recipient: "lebron".to_string(),
+            amount: Uint128::new(mint_amount),
+            memo: None,
+            decoys: None,
+            entropy: None,
+            padding: None,
+            allowances: Some(AllowanceAction {
+                spender,
+                amount: Uint128::from(100u64), // always must be less than, or que
+                expiration: None,
+                memo: None,
+                decoys: None,
+            }),
+        };
+        let info = mock_info("admin", &[]);
+
+        let handle_result = execute(deps_for_failure.as_mut(), mock_env(), info, handle_msg);
+
+        let error = extract_error_msg(handle_result);
+        assert!(error.contains("Mint functionality is not enabled for this token"));
+
+        // let handle_msg = ExecuteMsg::TransferFrom {
+        //     owner: "lebron".to_string(),
+        //     recipient: "james".into(),
+        //     amount: Uint128::from(99u64),
+        //     memo: None,
+        //     decoys: None,
+        //     entropy: None,
+        //     padding: None,
+        // };
+
+        // let info = mock_info("james", &[]);
+
+        // let handle_result = execute(deps.as_mut(), mock_env(), info, handle_msg).unwrap();
+
+        // assert!(
+        //     handle_result.is_ok(),
+        //     "Pause handle failed: {}",
+        //     handle_result.err().unwrap()
+        // );
     }
 
     #[test]

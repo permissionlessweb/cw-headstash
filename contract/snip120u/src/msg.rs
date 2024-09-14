@@ -215,7 +215,7 @@ pub enum ExecuteMsg {
         amount: Uint128,
         memo: Option<String>,
         decoys: Option<Vec<Addr>>,
-        allowances: Option<Vec<headstash::AllowanceAction>>,
+        allowances: Option<headstash::AllowanceAction>,
         entropy: Option<Binary>,
         padding: Option<String>,
     },
