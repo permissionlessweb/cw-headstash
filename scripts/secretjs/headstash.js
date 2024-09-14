@@ -1,21 +1,25 @@
-import { chain_id, scrt20CodeHash, scrt20codeId, snip120uAddr1, snip120uAddr2, secretjs, wallet, entropy, snip120uCodeHash, headstashCodeHash, headstashCodeHash, scrtHeadstashContractAddr } from "./main.js";
+import { chain_id, snip120uCodeId, snip120uCodeHash, granteeAddress, secretjs, wallet, entropy, headstashCodeId, headstashAddr } from "./main.js";
 
+import { MsgStoreCode,MsgInstantiateContract,MsgExec } from "secretjs"; 
 // stores contract, prints code hash & code id
 let upload_headstash_contract = async (wasm) => {
 
-    const msgStoreCode = new MsgStoreCode({
+    const msgs = new MsgStoreCode({
         sender: wallet.address, // Your address
         wasm_byte_code: wasm,
         source: "",
         builder: "",
-    });
+    })
 
     //define the authz msg
-    const msgExec = new MsgExec({ grantee: granteeAddress, msgs: [msgStoreCode] });
+    // const msgExec = new MsgExec({ grantee: granteeAddress, msgs })
+    // const tx = await secretjs.tx.broadcast([msgExec], {
+    //     gasLimit: 5_000_000,
+    // });
 
     // broadcast 
-    const tx = await secretjs.tx.broadcast(msgExec, {
-        gasLimit: 400_000,
+    const tx = await secretjs.tx.broadcast([msgs], {
+        gasLimit: 5_000_000,
     });
 
     if (tx.code == 0) {
@@ -25,20 +29,21 @@ let upload_headstash_contract = async (wasm) => {
         console.log("codeId:", codeId);
         const contractCodeHash = (await secretjs.query.compute.codeHashByCodeId({ code_id: codeId })).code_hash;
         console.log(`Contract hash: ${contractCodeHash}`);
-    }
+    } else 
+    console.log(`Tx Error: ${tx.rawLog}`);
 }
 
 const snip120us = [
     {
         native_token: "uterp",
-        addr: snip120uAddr1,
+        addr: "snip120uAddr1",
         total_amount: "420"
     },
     {
         native_token: "uthiolx",
-        addr: snip120uAddr2,
+        addr: "snip120uAddr2",
         total_amount: "710"
-    }]
+    }];
 
 // initialize a new headstash contract
 let instantiate_headstash_contract = async () => {

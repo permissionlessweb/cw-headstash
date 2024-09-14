@@ -36,12 +36,21 @@ build-mainnet-reproducible:
 		--mount type=volume,source=registry_cache,target=/usr/local/cargo/registry \
 		ghcr.io/scrtlabs/localsecret:v1.6.0-rc.3
 
-.PHONY: compress-wasm
-compress-wasm:
-	cp ./target/wasm32-unknown-unknown/release/*.wasm ./contract.wasm
+.PHONY: compress-headstash-wasm
+compress-headstash-wasm:
+	mv ./target/wasm32-unknown-unknown/release/cw_headstash.wasm ./artifacts/cw_headstash.wasm
 	@## The following line is not necessary, may work only on linux (extra size optimization)
 	@# wasm-opt -Os ./contract.wasm -o ./contract.wasm
-	cat ./contract.wasm | gzip -9 > ./contract.wasm.gz
+	cat ./artifacts/cw_headstash.wasm | gzip -9 > ./artifacts/cw_headstash.wasm.gz
+	
+.PHONY: compress-snip120u-wasm
+compress-snip120u-wasm:
+	mv ./contract/snip120u/target/wasm32-unknown-unknown/debug/snip20_reference_impl.wasm ./artifacts/snip120u.wasm
+	@## The following line is not necessary, may work only on linux (extra size optimization)
+	@# wasm-opt -Os ./contract.wasm -o ./contract.wasm
+	cat ./artifacts/snip120u.wasm | gzip -9 > ./artifacts/snip120u.wasm.gz
+	contract.wasm:
+
 
 .PHONY: schema
 schema:

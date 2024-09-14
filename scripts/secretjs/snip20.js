@@ -1,5 +1,5 @@
-import { chain_id, scrt20CodeHash, scrt20codeId, secretjs, wallet, scrtHeadstashContractAddr } from "./main.js";
-
+import { chain_id, snip120uCodeHash, snip120uCodeId, secretjs, wallet, headstashAddr } from "./main.js";
+import { MsgStoreCode, MsgInstantiateContract } from "secretjs"
 // stores contract, prints code hash & code id
 let upload_snip120u = async (wasm) => {
     const msgStoreCode = new MsgStoreCode({
@@ -10,10 +10,13 @@ let upload_snip120u = async (wasm) => {
     });
 
     //define the authz msg
-    const msgExec = new MsgExec({ grantee: granteeAddress, msgs: [msgStoreCode] });
+    // const msgExec = new MsgExec({ grantee: granteeAddress, msgs: [msgStoreCode] });
+    // const tx = await secretjs.tx.broadcast(msgExec, {
+    //     gasLimit: 400_000,
+    // });
 
     // broadcast 
-    const tx = await secretjs.tx.broadcast(msgExec, {
+    const tx = await secretjs.tx.broadcast([msgStoreCode], {
         gasLimit: 400_000,
     });
 
@@ -53,12 +56,13 @@ let init_snip120u = async (name, symbol, supported_denom) => {
         label: " Secret Wrapped Terp Network Gas Tokens (THIOL)" + Math.ceil(Math.random() * 10000),
     });
 
-    //define the authz msg
-    const msgExec = new MsgExec({ grantee: granteeAddress, msgs: [msgInstantiateContract] });
-
-    // broadcast 
-    const tx = await secretjs.tx.broadcast(msgExec, {
-        gasLimit: 400_000,
+    //broadcast as authz msg
+    // const msgExec = new MsgExec({ grantee: granteeAddress, msgs: [msgInstantiateContract] });
+    // const tx = await secretjs.tx.broadcast(msgExec, {
+    //     gasLimit: 400_000,
+    // });
+    const tx = await secretjs.tx.broadcast(msgInstantiateContract, {
+        gasLimit: 1_000_000,
     });
 
     if (tx.code == 0) {
@@ -99,7 +103,7 @@ let set_viewing_key = async (contract, entropy) => {
     )
 }
 let fund_headstash = async (contract, amount) => {
-    const msg = { transfer: { recipient: scrtHeadstashContractAddr, amount: amount } }
+    const msg = { transfer: { recipient: headstashAddr, amount: amount } }
     let tx = await secretjs.tx.compute.executeContract(
         {
             sender: wallet.address,

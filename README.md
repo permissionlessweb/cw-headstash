@@ -65,8 +65,8 @@ Contract owner function that will clawback any balance this contract has, into t
 ## SecretJS scripts
 | Command | Description |
 | --- | --- |
-| `-store-headstash` | Stores an airdrop contract |
-| `-store-snip120u` | Stores an airdrop contract |
+| `-upload-headstash` | Stores an airdrop contract |
+| `-upload-snip120u` | Stores an airdrop contract |
 | `-i-snip1` | Instantiates SNIP-20 version of token ONE |
 | `-i-snip2` | Optional, Instantiates SNIP-20 version of token TWO |
 | `-init-headstash` | Instantiates headstash contract with default settings |

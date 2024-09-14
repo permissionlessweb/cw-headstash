@@ -1,37 +1,38 @@
 import { Wallet, SecretNetworkClient, EncryptionUtilsImpl, MsgExecuteContract, fromUtf8, MsgExecuteContractResponse } from "secretjs";
-import { claim, add_headstash } from './account.js'
-import { printBatch } from './batch-add.js'
+// import { claim, add_headstash } from './account.js'
+// import { printBatch } from './batch-add.js'
 import { init_snip120u, deposit_to_snip20, query_token_info, query_token_config, set_viewing_key, query_balance, fund_headstash, upload_snip120u } from './snip20.js'
 import * as fs from "fs";
 
 import { upload_headstash_contract,instantiate_headstash_contract } from "./headstash.js";
 // wallet
-export const chain_id = "pulsar-3";
 export const wallet = new Wallet("<your-mnemonic-seed>");
-export const txEncryptionSeed = EncryptionUtilsImpl.GenerateNewSeed();
-export const cw_headstash_blob = fs.readFileSync("../../artifacts/cw_headstash.wasm.gz");
-export const snip120u_blob = fs.readFileSync("../../artifacts/snip120u.wasm.gz");
-
+export const granteeAddress = "test"
 // headstash contract
-export const headstashCodeId = 9016;
-export const headstashCodeHash = "f89afb136c18be3d1f008b799ca140f7916a1c62a2fc5c1e8e9e4f14778eafe9";
+export const headstashCodeId = 10366;
+export const headstashCodeHash = "0fa0106dfd5a9694064467ddd0868633a879a430c9f847a1105397c3476bbd08";
+export const headstashAddr = "";
 
 // snip-120u
-export const snip120uCodeId = 5697;
+export const snip120uCodeId = 0;
 export const snip120uCodeHash = "c74bc4b0406507257ed033caa922272023ab013b0c74330efc16569528fa34fe";
 
 // snip-1u20 addrs
-export const snip120uAddr1 = "";
-export const snip120uAddr2 = "";
+export const snip120uAddr1 = "test";
+export const snip120uAddr2 = "test";
 // token ONE & TWO denoms.
-export const snip120uNative1 = "";
-export const snip120uNative2 = "";
+export const snip120uNative1 = "test";
+export const snip120uNative2 = "testa";
 
+export const chain_id = "pulsar-3";
+export const cw_headstash_blob = fs.readFileSync("../../artifacts/cw_headstash.wasm.gz");
+export const snip120u_blob = fs.readFileSync("../../artifacts/snip120u.wasm.gz");
 export const entropy = "eretskeretjableret";
 export const permitKey = entropy;
+export const txEncryptionSeed = EncryptionUtilsImpl.GenerateNewSeed();
 
 // json path of headstash allocations
-export const ethPubkeysToAdd = fs.readFileSync('./tools/example-data/amounts.json', 'utf8');
+export const ethPubkeysToAdd = fs.readFileSync('../../contract/headstash/src/distribution.json', 'utf8');
 export var ethPubkeys = JSON.parse(ethPubkeysToAdd);
 export var batchSize = 100;
 
