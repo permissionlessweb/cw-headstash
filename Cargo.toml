@@ -4,6 +4,8 @@ members = [
 
   # Secret Headstash Contract
   "contract/headstash",
+  "contract/snip120u",
+  "scripts",
 ]
 exclude = ["scripts"]
 

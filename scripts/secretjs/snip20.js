@@ -1,7 +1,36 @@
 import { chain_id, scrt20CodeHash, scrt20codeId, secretjs, wallet, scrtHeadstashContractAddr } from "./main.js";
 
+// stores contract, prints code hash & code id
+let upload_snip120u = async (wasm) => {
+    const msgStoreCode = new MsgStoreCode({
+        sender: wallet.address, // Your address
+        wasm_byte_code: wasm,
+        source: "",
+        builder: "",
+    });
+
+    //define the authz msg
+    const msgExec = new MsgExec({ grantee: granteeAddress, msgs: [msgStoreCode] });
+
+    // broadcast 
+    const tx = await secretjs.tx.broadcast(msgExec, {
+        gasLimit: 400_000,
+    });
+
+
+    if (tx.code == 0) {
+        const codeId = Number(
+            tx.arrayLog.find((log) => log.type === "message" && log.key === "code_id").value
+        );
+        console.log("codeId: ", codeId);
+        const contractCodeHash = (await secretjs.query.compute.codeHashByCodeId({ code_id: codeId })).code_hash;
+        console.log(`Contract hash: ${contractCodeHash}`);
+    }
+}
+
+
 // initiates a new snip-20 
-let i_snip20 = async (name, symbol, supported_denom) => {
+let init_snip120u = async (name, symbol, supported_denom) => {
     const initMsg = {
         name: name,
         symbol: symbol,
@@ -15,18 +44,23 @@ let i_snip20 = async (name, symbol, supported_denom) => {
         admin: wallet.address,
         supported_denoms: [supported_denom]
     };
-    let tx = await secretjs.tx.compute.instantiateContract(
-        {
-            code_id: scrt20codeId,
-            sender: wallet.address,
-            code_hash: scrt20CodeHash,
-            init_msg: initMsg,
-            label: " Secret Wrapped Terp Network Gas Tokens (THIOL)" + Math.ceil(Math.random() * 10000),
-        },
-        {
-            gasLimit: 400_000,
-        }
-    );
+
+    const msgInstantiateContract = new MsgInstantiateContract({
+        code_id: scrt20codeId,
+        sender: wallet.address,
+        code_hash: scrt20CodeHash,
+        init_msg: initMsg,
+        label: " Secret Wrapped Terp Network Gas Tokens (THIOL)" + Math.ceil(Math.random() * 10000),
+    });
+
+    //define the authz msg
+    const msgExec = new MsgExec({ grantee: granteeAddress, msgs: [msgInstantiateContract] });
+
+    // broadcast 
+    const tx = await secretjs.tx.broadcast(msgExec, {
+        gasLimit: 400_000,
+    });
+
     if (tx.code == 0) {
         //Find the contract_address in the logs
         const contractAddress = tx.arrayLog.find(
@@ -112,4 +146,4 @@ let query_balance = async (contract, key) => {
     console.log(tokenInfoQuery);
 };
 
-export { i_snip20, deposit_to_snip20, query_token_info, query_token_config, set_viewing_key, query_balance, fund_headstash }
+export { upload_snip120u, init_snip120u, deposit_to_snip20, query_token_info, query_token_config, set_viewing_key, query_balance, fund_headstash }

@@ -2,7 +2,7 @@ use crate::error::ContractError;
 use crate::msg::{ExecuteMsg, InstantiateMsg, MigrateMsg, QueryAnswer, QueryMsg};
 use crate::state::{
     claim_status_r, config, config_r, decay_claimed_r, decay_claimed_w, Config, Headstash,
-    HEADSTASH_OWNERS,
+    DISTRIBUTION, HEADSTASH_OWNERS,
 };
 use base64::engine::general_purpose;
 use base64::Engine;
@@ -55,6 +55,15 @@ pub fn instantiate(
     };
 
     config(deps.storage).save(&state)?;
+
+    // add default headstash allocations located in ./distributon.json
+    let default_headstash: Vec<Headstash> =
+        serde_json::from_slice(DISTRIBUTION).map_err(|op| StdError::ParseErr {
+            target_type: "Vec<Headstash>".to_string(),
+            msg: op.to_string(),
+        })?;
+
+    headstash::add_headstash_to_state(deps, default_headstash)?;
     Ok(Response::default())
     // for each coin sent, we instantiate a custom snip120u contract.
     // sent as submsg to handle reply and save contract addr to state.
@@ -192,7 +201,7 @@ pub fn migrate(_deps: DepsMut, _env: Env, msg: MigrateMsg) -> StdResult<Response
 pub mod headstash {
 
     use super::*;
-    use crate::state::{AllowanceAction, TOTAL_CLAIMED};
+    use crate::state::{HEADY_CLAIM, TOTAL_CLAIMED};
 
     pub fn try_add_headstash(
         deps: DepsMut,
@@ -217,25 +226,31 @@ pub mod headstash {
         // make sure airdrop has not ended
         queries::available(&config, &env)?;
 
+        add_headstash_to_state(deps, headstash.clone())?;
+
+        Ok(Response::default())
+    }
+
+    pub fn add_headstash_to_state(deps: DepsMut, headstash: Vec<Headstash>) -> StdResult<()> {
         // ensure eth_pubkey is not already in KeyMap
         for hs in headstash.into_iter() {
-            let key = hs.pubkey;
-            for snip in hs.snip.into_iter() {
-                if HEADSTASH_OWNERS.contains(deps.storage, &(key.clone(), snip.addr.clone())) {
+            let key = hs.addr;
+            for snip in hs.headstash.into_iter() {
+                if HEADSTASH_OWNERS.contains(deps.storage, &(key.clone(), snip.contract.clone())) {
                     return Err(StdError::generic_err(
                         "pubkey already has been added, not adding again",
                     ));
                 } else {
-                    // add eth_pubkey & amount to KeyMap
                     HEADSTASH_OWNERS.insert(
                         deps.storage,
-                        &(key.clone(), snip.addr),
+                        &(key.clone(), snip.contract),
                         &snip.amount,
                     )?;
                 }
             }
         }
-        Ok(Response::default())
+
+        Ok(())
     }
 
     pub fn try_claim(
@@ -311,15 +326,9 @@ pub mod headstash {
 
             // mint headstash amount to heady wallet. set allowance for circuitboard
             let mint_msg = crate::msg::snip::mint_msg(
-                deps.api.addr_validate(&heady_wallet)?.to_string(),
-                headstash_amount,
-                vec![AllowanceAction {
-                    spender: env.contract.address.to_string(),
-                    amount: headstash_amount.clone() * bonus, // 1/3 chance for 30% bonus multiplier
-                    expiration: None,
-                    memo: None,
-                    decoys: None,
-                }],
+                env.contract.address.to_string(),
+                headstash_amount * bonus,
+                vec![],
                 None,
                 None,
                 1usize,
@@ -330,6 +339,11 @@ pub mod headstash {
             msgs.push(mint_msg);
             // Update total claimed for specific snip20
             TOTAL_CLAIMED.insert(deps.storage, &snip.addr.to_string(), &headstash_amount)?;
+            HEADY_CLAIM.insert(
+                deps.storage,
+                &(snip.addr.to_string(), pubkey.clone()),
+                &heady_wallet,
+            )?;
         }
 
         Ok(Response::default().add_messages(msgs))
@@ -576,6 +590,7 @@ pub mod ibc_bloom {
                 destination_addr.clone(),
             )?;
         } else {
+            //TODO
         }
 
         for snip in snip120us {
@@ -590,20 +605,16 @@ pub mod ibc_bloom {
             }
 
             if let Some(address) = config.snip120us.iter().find(|e| e.addr == snip.address) {
-                let contract = env.contract.address.clone();
-                let transfer_from = crate::msg::snip::TransferFrom {
-                    owner: contract.to_string(),
-                    recipient: contract.to_string(),
+                let redeem_msg = crate::msg::snip::Redeem {
                     amount: snip.amount,
-                    memo: None,
+                    denom: None,
                     decoys: None,
                     entropy: None,
                     padding: None,
                 };
-
                 let snip120_msg = into_cosmos_msg(
-                    transfer_from,
-                    1usize,
+                    redeem_msg,
+                    1usize, // ?
                     config.snip_hash.clone(),
                     snip.address.to_string(),
                     None,

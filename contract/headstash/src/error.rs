@@ -12,6 +12,9 @@ pub enum ContractError {
     #[error("unauthorized")]
     Unauthorized {},
     
+    #[error("serde_json error")]
+    SerdeJSON(#[from] serde_json::Error),
+
     #[error("Contract got an unexpected Reply")]
     UnexpectedReply(),
 

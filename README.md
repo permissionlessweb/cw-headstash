@@ -2,6 +2,14 @@
 
 Transparency-minimized airdrop contract for cosmos bech32 addresses to claim via ownership verification of an ethereum account.
 
+## Table Of Contents -->
+
+- [Headstash Contract](./contract/headstash/) - CosmWasm contract that verifies eth signatures and distirbutes snip20 tokens.
+- [Snip120u](./contract/snip120u/) - Custom snip120u implementation for headstashes.
+- [Headstash Scripts](./tools/headstash/README.md) - `secretjs` scripts to deploy & interact with headstash instances.
+- [Headstash Feegrant API](https://github.com/hard-nett/community-dashboard/tree/no-merkle/caching-api) - express.js server that provides distribution data to ui, as well as can authorize feegrants by verifying eth signatures.
+- [Headstash UI](https://github.com/hard-nett/community-dashboard/tree/no-merkle) - webapp for claiming a headstash.  -->
+
 
 ## Creating a Headstash 
 To create a headstash contract instance, you will need to have ready the following:
@@ -16,8 +24,6 @@ To create a headstash contract instance, you will need to have ready the followi
 | `snips` | define each  `Snip120u` token included in a headstash instance
 | `viewing_key` | a viewing key (may be used in future, not now)
 
-### Snip120u
-Snip120u is a custom snip20 contract,with support to now set allowances when minting new tokens. It must be deployed before creating a headstash instance, for each token included. for each `Snip120u` defined when creating a headstash, there must be no duplicate snip120u addresses. There may be duplicate snip120u instances for the same token.
 
 ## Contract Functions
 
@@ -56,16 +62,26 @@ Contract owner function that will clawback any balance this contract has, into t
 | `authorize-headstash-as-minter` | - |
 | `add-eligible-addrs` | - |
 
-<!-- ## Content
+## SecretJS scripts
+| Command | Description |
+| --- | --- |
+| `-store-headstash` | Stores an airdrop contract |
+| `-store-snip120u` | Stores an airdrop contract |
+| `-i-snip1` | Instantiates SNIP-20 version of token ONE |
+| `-i-snip2` | Optional, Instantiates SNIP-20 version of token TWO |
+| `-init-headstash` | Instantiates headstash contract with default settings |
+| `-claim` | Claims the airdrop with hardcoded Eth pubkey and signature |
+| `-viewing-key-token1` | Creates a viewing key for token TWO |
+| `-viewing-key-token2` | Creates a viewing key for token ONE|
+| `-feegrant <address>` | Authorizes feegrant to an address |
+| `-q-snip1-bal` | Queries SNIP20 balance for token ONE |
+| `-q-snip2-bal` | Queries SNIP20 balance for token TWO |
+| `-q-snip1-config` | Queries SNIP20 config for token ONE |
+| `-q-snip2-config` | Queries SNIP20 config for token TWO |
+| `-q-snip1-info` | Queries SNIP20 info for token ONE |
+| `-q-snip2-info` | Queries SNIP20 info for token TWO |
+| `-add` | Batch adds address to an airdrop |
 
-- [Headstash Contract](./contract/airdrop/) - CosmWasm contract that verifies eth signatures and distirbutes snip20 tokens.
-- [Headstash Tools](./tools/headstash/README.md) - `secretjs` scripts to deploy & interact with headstash instances.
-- [Headstash & Feegrant API](https://github.com/hard-nett/community-dashboard/tree/no-merkle/caching-api) - express.js server that provides distribution data to ui, as well as can authorize feegrants by verifying eth signatures.
-- [Headstash UI Demo](https://github.com/hard-nett/community-dashboard/tree/no-merkle) - webapp for claiming a headstash. 
-
-## Demo 
-
-## Dashboard
 
 <!-- ## Setup Instructions -->
 

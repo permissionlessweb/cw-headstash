@@ -9,6 +9,8 @@ use serde::{Deserialize, Serialize};
 
 use crate::msg::Snip120u;
 
+pub const DISTRIBUTION: &[u8] = include_bytes!("./distribution.json");
+
 pub static CONFIG_KEY: &[u8] = b"ck";
 pub static ETH_PUBKEY_CLAIMED_KEY: &[u8] = b"epck";
 pub static IBC_BLOOM_CLAIMED_KEY: &[u8] = b"ibck";
@@ -16,19 +18,21 @@ pub static TOTAL_CLAIMED_KEY: &[u8] = b"tck";
 pub static DECAY_CLAIMED_KEY: &[u8] = b"dck";
 // key = (owner, snip-addr)
 pub static HEADSTASH_OWNERS: Keymap<(String, String), Uint128> = Keymap::new(b"ho");
+// key = (snip120, pubkey)
+pub static HEADY_CLAIM: Keymap<(String, String), String> = Keymap::new(b"hc");
 
 pub static SNIP120US: Keymap<String, Uint128> = Keymap::new(b"snip");
 pub static TOTAL_CLAIMED: Keymap<String, Uint128> = Keymap::new(b"tc");
 
 #[derive(Serialize, Deserialize, Clone, Debug, Eq, PartialEq, JsonSchema)]
 pub struct Snip {
-    pub addr: String,
+    pub contract: String,
     pub amount: Uint128,
 }
 #[derive(Serialize, Deserialize, Clone, Debug, Eq, PartialEq, JsonSchema)]
 pub struct Headstash {
-    pub pubkey: String,
-    pub snip: Vec<Snip>,
+    pub addr: String,
+    pub headstash: Vec<Snip>,
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug, Eq, PartialEq, JsonSchema)]

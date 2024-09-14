@@ -123,13 +123,11 @@ pub mod snip {
     }
 
     #[derive(Serialize, Deserialize, Clone, Debug, Eq, PartialEq, JsonSchema)]
-    pub struct TransferFrom {
-        pub owner: String,
-        pub recipient: String,
+    pub struct Redeem {
         pub amount: Uint128,
+        pub denom: Option<String>,
         pub decoys: Option<Vec<Addr>>,
         pub entropy: Option<Binary>,
-        pub memo: Option<String>,
         pub padding: Option<String>,
     }
 
@@ -182,7 +180,7 @@ pub mod snip {
     }
 
     pub fn into_cosmos_msg(
-        msg: TransferFrom,
+        msg: Redeem,
         mut block_size: usize,
         code_hash: String,
         contract_addr: String,
