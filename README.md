@@ -43,13 +43,20 @@ Contract owner function that will add an eligible address that can verify & clai
 ### Clawback
 Contract owner function that will clawback any balance this contract has, into the snip120u token form.
 
+### Ibc-Bloom 
+
+Ibc-Bloom is how participants who have claimed a headstash get tokens to their home chains, without revealing the owner of the tokens. Users submit their desired actioms, and the contract stores them to be run for later. A `min_cadance` is the minimum time all ibc-bloom msgs will process. The longer, the more obfuscation, so users will be able to add a `cadance` length to extend this time. A value called `entropy_ratio` is set by the user and is a 1-10 range of the level of entropy users desire to introduce for completing their ibc-bloom process. The lower this value is, the greater the chance your transaction will be included to finalize by the contracts. 
+
+The contract at random intervals, will randomly choose from an entropy_ratio, a randoom list msgs from a random list of addresses. These msgs will be process and included to facilitate 
+
+
 ## Headstash Lifecycle 
 
 ### Allocation distribution is prepared 
 ### IBC infrastructure is prepared
 ### ICA is deployed on controller network
-### Necessary Authorizations are granted
-### Headstash Infrastructure is deployed on host network
+### Necessary authorizations are granted
+### Headstash infrastructure is deployed on host network
 
 ## Cw-Orchestrator Scripts
 | value | description| 

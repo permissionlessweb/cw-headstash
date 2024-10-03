@@ -1,9 +1,6 @@
 use crate::error::ContractError;
 use crate::msg::{ExecuteMsg, InstantiateMsg, MigrateMsg, QueryAnswer, QueryMsg};
-use crate::state::{
-    claim_status_r, config, config_r, decay_claimed_r, decay_claimed_w, Config, Headstash,
-    DISTRIBUTION, HEADSTASH_OWNERS,
-};
+use crate::state::{Config, Headstash, CONFIG, HEADSTASH_OWNERS};
 use base64::engine::general_purpose;
 use base64::Engine;
 // use crate::SNIP120U_REPLY;
@@ -54,16 +51,8 @@ pub fn instantiate(
         channel_id: msg.channel_id,
     };
 
-    config(deps.storage).save(&state)?;
+    CONFIG.save(deps.storage, &state)?;
 
-    // add default headstash allocations located in ./distributon.json
-    let default_headstash: Vec<Headstash> =
-        serde_json::from_slice(DISTRIBUTION).map_err(|op| StdError::ParseErr {
-            target_type: "Vec<Headstash>".to_string(),
-            msg: op.to_string(),
-        })?;
-
-    headstash::add_headstash_to_state(deps, default_headstash)?;
     Ok(Response::default())
     // for each coin sent, we instantiate a custom snip120u contract.
     // sent as submsg to handle reply and save contract addr to state.
@@ -110,23 +99,13 @@ pub fn execute(deps: DepsMut, env: Env, info: MessageInfo, msg: ExecuteMsg) -> S
         ExecuteMsg::Claim {
             eth_pubkey,
             eth_sig,
-            heady_wallet,
-        } => self::headstash::try_claim(deps, env, info, eth_pubkey, eth_sig, heady_wallet),
+        } => self::headstash::try_claim(deps, env, info, eth_pubkey, eth_sig),
         ExecuteMsg::Clawback {} => self::headstash::try_clawback(deps, env, info),
         ExecuteMsg::IbcBloom {
-            destination_addr,
             eth_pubkey,
-            eth_sig,
-            snip120s,
-        } => self::ibc_bloom::try_ibc_bloom(
-            deps,
-            env,
-            info,
-            eth_pubkey,
-            eth_sig,
-            destination_addr,
-            snip120s,
-        ),
+            bloom_msg,
+        } => self::ibc_bloom::try_ibc_bloom(deps, env, info, eth_pubkey, bloom_msg),
+        ExecuteMsg::HandleIbcBloom {} => ibc_bloom::handle_ibc_bloom_actions(deps, info),
     }
 }
 
@@ -201,7 +180,10 @@ pub fn migrate(_deps: DepsMut, _env: Env, msg: MigrateMsg) -> StdResult<Response
 pub mod headstash {
 
     use super::*;
-    use crate::state::{HEADY_CLAIM, TOTAL_CLAIMED};
+    use crate::state::{
+        AllowanceAction, HeadstashSig, CLAIMED_HEADSTASH, DECAY_CLAIMED, HEADSTASH_SIGS,
+        TOTAL_CLAIMED,
+    };
 
     pub fn try_add_headstash(
         deps: DepsMut,
@@ -210,7 +192,7 @@ pub mod headstash {
         headstash: Vec<Headstash>,
     ) -> StdResult<Response> {
         // ensure sender is admin
-        let config = config_r(deps.storage).load()?;
+        let config = CONFIG.load(deps.storage)?;
 
         if headstash.is_empty() {
             return Err(StdError::generic_err(
@@ -236,16 +218,14 @@ pub mod headstash {
         for hs in headstash.into_iter() {
             let key = hs.addr;
             for snip in hs.headstash.into_iter() {
-                if HEADSTASH_OWNERS.contains(deps.storage, &(key.clone(), snip.contract.clone())) {
+                let l1 = HEADSTASH_OWNERS.add_suffix(key.as_bytes());
+                let l2 = l1.add_suffix(snip.contract.as_bytes());
+                if l2.may_load(deps.storage)?.is_some() {
                     return Err(StdError::generic_err(
                         "pubkey already has been added, not adding again",
                     ));
                 } else {
-                    HEADSTASH_OWNERS.insert(
-                        deps.storage,
-                        &(key.clone(), snip.contract),
-                        &snip.amount,
-                    )?;
+                    l2.save(deps.storage, &snip.amount)?
                 }
             }
         }
@@ -259,36 +239,36 @@ pub mod headstash {
         info: MessageInfo,
         pubkey: String,
         sig: String,
-        heady_wallet: String,
     ) -> StdResult<Response> {
         let mut msgs: Vec<CosmosMsg> = vec![];
-        let config = config_r(deps.storage).load()?;
+        let config = CONFIG.load(deps.storage)?;
 
         // make sure airdrop has not ended
         queries::available(&config, &env)?;
 
         // if pubkey does not start with 0x1, we expect it is a solana wallet and we must verify
         if pubkey.starts_with("0x1") {
-            validation::verify_ethereum_claim(
-                &deps,
+            validation::verify_ethereum_sig(
+                deps.api,
+                deps.storage,
                 info.sender.clone(),
                 pubkey.to_string(),
                 sig.clone(),
                 config.claim_msg_plaintext.clone(),
             )?;
         } else {
-            validation::verify_solana_wallet(
+            validation::verify_solana_sig(
                 &deps,
                 info.sender.clone(),
                 pubkey.clone(),
-                sig,
+                sig.clone(),
                 config.claim_msg_plaintext,
             )?;
         }
 
-        // check if address has already claimed
-        let state = claim_status_r(deps.storage).may_load(pubkey.as_bytes())?;
-        if state == Some(true) {
+        // check if address has already claimed. This occurs after sig is verified, preventing leakage of claim status for a key.
+        let pf = CLAIMED_HEADSTASH.add_suffix(pubkey.as_bytes());
+        if pf.may_load(deps.storage)? == Some(true) {
             return Err(StdError::generic_err(
                 "You have already claimed your headstash, homie!",
             ));
@@ -317,32 +297,44 @@ pub mod headstash {
             //     ));
             // };
 
-            // get headstash amount from KeyMap
-            let headstash_amount = HEADSTASH_OWNERS
-                .get(deps.storage, &(pubkey.clone(), snip.addr.to_string()))
-                .ok_or_else(|| {
-                    StdError::generic_err("Ethereum Pubkey not found in the contract state!")
-                })?;
+            // get headstash amount from map
+            let l1 = HEADSTASH_OWNERS.add_suffix(pubkey.clone().as_bytes());
+            let l2 = l1.add_suffix(snip.addr.as_bytes());
+            if let Some(amnt) = l2.may_load(deps.storage)? {
+                let headstash_amount = amnt * bonus;
+                // mint headstash amount to message signer. set allowance for this contract
+                let mint_msg = crate::msg::snip::mint_msg(
+                    info.sender.to_string(), // mint to the throwaway key
+                    headstash_amount,
+                    vec![AllowanceAction {
+                        spender: env.contract.address.to_string(),
+                        amount: headstash_amount,
+                        expiration: config.end_date,
+                        memo: None,
+                        decoys: None,
+                    }],
+                    None,
+                    None,
+                    1usize,
+                    config.snip_hash.clone(),
+                    snip.addr.to_string(),
+                )?;
 
-            // mint headstash amount to heady wallet. set allowance for circuitboard
-            let mint_msg = crate::msg::snip::mint_msg(
-                env.contract.address.to_string(),
-                headstash_amount * bonus,
-                vec![],
-                None,
-                None,
-                1usize,
-                config.snip_hash.clone(),
-                snip.addr.to_string(),
-            )?;
+                msgs.push(mint_msg);
 
-            msgs.push(mint_msg);
-            // Update total claimed for specific snip20
-            TOTAL_CLAIMED.insert(deps.storage, &snip.addr.to_string(), &headstash_amount)?;
-            HEADY_CLAIM.insert(
+                // Update total claimed for specific snip20
+                let tc = TOTAL_CLAIMED.add_suffix(snip.addr.as_str().as_bytes());
+                tc.save(deps.storage, &headstash_amount)?;
+            }
+
+            // saves signature w/ key to item in state as info.sender
+            let hs = HEADSTASH_SIGS.add_suffix(info.sender.as_str().as_bytes());
+            hs.save(
                 deps.storage,
-                &(snip.addr.to_string(), pubkey.clone()),
-                &heady_wallet,
+                &HeadstashSig {
+                    addr: pubkey.clone(),
+                    sig: sig.clone(),
+                },
             )?;
         }
 
@@ -352,7 +344,8 @@ pub mod headstash {
     pub fn try_clawback(deps: DepsMut, env: Env, info: MessageInfo) -> StdResult<Response> {
         let mut msgs: Vec<CosmosMsg> = vec![];
         // ensure sender is admin
-        let config = config_r(deps.storage).load()?;
+        let config = CONFIG.load(deps.storage)?;
+
         let admin = config.admin;
         if info.sender != admin {
             return Err(StdError::generic_err(
@@ -363,7 +356,7 @@ pub mod headstash {
         // ensure clawback can happen, update state
         if let Some(end_date) = config.end_date {
             if env.block.time.seconds() > end_date {
-                decay_claimed_w(deps.storage).update(|claimed| {
+                DECAY_CLAIMED.update(deps.storage, |claimed| {
                     if claimed {
                         Err(StdError::generic_err("this jawn already was clawed-back!"))
                     } else {
@@ -373,27 +366,25 @@ pub mod headstash {
             }
 
             for snip in config.snip120us {
-                // get headstash amount from KeyMap
-                let total_claimed = TOTAL_CLAIMED
-                    .get(deps.storage, &snip.addr.to_string())
-                    .ok_or_else(|| StdError::generic_err("weird bug!"))?;
+                // update headstash amount for admin
+                let tc = TOTAL_CLAIMED.add_suffix(snip.addr.as_str().as_bytes());
+                tc.update(deps.storage, |a| {
+                    let new = snip.total_amount.checked_sub(a)?;
+                    let mint_msg = crate::msg::snip::mint_msg(
+                        admin.to_string(),
+                        new,
+                        vec![],
+                        None,
+                        None,
+                        1usize,
+                        config.snip_hash.clone(),
+                        snip.addr.to_string(),
+                    )?;
+                    msgs.push(mint_msg);
+                    Ok(new)
+                })?;
 
-                let clawback_total = snip.total_amount.checked_sub(total_claimed)?;
-
-                let mint_msg = crate::msg::snip::mint_msg(
-                    admin.to_string(),
-                    clawback_total,
-                    vec![],
-                    None,
-                    None,
-                    1usize,
-                    config.snip_hash.clone(),
-                    snip.addr.to_string(),
-                )?;
-
-                msgs.push(mint_msg);
                 // Update total claimed
-                TOTAL_CLAIMED.insert(deps.storage, &snip.addr.to_string(), &clawback_total)?;
             }
         } else {
             return Err(StdError::generic_err(
@@ -406,6 +397,8 @@ pub mod headstash {
 }
 
 pub mod queries {
+    use crate::state::DECAY_CLAIMED;
+
     use super::*;
 
     pub fn available(config: &Config, env: &Env) -> StdResult<()> {
@@ -426,18 +419,18 @@ pub mod queries {
 
     pub fn clawback(deps: Deps) -> StdResult<QueryAnswer> {
         Ok(QueryAnswer::ClawbackResponse {
-            bool: decay_claimed_r(deps.storage).load()?,
+            bool: DECAY_CLAIMED.load(deps.storage)?,
         })
     }
 
     pub fn query_config(deps: Deps) -> StdResult<QueryAnswer> {
         Ok(QueryAnswer::ConfigResponse {
-            config: config_r(deps.storage).load()?,
+            config: CONFIG.load(deps.storage)?,
         })
     }
 
     pub fn dates(deps: Deps) -> StdResult<QueryAnswer> {
-        let config = config_r(deps.storage).load()?;
+        let config = CONFIG.load(deps.storage)?;
         Ok(QueryAnswer::DatesResponse {
             start: config.start_date,
             end: config.end_date,
@@ -446,7 +439,7 @@ pub mod queries {
 }
 // src: https://github.com/public-awesome/launchpad/blob/main/contracts/sg-eth-airdrop/src/claim_airdrop.rs#L85
 pub mod validation {
-    use cosmwasm_std::{Addr, Decimal};
+    use cosmwasm_std::{Addr, Api, Decimal, Storage};
 
     use super::*;
     use crate::verify_ethereum_text;
@@ -472,14 +465,14 @@ pub mod validation {
     }
 
     /// Validates an ethereum signature comes from a given pubkey.
-    pub fn verify_ethereum_claim(
-        deps: &DepsMut,
+    pub fn verify_ethereum_sig(
+        api: &dyn Api,
         sender: Addr,
-        eth_pubkey: String,
-        eth_sig: String,
+        signer: String,
+        sig: String,
         plaintxt: String,
     ) -> Result<(), StdError> {
-        match validate_ethereum_text(deps, sender, plaintxt, eth_sig, eth_pubkey.clone())? {
+        match validate_ethereum_text(api, sender.clone(), plaintxt, sig.clone(), signer.clone())? {
             true => Ok(()),
             false => Err(StdError::generic_err("cannot validate eth_sig")),
         }
@@ -500,7 +493,7 @@ pub mod validation {
     }
 
     pub fn validate_ethereum_text(
-        deps: &DepsMut,
+        api: &dyn Api,
         sender: Addr,
         plaintxt: String,
         eth_sig: String,
@@ -508,9 +501,7 @@ pub mod validation {
     ) -> StdResult<bool> {
         let plaintext_msg = compute_plaintext_msg(plaintxt, sender);
         match hex::decode(eth_sig.clone()) {
-            Ok(eth_sig_hex) => {
-                verify_ethereum_text(deps.as_ref(), &plaintext_msg, &eth_sig_hex, &eth_pubkey)
-            }
+            Ok(eth_sig_hex) => verify_ethereum_text(api, &plaintext_msg, &eth_sig_hex, &eth_pubkey),
             Err(_) => Err(StdError::InvalidHex {
                 msg: format!("Could not decode the eth signature"),
             }),
@@ -523,7 +514,7 @@ pub mod validation {
     }
 
     // source: https://github.com/SecretSaturn/SecretPath/blob/aae6c61ff755aa22112945eab308e9037044980b/TNLS-Gateways/secret/src/msg.rs#L101
-    pub fn verify_solana_wallet(
+    pub fn verify_solana_sig(
         deps: &DepsMut,
         sender: Addr,
         pubkey: String,
@@ -561,84 +552,98 @@ pub mod validation {
 pub mod ibc_bloom {
     use super::*;
 
-    use cosmwasm_std::{Addr, Coin, DepsMut, IbcMsg, IbcTimeout, StdError};
+    use cosmwasm_std::{Addr, Decimal, DepsMut, StdError};
 
-    use crate::state::{ibc_bloom_status_r, ibc_bloom_status_w};
-    use crate::verify::verify_ethereum_text;
-
-    use crate::{msg::snip::into_cosmos_msg, state::BloomSnip120u};
+    use crate::{
+        msg::snip::into_cosmos_msg,
+        state::{
+            bloom::{BloomSnip120u, IbcBloomMsg, IbcBloomStore},
+            BLOOMSBLOOMS, HEADSTASH_SIGS,
+        },
+        verify::verify_ethereum_text,
+    };
 
     pub fn try_ibc_bloom(
         deps: DepsMut,
         env: Env,
         info: MessageInfo,
         pubkey: String,
-        sig: String,
-        destination_addr: String,
-        snip120us: Vec<BloomSnip120u>,
+        bloom_msg: IbcBloomMsg,
     ) -> StdResult<Response> {
-        let mut msgs = vec![];
-        let config = config_r(deps.storage).load()?;
-        // if pubkey does not start with 0x1, we expect it is a solana wallet and we must verify
-        if pubkey.starts_with("0x1") {
-            verify_bloom_claim(
-                &deps,
-                info.sender.clone(),
-                pubkey.clone(),
-                sig.clone(),
-                config.claim_msg_plaintext,
-                destination_addr.clone(),
-            )?;
-        } else {
-            //TODO
-        }
-
-        for snip in snip120us {
-            HEADSTASH_OWNERS
-                .get(deps.storage, &(pubkey.clone(), snip.address.to_string()))
-                .ok_or_else(|| {
-                    StdError::generic_err("Ethereum Pubkey not found in the contract state!")
-                })?;
-
-            if ibc_bloom_status_r(deps.storage).load(sig.as_bytes())? {
-                return Err(StdError::generic_err("already ibc-bloomed"));
+        let config = CONFIG.load(deps.storage)?;
+        // verify msg sender has been authorized with public address signature
+        let hs = HEADSTASH_SIGS.add_suffix(info.sender.as_str().as_bytes());
+        if let Some(sig) = hs.may_load(deps.storage)? {
+            if sig.addr.ne(info.sender.as_str()) {
+                return Err(StdError::generic_err("unable to process bloom."));
             }
-
-            if let Some(address) = config.snip120us.iter().find(|e| e.addr == snip.address) {
-                let redeem_msg = crate::msg::snip::Redeem {
-                    amount: snip.amount,
-                    denom: None,
-                    decoys: None,
-                    entropy: None,
-                    padding: None,
-                };
-                let snip120_msg = into_cosmos_msg(
-                    redeem_msg,
-                    1usize, // ?
-                    config.snip_hash.clone(),
-                    snip.address.to_string(),
-                    None,
-                )?;
-
-                let ibc_send = IbcMsg::Transfer {
-                    channel_id: config.channel_id.clone(),
-                    to_address: destination_addr.clone(),
-                    amount: Coin::new(snip.amount.u128(), address.native_token.clone()),
-                    timeout: IbcTimeout::with_timestamp(env.block.time.plus_seconds(300u64)),
-                    memo: "".into(),
-                };
-
-                msgs.push(snip120_msg);
-                msgs.push(ibc_send.into())
+            // save bloomMsg
+            // IbcBloomStore::save_bloom_to_mempool(deps.storage, &info.sender, vec![bloom_msg.clone()])?;
+            let entropy_ratio = bloom_msg.entropy_ratio.clamp(1, 10) as u128;
+            let blooms = BLOOMSBLOOMS
+                .add_suffix(entropy_ratio.to_string().as_bytes())
+                .add_suffix(info.sender.clone().into_string().as_bytes());
+            if let Some(bloom) = blooms.get(deps.storage, &info.sender.to_string()) {
+                if bloom.source_token == bloom_msg.source_token {
+                    return Err(StdError::generic_err("Blooming for this token has already begun!
+                     There is no current support to update or add additional bloom msgs for the same source token.
+                     If you would like this feature, lets make it happen :)"));
+                }
+                blooms.insert(deps.storage, &sig.addr, &bloom_msg)?;
             } else {
-                return Err(StdError::generic_err("no snip20 addr provided"));
+                blooms.insert(deps.storage, &sig.addr, &bloom_msg)?;
+            };
+
+            if pubkey.starts_with("0x1") {
+                verify_bloom_claim(
+                    &deps,
+                    info.sender.clone(),
+                    pubkey.clone(),
+                    sig.sig.clone(),
+                    config.claim_msg_plaintext,
+                )?;
+            } else {
+                // TODO
             }
-        }
+        };
 
-        // set eth-pubkey to state
-        ibc_bloom_status_w(deps.storage).save(pubkey.as_bytes(), &true)?;
+        // for snip in snip120us {
+        // if ibc_bloom_status_r(deps.storage).load(sig.as_bytes())? {
+        //     return Err(StdError::generic_err("already ibc-bloomed"));
+        // }
 
-        Ok(Response::new().add_messages(msgs))
+        //     // if let Some(address) = config.snip120us.iter().find(|e| e.addr == snip.address) {
+        //     //     let redeem_msg = crate::msg::snip::Redeem {
+        //     //         amount: snip.amount,
+        //     //         denom: None,
+        //     //         decoys: None,
+        //     //         entropy: None,
+        //     //         padding: None,
+        //     //     };
+        //     //     let snip120_msg = into_cosmos_msg(
+        //     //         redeem_msg,
+        //     //         1usize, // ?
+        //     //         config.snip_hash.clone(),
+        //     //         snip.address.to_string(),
+        //     //         None,
+        //     //     )?;
+
+        //     //     let ibc_send = IbcMsg::Transfer {
+        //     //         channel_id: config.channel_id.clone(),
+        //     //         to_address: destination_addr.clone(),
+        //     //         amount: Coin::new(snip.amount.u128(), address.native_token.clone()),
+        //     //         timeout: IbcTimeout::with_timestamp(env.block.time.plus_seconds(300u64)),
+        //     //         memo: "".into(),
+        //     //     };
+
+        //     //     msgs.push(snip120_msg);
+        //     //     msgs.push(ibc_send.into())
+        //     // } else {
+        //     //     return Err(StdError::generic_err("no snip20 addr provided"));
+        //     // }
+        // }
+
+        Ok(Response::new())
     }
 
     // todo: compress into headstash validation also
@@ -648,16 +653,8 @@ pub mod ibc_bloom {
         eth_pubkey: String,
         eth_sig: String,
         claim_plaintxt: String,
-        secondary_address: String,
     ) -> Result<(), StdError> {
-        match validate_bloom_ethereum_text(
-            deps,
-            sender,
-            &claim_plaintxt,
-            eth_sig,
-            eth_pubkey,
-            secondary_address,
-        )? {
+        match validate_bloom_ethereum_text(deps, sender, &claim_plaintxt, eth_sig, eth_pubkey)? {
             true => Ok(()),
             false => Err(StdError::generic_err("cannot validate eth_sig")),
         }
@@ -670,12 +667,11 @@ pub mod ibc_bloom {
         claim_plaintxt: &String,
         eth_sig: String,
         eth_pubkey: String,
-        secondary_address: String,
     ) -> StdResult<bool> {
-        let plaintext_msg = compute_bloom_plaintext_msg(claim_plaintxt, sender, &secondary_address);
+        let plaintext_msg = compute_bloom_plaintext_msg(claim_plaintxt, sender);
         match hex::decode(eth_sig.clone()) {
             Ok(eth_sig_hex) => {
-                verify_ethereum_text(deps.as_ref(), &plaintext_msg, &eth_sig_hex, &eth_pubkey)
+                verify_ethereum_text(deps.api, &plaintext_msg, &eth_sig_hex, &eth_pubkey)
             }
             Err(_) => Err(StdError::InvalidHex {
                 msg: format!("Could not decode {eth_sig}"),
@@ -684,13 +680,8 @@ pub mod ibc_bloom {
     }
 
     // loads the sender and secondary wallet to the claim_plaintxt string.
-    pub fn compute_bloom_plaintext_msg(
-        claim_plaintxt: &String,
-        sender: Addr,
-        secondary_address: &String,
-    ) -> String {
+    pub fn compute_bloom_plaintext_msg(claim_plaintxt: &String, sender: Addr) -> String {
         let mut plaintext_msg = str::replace(&claim_plaintxt, "{wallet}", sender.as_ref());
-        plaintext_msg = str::replace(&plaintext_msg, "{secondary_address}", secondary_address);
         plaintext_msg
     }
 
@@ -718,9 +709,8 @@ pub mod ibc_bloom {
         pubkey: String,
         signature: String,
         plaintxt: String,
-        secondary_address: &String,
     ) -> Result<(), StdError> {
-        let computed_plaintxt = compute_bloom_plaintext_msg(&plaintxt, sender, secondary_address);
+        let computed_plaintxt = compute_bloom_plaintext_msg(&plaintxt, sender);
         match deps.api.secp256k1_verify(
             computed_plaintxt.clone().into_bytes().as_slice(),
             signature.clone().into_bytes().as_slice(),
@@ -746,6 +736,26 @@ pub mod ibc_bloom {
                 }),
         }
     }
+
+    pub fn handle_ibc_bloom_actions(
+        deps: DepsMut,
+        info: MessageInfo,
+    ) -> Result<Response, StdError> {
+        // ensure sender is admin
+        let config = CONFIG.load(deps.storage)?;
+        let admin = config.admin;
+        if info.sender != admin {
+            return Err(StdError::generic_err("aint no bloomin happenin!"));
+        }
+
+        // load bloom-mempool
+        // let msgs = IbcBloomStore::load_bloom_from_mempool(deps.storage, &info.sender);
+
+        // form msg
+
+        //
+        Ok(Response::new())
+    }
 }
 
 pub mod utils {
@@ -768,6 +778,30 @@ pub mod utils {
     //     };
     //     Ok(execute.into())
     // }
+
+    pub fn weighted_random(rand: u64) -> u64 {
+        if rand < 90 {
+            1
+        } else if rand < 170 {
+            2
+        } else if rand < 240 {
+            3
+        } else if rand < 300 {
+            4
+        } else if rand < 350 {
+            5
+        } else if rand < 390 {
+            6
+        } else if rand < 420 {
+            7
+        } else if rand < 440 {
+            8
+        } else if rand < 449 {
+            9
+        } else {
+            10
+        }
+    }
 
     // Take a Vec<u8> and pad it up to a multiple of `block_size`, using spaces at the end.
     pub fn space_pad(block_size: usize, message: &mut Vec<u8>) -> &mut Vec<u8> {
@@ -802,15 +836,12 @@ mod tests {
         let secondary_address = "secondary123".to_string();
 
         assert_eq!(
-            compute_bloom_plaintext_msg(&PLAINTXT.to_string(), sender.clone(), &secondary_address),
+            compute_bloom_plaintext_msg(&PLAINTXT.to_string(), sender.clone()),
             expected_result.to_string()
         );
 
-        let err = compute_bloom_plaintext_msg(
-            &PLAINTXT.to_string(),
-            Addr::unchecked(secondary_address),
-            &sender.to_string(),
-        );
+        let err =
+            compute_bloom_plaintext_msg(&PLAINTXT.to_string(), Addr::unchecked(secondary_address));
 
         assert_ne!(err, expected_result.to_string());
     }

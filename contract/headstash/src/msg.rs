@@ -3,23 +3,13 @@ use cosmwasm_std::{Addr, Binary, Uint128};
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
-use crate::state::{BloomSnip120u, Config, Headstash};
-
-#[derive(Serialize, Deserialize, Clone, Debug, Eq, PartialEq, JsonSchema)]
-pub struct Snip120u {
-    // native x/bank token for this snip120u
-    pub native_token: String,
-    // pub name: String,
-    pub addr: Addr,
-    // total amount of this to be distributed during this headstash
-    pub total_amount: Uint128,
-}
+use crate::state::{bloom::IbcBloomMsg, Config, Headstash, Snip120u};
 
 #[derive(Serialize, Deserialize, Clone, Debug, Eq, PartialEq, JsonSchema)]
 pub struct InstantiateMsg {
     /// owner of contract
     pub owner: Addr,
-    /// {wallet}
+    /// HREAM ~ {} ~ {} ~ {}
     pub claim_msg_plaintext: String,
     /// optional date that once reached, will start headstash distribution event.
     pub start_date: Option<u64>,
@@ -47,15 +37,13 @@ pub enum ExecuteMsg {
     Claim {
         eth_pubkey: String,
         eth_sig: String,
-        heady_wallet: String,
     },
     Clawback {},
     IbcBloom {
         eth_pubkey: String,
-        eth_sig: String,
-        destination_addr: String,
-        snip120s: Vec<BloomSnip120u>,
+        bloom_msg: IbcBloomMsg,
     },
+    HandleIbcBloom {},
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug, Eq, PartialEq, JsonSchema)]
@@ -87,6 +75,12 @@ pub enum QueryAnswer {
 pub enum MigrateMsg {
     Migrate {},
     StdError {},
+}
+
+#[derive(Serialize, Deserialize, Clone, Debug, Eq, PartialEq, JsonSchema)]
+#[serde(rename_all = "snake_case")]
+pub enum SudoMsg {
+    HandleIbcBloom {},
 }
 
 pub mod snip {

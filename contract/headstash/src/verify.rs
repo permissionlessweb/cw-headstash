@@ -1,4 +1,4 @@
-use cosmwasm_std::{Deps, StdError, StdResult};
+use cosmwasm_std::{Api,  StdError, StdResult};
 use secret_toolkit::crypto::secp256k1::PublicKey;
 use sha2::Digest;
 use sha3::Keccak256;
@@ -52,7 +52,7 @@ pub fn decode_address(input: &str) -> StdResult<[u8; 20]> {
 }
 
 pub fn verify_ethereum_text(
-    deps: Deps,
+    api: &dyn Api,
     message: &str,
     signature: &[u8],
     signer_address: &str,
@@ -73,7 +73,7 @@ pub fn verify_ethereum_text(
     let recovery = get_recovery_param(*v)?;
 
     // Verification
-    let calculated_pubkey = deps.api.secp256k1_recover_pubkey(&hash, rs, recovery)?;
+    let calculated_pubkey = api.secp256k1_recover_pubkey(&hash, rs, recovery)?;
 
     // Deserialize the uncompressed public key
     let uncompressed_public_key = PublicKey::parse(&calculated_pubkey)
@@ -83,7 +83,7 @@ pub fn verify_ethereum_text(
     if signer_address != calculated_address {
         return Ok(false);
     }
-    let result = deps.api.secp256k1_verify(&hash, rs, &calculated_pubkey);
+    let result = api.secp256k1_verify(&hash, rs, &calculated_pubkey);
     match result {
         Ok(verifies) => Ok(verifies),
         Err(err) => Err(err.into()),
