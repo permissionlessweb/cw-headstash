@@ -44,7 +44,7 @@ secret-toolkit-crypto = { git = "https://github.com/scrtlabs/secret-toolkit", fe
   "hash",
 ], rev = "9b74bdac71c2fedcc12246f18cdfdd94b8991282" }
 
-shade-protocol = { git = "https://github.com/securesecrets/shade", rev= "ae81bce8e1cb42df40b28aa811e9f701a4d78738"}
+shade-protocol = { git = "https://github.com/securesecrets/shade", rev= "9e43008786536564443fd9832713b7b2bca9fb5b"}
 schemars = "0.8.12"
 serde = { version = "1.0.158", default-features = false, features = ["derive"] }
 base64 = "0.21.0"

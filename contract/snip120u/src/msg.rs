@@ -97,6 +97,14 @@ pub enum ExecuteMsg {
         entropy: Option<Binary>,
         padding: Option<String>,
     },
+    RedeemFrom {
+        owner: String,
+        amount: Uint128,
+        denom: Option<String>,
+        decoys: Option<Vec<Addr>>,
+        entropy: Option<Binary>,
+        padding: Option<String>,
+    },
     Deposit {
         decoys: Option<Vec<Addr>>,
         entropy: Option<Binary>,
@@ -340,7 +348,9 @@ pub enum ExecuteAnswer {
     Redeem {
         status: ResponseStatus,
     },
-
+    RedeemFrom {
+        status: ResponseStatus,
+    },
     // Base
     Transfer {
         status: ResponseStatus,

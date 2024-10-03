@@ -45,7 +45,7 @@ pub static BLOOM_CLAIMED_KEY: Item<bool> = Item::new(KEY_BLOOM_CLAIMED_KEY);
 #[derive(Serialize, Deserialize, Clone, Debug, Eq, PartialEq, JsonSchema)]
 pub struct Headstash {
     pub addr: String,
-    pub headstash: Vec<Snip>,
+    pub snips: Vec<Snip>,
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug, Eq, PartialEq, JsonSchema)]

@@ -4,42 +4,52 @@ import { Wallet, SecretNetworkClient, EncryptionUtilsImpl, MsgExecuteContract, f
 import { init_snip120u, deposit_to_snip20, query_token_info, query_token_config, set_viewing_key, query_balance, fund_headstash, upload_snip120u } from './snip20.js'
 import * as fs from "fs";
 
-import { upload_headstash_contract,instantiate_headstash_contract } from "./headstash.js";
+import { upload_headstash_contract, instantiate_headstash_contract } from "./headstash.js";
 // wallet
-export const wallet = new Wallet("<your-mnemonic-seed>");
-export const granteeAddress = "test"
+export const wallet = new Wallet("");
+
+
 // headstash contract
-export const headstashCodeId = 10366;
-export const headstashCodeHash = "0fa0106dfd5a9694064467ddd0868633a879a430c9f847a1105397c3476bbd08";
+export const headstashCodeId = 1944;
+export const headstashCodeHash = "b114f46629664883f51522b0b4ba9a9ea0bf3413f07c09cef76488a8ea5fce55";
 export const headstashAddr = "";
 
 // snip-120u
-export const snip120uCodeId = 0;
-export const snip120uCodeHash = "c74bc4b0406507257ed033caa922272023ab013b0c74330efc16569528fa34fe";
+export const snip120uCodeId = 1945;
+export const snip120uCodeHash = "fb22a61a6009705137b86bf317c7fe1f62a48440cef73fef23feaf7d1998570c";
 
 // snip-1u20 addrs
-export const snip120uAddr1 = "test";
-export const snip120uAddr2 = "test";
+export const snip120uAddr1 = "secret1cqwafm8quzaltgtdhcfvm6xp3z9qum4whw08u5";
+export const snip120uAddr2 = "secret1k6004d9p8yg754d530jq897d39gjldtnt9sv7p";
+"2000000"
 // token ONE & TWO denoms.
-export const snip120uNative1 = "test";
-export const snip120uNative2 = "testa";
+export const snip120uNative1 = "ibc/AF840D44CC92103AD006850542368B888D29C4D4FFE24086E767F161FBDDCE76";
+export const snip120uNative2 = "ibc/7477828AC3E19352BA2D63352EA6D0680E3F29C126B87ACBDC27858CF7AF3A64";
 
-export const chain_id = "pulsar-3";
-export const cw_headstash_blob = fs.readFileSync("../../artifacts/cw_headstash.wasm.gz");
-export const snip120u_blob = fs.readFileSync("../../artifacts/snip120u.wasm.gz");
+export const counterpartyChannelId = "channel-165"
+export const chain_id = "secret-4";
+export const cw_headstash_blob = fs.readFileSync("../../artifacts/cw_headstash.wasm");
+export const snip120u_blob = fs.readFileSync("../../artifacts/snip120u_impl.wasm");
 export const entropy = "eretskeretjableret";
 export const permitKey = entropy;
 export const txEncryptionSeed = EncryptionUtilsImpl.GenerateNewSeed();
 
-// json path of headstash allocations
-export const ethPubkeysToAdd = fs.readFileSync('../../contract/headstash/src/distribution.json', 'utf8');
-export var ethPubkeys = JSON.parse(ethPubkeysToAdd);
-export var batchSize = 100;
+export const snip120us = [
+  {
+      native_token: "uterp",
+      addr: snip120uAddr1,
+      total_amount: "7100000"
+  },
+  {
+      native_token: "uthiol",
+      addr: snip120uAddr2,
+      total_amount: "7100000"
+  }];
 
 // signing client 
 export const secretjs = new SecretNetworkClient({
   chainId: chain_id,
-  url: "https://lcd.testnet.secretsaturn.net",
+  url: "https://lcd.mainnet.secretsaturn.net",
   wallet: wallet,
   walletAddress: wallet.address,
   txEncryptionSeed: txEncryptionSeed
@@ -49,39 +59,41 @@ export const secretjs = new SecretNetworkClient({
 const args = process.argv.slice(2);
 if (args.length < 1) {
   console.error('Invalid option.');
-} else if (args[0] === '-upload-headstash') {
+} else if (args[0] === '-1') {
   upload_headstash_contract(cw_headstash_blob);
-} else if (args[0] === '-upload-snip120u') {
+} else if (args[0] === '-2') {
   upload_snip120u(snip120u_blob);
-} else if (args[0] === '-init-snip120u1') {
-  init_snip120u("first-snip20", "ONE", snip120uNative1)
+} else if (args[0] === '-3a') {
+  // name, symbol, supported-denom
+  init_snip120u("secret terp test", "scrtTERP", snip120uNative1)
     .then(() => { console.log("Created the First Snip20!"); })
     .catch((error) => { console.error("Failed:", error); });
-} else if (args[0] === '-i-snip2') {
-  init_snip120u("second-snip20", "TWO", snip120uNative2)
+} else if (args[0] === '-3b') {
+  init_snip120u("secret thioool test", "scrtTHIOL", snip120uNative2)
     .then(() => { console.log("Created the Second Snip20!"); })
     .catch((error) => { console.error("Failed:", error); });
-
-} else if (args[0] === '-convert-token1') {
-  if (args.length < 2) {
-    console.error('Usage: -convert-token1 amount');
-    process.exit(1);
-  }
-  const [, a,] = args;
-  console.log("depositing token ONE")
-  deposit_to_snip20(snip120uAddr1, a, snip120uNative1)
-    .then(() => { console.log("Converted token ONE into its secret form!"); })
-    .catch((error) => { console.error("Failed:", error); });
-} else if (args[0] === '-convert-token2') {
-  if (args.length < 2) {
-    console.error('Usage: -d amount');
-    process.exit(1);
-  }
-  const [, a,] = args;
-  console.log("depositing token TWO")
-  deposit_to_snip20(snip120uAddr2, a, snip120uNative2)
-    .then(() => { console.log("Converted token TWO into its secret form!"); })
-    .catch((error) => { console.error("Failed:", error); });
+} else if (args[0] === '-4') {
+  instantiate_headstash_contract();
+  // } else if (args[0] === '-4') {
+  //   if (args.length < 2) {
+  //     console.error('Usage: -convert-token1 amount');
+  //     process.exit(1);
+  //   }
+  //   const [, a,] = args;
+  //   console.log("depositing token ONE")
+  //   deposit_to_snip20(snip120uAddr1, a, snip120uNative1)
+  //     .then(() => { console.log("Converted token ONE into its secret form!"); })
+  //     .catch((error) => { console.error("Failed:", error); });
+  // } else if (args[0] === '-convert-token2') {
+  //   if (args.length < 2) {
+  //     console.error('Usage: -d amount');
+  //     process.exit(1);
+  //   }
+  //   const [, a,] = args;
+  //   console.log("depositing token TWO")
+  //   deposit_to_snip20(snip120uAddr2, a, snip120uNative2)
+  //     .then(() => { console.log("Converted token TWO into its secret form!"); })
+  //     .catch((error) => { console.error("Failed:", error); });
 } else if (args[0] === '-viewing-key-2') {
   set_viewing_key(snip120uAddr2, entropy)
     .then(() => { console.log("Created viewing-key!"); })
@@ -117,27 +129,8 @@ if (args.length < 1) {
     .then(() => { console.log("Queried Balance!"); })
     .catch((error) => { console.error("Failed:", error); });
 
-} else if (args[0] === '-init-headstash') {
-  instantiate_headstash_contract();
+
   //////////////////////////////// HEADSTASH ACTIONS ///////////////////////////////
-// } else if (args[0] === '-fund-hs-token1') {
-//   if (args.length < 2) {
-//     console.error('Usage: -fund-hs-token1 amount');
-//     process.exit(1);
-//   }
-//   const [, a,] = args;
-//   fund_headstash(snip120uAddr1, a)
-//     .then(() => { console.log("Funded headstash with token ONE!"); })
-//     .catch((error) => { console.error("Failed:", error); });
-// } else if (args[0] === '-fund-hs-token2') {
-//   if (args.length < 2) {
-//     console.error('Usage: -fund-hs-token2 amount');
-//     process.exit(1);
-//   }
-//   const [, a,] = args;
-//   fund_headstash(snip120uAddr2, a)
-//     .then(() => { console.log("Funded headstash with token TWO!"); })
-//     .catch((error) => { console.error("Failed:", error); });
 } else if (args[0] === '-claim') { // create an account, claims airdrop 
   claim(args[1])
 } else if (args[0] === '-add') {

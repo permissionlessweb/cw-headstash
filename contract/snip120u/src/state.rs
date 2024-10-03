@@ -1,4 +1,3 @@
-use cosmwasm_storage::{bucket, bucket_read, Bucket, ReadonlyBucket};
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
@@ -7,7 +6,6 @@ use secret_toolkit::serialization::Json;
 use secret_toolkit::storage::{Item, Keymap, Keyset};
 use secret_toolkit_crypto::SHA256_HASH_SIZE;
 
-use crate::headstash::HeadstashMsg;
 use crate::msg::ContractStatusLevel;
 
 pub const KEY_CONFIG: &[u8] = b"config";
@@ -23,22 +21,6 @@ pub const PREFIX_ALLOWANCES: &[u8] = b"allowances";
 pub const PREFIX_ALLOWED: &[u8] = b"allowed";
 pub const PREFIX_VIEW_KEY: &[u8] = b"viewingkey";
 pub const PREFIX_RECEIVERS: &[u8] = b"receivers";
-
-pub const KEY_HEADSTASH_CONFIG: &[u8] = b"headstash";
-pub const KEY_HEADSTASH_MEMPOOL: &[u8] = b"mempool";
-
-#[derive(Serialize, Debug, Deserialize, Clone, JsonSchema)]
-#[cfg_attr(test, derive(Eq, PartialEq))]
-pub struct HeadstashConfig {
-    /// minimum cadance before messages are eligible to be added to mempool.
-    pub default_cadance: u64,
-    /// minimum cadance that can be set before messages are eligible for mempool. if 0, default_cadance is set.
-    pub min_cadance: u64,
-    /// if enabled, randomness seed is used to add random value to cadance.
-    pub random_cadance: bool,
-    /// if enabled, decoy messages are included in batches to create noise
-    pub decoys: bool,
-}
 
 // Config
 #[derive(Serialize, Debug, Deserialize, Clone, JsonSchema)]
@@ -77,28 +59,6 @@ pub static PRNG: Item<[u8; SHA256_HASH_SIZE]> = Item::new(KEY_PRNG);
 pub static MINTERS: Item<Vec<Addr>> = Item::new(KEY_MINTERS);
 
 pub static TX_COUNT: Item<u64> = Item::new(KEY_TX_COUNT);
-
-pub static HEADSTASH_CONFIG: Item<HeadstashConfig> = Item::new(KEY_CONFIG);
-
-pub struct HeadstashStore {}
-impl HeadstashStore {
-    // loads pending msgs from store
-    pub fn load(storage: &dyn Storage) -> ReadonlyBucket<HeadstashMsg> {
-        bucket_read(storage, KEY_HEADSTASH_MEMPOOL)
-    }
-    // saves a new pending msg
-    pub fn save(storage: &mut dyn Storage) -> Bucket<HeadstashMsg> {
-        bucket(storage, KEY_HEADSTASH_MEMPOOL)
-    }
-    // loads the config for headstash params
-    pub fn load_config(storage: &dyn Storage) -> ReadonlyBucket<HeadstashConfig> {
-        bucket_read(storage, KEY_HEADSTASH_CONFIG)
-    }
-    // saves the config for headstash params
-    pub fn save_config(storage: &mut dyn Storage) -> Bucket<HeadstashConfig> {
-        bucket(storage, KEY_HEADSTASH_CONFIG)
-    }
-}
 
 pub struct PrngStore {}
 impl PrngStore {
@@ -243,7 +203,6 @@ impl BalancesStore {
                     }
                     Self::save(store, acc, new_balance)?;
                 }
-
                 Ok(())
             }
         }

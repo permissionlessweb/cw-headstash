@@ -195,14 +195,18 @@ node main.js -q-snip1-bal
 The cost to add 200 addresses to the contract map is  ~ 1 SCRT token @ `0.1 SCRT` for Fee Price  [example tx](https://testnet.ping.pub/secret/tx/C54BBEBE5360E98E200DDDA21E69278A05A11C342EDA8798011CA10BB8F0C320) -->
 
 ### Future Goals
-- ~~On contract init, create snip120u contract for each token sent.~~
-- ~~Allow cosmos, eth pubkeys, or solana addr to verify ownership and claim headstash.~~
-- ~~Define custom value for each token denomination~~
-- ~~Entropy generation contracts for post-claim distortion~~
-- ~~Add optional randomness multiplier to airdrop claim.~~
+- add optional public contract response support  
 - Reimplement merkle tree 
 - Skip over duplicates when adding new addresses, add config to add or replace value if duplicate is added
 - Implement IBC version, handle callbacks for ibc packet transfer success.
 - Update total_amount when additional accepted token is sent, allow claim proportional to distribution amount after each claim.
 - Configure claim hooks 
+- Configure IBC/Clock hooks for tx mempool support
+
     
+
+- ~~On contract init, create snip120u contract for each token sent.~~
+- ~~Allow cosmos, eth pubkeys, or solana addr to verify ownership and claim headstash.~~
+- ~~Define custom value for each token denomination~~
+- ~~Entropy generation contracts for post-claim distortion~~
+- ~~Add optional randomness multiplier to airdrop claim.~~

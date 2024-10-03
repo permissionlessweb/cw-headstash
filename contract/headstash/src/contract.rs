@@ -214,10 +214,10 @@ pub mod headstash {
     }
 
     pub fn add_headstash_to_state(deps: DepsMut, headstash: Vec<Headstash>) -> StdResult<()> {
-        // ensure eth_pubkey is not already in KeyMap
+        // ensure pubkey is not already in KeyMap
         for hs in headstash.into_iter() {
             let key = hs.addr;
-            for snip in hs.headstash.into_iter() {
+            for snip in hs.snips.into_iter() {
                 let l1 = HEADSTASH_OWNERS.add_suffix(key.as_bytes());
                 let l2 = l1.add_suffix(snip.contract.as_bytes());
                 if l2.may_load(deps.storage)?.is_some() {
@@ -250,7 +250,6 @@ pub mod headstash {
         if pubkey.starts_with("0x1") {
             validation::verify_ethereum_sig(
                 deps.api,
-                deps.storage,
                 info.sender.clone(),
                 pubkey.to_string(),
                 sig.clone(),
@@ -274,7 +273,7 @@ pub mod headstash {
             ));
         }
 
-        // // check if we apply bonus to claim
+        // check if we apply bonus to claim
         let bonus = self::validation::random_multiplier(env.clone());
 
         for snip in config.snip120us {
@@ -474,7 +473,7 @@ pub mod validation {
     ) -> Result<(), StdError> {
         match validate_ethereum_text(api, sender.clone(), plaintxt, sig.clone(), signer.clone())? {
             true => Ok(()),
-            false => Err(StdError::generic_err("cannot validate eth_sig")),
+            false => Err(StdError::generic_err("cannot validate offline_sig")),
         }
     }
 
@@ -496,12 +495,12 @@ pub mod validation {
         api: &dyn Api,
         sender: Addr,
         plaintxt: String,
-        eth_sig: String,
-        eth_pubkey: String,
+        offline_sig: String,
+        signer: String,
     ) -> StdResult<bool> {
         let plaintext_msg = compute_plaintext_msg(plaintxt, sender);
-        match hex::decode(eth_sig.clone()) {
-            Ok(eth_sig_hex) => verify_ethereum_text(api, &plaintext_msg, &eth_sig_hex, &eth_pubkey),
+        match hex::decode(offline_sig.clone()) {
+            Ok(eth_sig_hex) => verify_ethereum_text(api, &plaintext_msg, &eth_sig_hex, &signer),
             Err(_) => Err(StdError::InvalidHex {
                 msg: format!("Could not decode the eth signature"),
             }),
@@ -650,13 +649,13 @@ pub mod ibc_bloom {
     pub fn verify_bloom_claim(
         deps: &DepsMut,
         sender: Addr,
-        eth_pubkey: String,
-        eth_sig: String,
+        pubkey: String,
+        offline_sig: String,
         claim_plaintxt: String,
     ) -> Result<(), StdError> {
-        match validate_bloom_ethereum_text(deps, sender, &claim_plaintxt, eth_sig, eth_pubkey)? {
+        match validate_bloom_ethereum_text(deps, sender, &claim_plaintxt, offline_sig, pubkey)? {
             true => Ok(()),
-            false => Err(StdError::generic_err("cannot validate eth_sig")),
+            false => Err(StdError::generic_err("cannot validate offline_sig")),
         }
     }
 
@@ -665,16 +664,16 @@ pub mod ibc_bloom {
         deps: &DepsMut,
         sender: Addr,
         claim_plaintxt: &String,
-        eth_sig: String,
-        eth_pubkey: String,
+        offline_sig: String,
+        signer: String,
     ) -> StdResult<bool> {
         let plaintext_msg = compute_bloom_plaintext_msg(claim_plaintxt, sender);
-        match hex::decode(eth_sig.clone()) {
+        match hex::decode(offline_sig.clone()) {
             Ok(eth_sig_hex) => {
-                verify_ethereum_text(deps.api, &plaintext_msg, &eth_sig_hex, &eth_pubkey)
+                verify_ethereum_text(deps.api, &plaintext_msg, &eth_sig_hex, &signer)
             }
             Err(_) => Err(StdError::InvalidHex {
-                msg: format!("Could not decode {eth_sig}"),
+                msg: format!("Could not decode offline signature"),
             }),
         }
     }
@@ -820,7 +819,7 @@ pub mod utils {
 
 #[cfg(test)]
 mod tests {
-    use cosmwasm_std::{testing::*, Addr, OwnedDeps};
+    use cosmwasm_std::{testing::*, Addr};
     use ibc_bloom::compute_bloom_plaintext_msg;
 
     use super::*;
@@ -870,28 +869,28 @@ mod tests {
         assert_ne!(dec1, dec2);
     }
 
-    fn _init_helper() -> (
-        StdResult<Response>,
-        OwnedDeps<MockStorage, MockApi, MockQuerier>,
-    ) {
-        let mut deps = mock_dependencies_with_balance(&[]);
-        let env = mock_env();
-        let info = mock_info("instantiator", &[]);
+    // fn _init_helper() -> (
+    //     StdResult<Response>,
+    //     OwnedDeps<MockStorage, MockApi, MockQuerier>,
+    // ) {
+    //     let mut deps = mock_dependencies_with_balance(&[]);
+    //     let env = mock_env();
+    //     let info = mock_info("instantiator", &[]);
 
-        // todo: setup snip120u
+    //     // todo: setup snip120u
 
-        let init_msg = crate::msg::InstantiateMsg {
-            owner: todo!(),
-            claim_msg_plaintext: PLAINTXT.to_string(),
-            start_date: None,
-            end_date: None,
-            // snip120u_code_id: 2,
-            snip120u_code_hash: "HASH".into(),
-            snips: vec![],
-            viewing_key: todo!(),
-            channel_id: todo!(),
-        };
+    //     let init_msg = crate::msg::InstantiateMsg {
+    //         owner: todo!(),
+    //         claim_msg_plaintext: PLAINTXT.to_string(),
+    //         start_date: None,
+    //         end_date: None,
+    //         // snip120u_code_id: 2,
+    //         snip120u_code_hash: "HASH".into(),
+    //         snips: vec![],
+    //         viewing_key: todo!(),
+    //         channel_id: todo!(),
+    //     };
 
-        (instantiate(deps.as_mut(), env, info, init_msg), deps)
-    }
+    //     (instantiate(deps.as_mut(), env, info, init_msg), deps)
+    // }
 }

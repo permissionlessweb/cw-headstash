@@ -2,7 +2,7 @@
 /// https://github.com/SecretFoundation/SNIPs/blob/master/SNIP-20.md
 use cosmwasm_std::{
     entry_point, to_binary, Addr, BankMsg, Binary, Coin, CosmosMsg, Deps, DepsMut, Env,
-    MessageInfo, Response, StdError, StdResult, Storage, Uint128,
+    MessageInfo, Response, StdError, StdResult, Storage, Uint128, WasmMsg,
 };
 use rand::RngCore;
 use secret_toolkit::permit::{Permit, RevokedPermits, TokenPermissions};
@@ -184,6 +184,22 @@ pub fn execute(deps: DepsMut, env: Env, info: MessageInfo, msg: ExecuteMsg) -> S
                 } if contract_status == ContractStatusLevel::StopAllButRedeems => {
                     try_redeem(deps, env, info, amount, denom, decoys, account_random_pos)
                 }
+                ExecuteMsg::RedeemFrom {
+                    amount,
+                    owner,
+                    denom,
+                    decoys,
+                    ..
+                } if contract_status == ContractStatusLevel::StopAllButRedeems => try_redeem_from(
+                    deps,
+                    env,
+                    info,
+                    owner,
+                    amount,
+                    denom,
+                    decoys,
+                    account_random_pos,
+                ),
                 _ => Err(StdError::generic_err(
                     "This contract is stopped and this action is not allowed",
                 )),
@@ -259,7 +275,6 @@ pub fn execute(deps: DepsMut, env: Env, info: MessageInfo, msg: ExecuteMsg) -> S
         }
         ExecuteMsg::CreateViewingKey { entropy, .. } => try_create_key(deps, env, info, entropy),
         ExecuteMsg::SetViewingKey { key, .. } => try_set_key(deps, info, key),
-
         // Allowance
         ExecuteMsg::IncreaseAllowance {
             spender,
@@ -373,6 +388,22 @@ pub fn execute(deps: DepsMut, env: Env, info: MessageInfo, msg: ExecuteMsg) -> S
         ExecuteMsg::RemoveSupportedDenoms { denoms, .. } => {
             remove_supported_denoms(deps, info, denoms)
         }
+        ExecuteMsg::RedeemFrom {
+            owner,
+            amount,
+            denom,
+            decoys,
+            ..
+        } => try_redeem_from(
+            deps,
+            env,
+            info,
+            owner,
+            amount,
+            denom,
+            decoys,
+            account_random_pos,
+        ),
     };
 
     pad_handle_result(response, RESPONSE_BLOCK_SIZE)
@@ -831,6 +862,7 @@ fn try_mint(
     allowances: Option<headstash::AllowanceAction>,
 ) -> StdResult<Response> {
     let recipient = deps.api.addr_validate(recipient.as_str())?;
+    // let mut msgs = vec![];
 
     let constants = CONFIG.load(deps.storage)?;
 
@@ -851,7 +883,6 @@ fn try_mint(
     let minted_amount = safe_add(&mut total_supply, amount.u128());
     TOTAL_SUPPLY.save(deps.storage, &total_supply)?;
 
-
     // set reciepient allowances if any
     if let Some(allow) = allowances.clone() {
         let spender = deps.api.addr_validate(allow.spender.as_str())?;
@@ -862,16 +893,27 @@ fn try_mint(
         } else {
             allowance.amount = allowance.amount.saturating_add(amount.u128());
         }
-        
+
         if allow.expiration.is_some() {
             allowance.expiration = allow.expiration;
         }
-        
+
         print!("{:#?}", allowances.clone());
         AllowancesStore::save(deps.storage, &recipient.clone(), &spender, &allowance)?;
-
+        // let msg = crate::msg::ExecuteMsg::IncreaseAllowance {
+        //     spender: allow.spender,
+        //     amount,
+        //     expiration: allow.expiration,
+        //     padding: None,
+        // };
+        // let cosmos_msg = CosmosMsg::Wasm(WasmMsg::Execute {
+        //     contract_addr: env.contract.address.to_string(),
+        //     code_hash: env.contract.code_hash,
+        //     msg: to_binary(&msg)?,
+        //     funds: vec![],
+        // });
+        // msgs.push(cosmos_msg)
     }
-    print!("{:#?}", allowances);
 
     // Note that even when minted_amount is equal to 0 we still want to perform the operations for logic consistency
     try_mint_impl(
@@ -886,7 +928,10 @@ fn try_mint(
         account_random_pos,
     )?;
 
-    Ok(Response::new().set_data(to_binary(&ExecuteAnswer::Mint { status: Success })?))
+    Ok(Response::new()
+        .set_data(to_binary(&ExecuteAnswer::Mint { status: Success })?)
+        // .add_messages(msgs)
+    )
 }
 
 fn try_batch_mint(
@@ -1526,6 +1571,108 @@ fn try_transfer_from_impl(
 }
 
 #[allow(clippy::too_many_arguments)]
+fn try_redeem_from(
+    deps: DepsMut,
+    env: Env,
+    info: MessageInfo,
+    owner: String,
+    amount: Uint128,
+    denom: Option<String>,
+    decoys: Option<Vec<Addr>>,
+    account_random_pos: Option<usize>,
+) -> StdResult<Response> {
+    let constants = CONFIG.load(deps.storage)?;
+    if !constants.redeem_is_enabled {
+        return Err(StdError::generic_err(
+            "Redeem functionality is not enabled for this token.",
+        ));
+    }
+    let owner = deps.api.addr_validate(owner.as_str())?;
+    // let recipient = deps.api.addr_validate(recipient.as_str())?;
+    use_allowance(
+        deps.storage,
+        &env,
+        &owner,
+        &info.sender.clone(),
+        amount.u128(),
+    )?;
+
+    // if denom is none and there is only 1 supported denom then we don't need to check anything
+    let withdraw_denom = if denom.is_none() && constants.supported_denoms.len() == 1 {
+        constants.supported_denoms.first().unwrap().clone()
+    // if denom is specified make sure it's on the list before trying to withdraw with it
+    } else if denom.is_some() && constants.supported_denoms.contains(denom.as_ref().unwrap()) {
+        denom.unwrap()
+    // error handling
+    } else if denom.is_none() {
+        return Err(StdError::generic_err(
+            "Tried to redeem without specifying denom, but multiple coins are supported",
+        ));
+    } else {
+        return Err(StdError::generic_err(
+            "Tried to redeem for an unsupported coin",
+        ));
+    };
+
+    let sender_address = &info.sender;
+    let amount_raw = amount.u128();
+
+    BalancesStore::update_balance(
+        deps.storage,
+        &owner, // the actual owners balance is updated.
+        amount_raw,
+        false,
+        "redeemFrom",
+        &decoys,
+        &account_random_pos,
+    )?;
+
+    let total_supply = TOTAL_SUPPLY.load(deps.storage)?;
+    if let Some(total_supply) = total_supply.checked_sub(amount_raw) {
+        TOTAL_SUPPLY.save(deps.storage, &total_supply)?;
+    } else {
+        return Err(StdError::generic_err(
+            "You are trying to redeem more tokens than what is available in the total supply",
+        ));
+    }
+
+    let token_reserve = deps
+        .querier
+        .query_balance(&env.contract.address, &withdraw_denom)?
+        .amount;
+    if amount > token_reserve {
+        return Err(StdError::generic_err(format!(
+            "You are trying to redeem for more {withdraw_denom} than the contract has in its reserve",
+        )));
+    }
+
+    let withdrawal_coins: Vec<Coin> = vec![Coin {
+        denom: withdraw_denom,
+        amount,
+    }];
+
+    store_redeem(
+        deps.storage,
+        &owner, // store the owner as the redeemer (dont wanna break anything if this is not the same as the balance being update -_()_- )
+        amount,
+        constants.symbol,
+        &env.block,
+        &decoys,
+        &account_random_pos,
+    )?;
+
+    let message = CosmosMsg::Bank(BankMsg::Send {
+        to_address: sender_address.clone().into_string(),
+        amount: withdrawal_coins,
+    });
+
+    let res = Response::new()
+        .add_message(message)
+        .set_data(to_binary(&ExecuteAnswer::RedeemFrom { status: Success })?);
+    Ok(res)
+}
+
+#[allow(clippy::too_many_arguments)]
 fn try_transfer_from(
     mut deps: DepsMut,
     env: &Env,
@@ -2099,7 +2246,7 @@ mod tests {
     };
     use headstash::AllowanceAction;
     use secret_toolkit::permit::{PermitParams, PermitSignature, PubKey};
-    use secret_toolkit::snip20::allowance_query;
+    // use secret_toolkit::snip20::allowance_query;
 
     use crate::msg::ResponseStatus;
     use crate::msg::{InitConfig, InitialBalance};
@@ -4005,7 +4152,7 @@ mod tests {
 
     #[test]
     fn test_handle_mint_with_allowance() {
-        let (init_result, mut deps) = init_helper_with_config(
+        let (init_result, mut _deps) = init_helper_with_config(
             vec![InitialBalance {
                 address: "lebron".to_string(),
                 amount: Uint128::new(5000),

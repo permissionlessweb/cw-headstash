@@ -1,4 +1,4 @@
-use cosmwasm_std::{Api,  StdError, StdResult};
+use cosmwasm_std::{Api, StdError, StdResult};
 use secret_toolkit::crypto::secp256k1::PublicKey;
 use sha2::Digest;
 use sha3::Keccak256;

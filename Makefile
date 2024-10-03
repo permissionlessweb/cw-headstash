@@ -17,7 +17,7 @@ unit-test:
 # in the local development chain (see the `start-server` command below)
 # and mainnet won't accept contracts built with the feature enabled.
 .PHONY: build _build
-build: _build compress-wasm
+build: _build compress-headstash-wasm
 _build:
 	RUSTFLAGS='-C link-arg=-s' cargo build --release --target wasm32-unknown-unknown
 
