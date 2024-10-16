@@ -2,7 +2,7 @@
 /// https://github.com/SecretFoundation/SNIPs/blob/master/SNIP-20.md
 use cosmwasm_std::{
     entry_point, to_binary, Addr, BankMsg, Binary, Coin, CosmosMsg, Deps, DepsMut, Env,
-    MessageInfo, Response, StdError, StdResult, Storage, Uint128, WasmMsg,
+    MessageInfo, Response, StdError, StdResult, Storage, Uint128,
 };
 use rand::RngCore;
 use secret_toolkit::permit::{Permit, RevokedPermits, TokenPermissions};
@@ -928,9 +928,8 @@ fn try_mint(
         account_random_pos,
     )?;
 
-    Ok(Response::new()
-        .set_data(to_binary(&ExecuteAnswer::Mint { status: Success })?)
-        // .add_messages(msgs)
+    Ok(
+        Response::new().set_data(to_binary(&ExecuteAnswer::Mint { status: Success })?), // .add_messages(msgs)
     )
 }
 

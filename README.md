@@ -2,6 +2,23 @@
 
 Transparency-minimized airdrop contract for cosmos bech32 addresses to claim via ownership verification of an ethereum account.
 
+### Future Goals
+- Implement IBC version, handle callbacks for ibc packet transfer success & errors.
+- add optional public contract response support  
+- Reimplement merkle tree 
+- Skip over duplicates when adding new addresses, add config to add or replace value if duplicate is added
+- Update total_amount when additional accepted token is sent, allow claim proportional to distribution amount after each claim.
+- Configure claim hooks 
+
+    
+
+~~- Configure IBC/Clock hooks for tx mempool support~~
+- ~~On contract init, create snip120u contract for each token sent.~~
+- ~~Allow cosmos, eth pubkeys, or solana addr to verify ownership and claim headstash.~~
+- ~~Define custom value for each token denomination~~
+- ~~Entropy generation contracts for post-claim distortion~~
+- ~~Add optional randomness multiplier to airdrop claim.~~
+
 ## Table Of Contents -->
 
 - [Headstash Contract](./contract/headstash/) - CosmWasm contract that verifies eth signatures and distirbutes snip20 tokens.
@@ -9,7 +26,6 @@ Transparency-minimized airdrop contract for cosmos bech32 addresses to claim via
 - [Headstash Scripts](./tools/headstash/README.md) - `secretjs` scripts to deploy & interact with headstash instances.
 - [Headstash Feegrant API](https://github.com/hard-nett/community-dashboard/tree/no-merkle/caching-api) - express.js server that provides distribution data to ui, as well as can authorize feegrants by verifying eth signatures.
 - [Headstash UI](https://github.com/hard-nett/community-dashboard/tree/no-merkle) - webapp for claiming a headstash.  -->
-
 
 ## Creating a Headstash 
 To create a headstash contract instance, you will need to have ready the following:
@@ -91,8 +107,6 @@ The contract at random intervals, will randomly choose from an entropy_ratio, a 
 
 
 <!-- ## Setup Instructions -->
-
-
 
 
 <!-- ## Usage Guidelines 
@@ -194,19 +208,3 @@ node main.js -q-snip1-bal
 ### Gas Cost 
 The cost to add 200 addresses to the contract map is  ~ 1 SCRT token @ `0.1 SCRT` for Fee Price  [example tx](https://testnet.ping.pub/secret/tx/C54BBEBE5360E98E200DDDA21E69278A05A11C342EDA8798011CA10BB8F0C320) -->
 
-### Future Goals
-- add optional public contract response support  
-- Reimplement merkle tree 
-- Skip over duplicates when adding new addresses, add config to add or replace value if duplicate is added
-- Implement IBC version, handle callbacks for ibc packet transfer success.
-- Update total_amount when additional accepted token is sent, allow claim proportional to distribution amount after each claim.
-- Configure claim hooks 
-- Configure IBC/Clock hooks for tx mempool support
-
-    
-
-- ~~On contract init, create snip120u contract for each token sent.~~
-- ~~Allow cosmos, eth pubkeys, or solana addr to verify ownership and claim headstash.~~
-- ~~Define custom value for each token denomination~~
-- ~~Entropy generation contracts for post-claim distortion~~
-- ~~Add optional randomness multiplier to airdrop claim.~~

@@ -3,7 +3,10 @@ use cosmwasm_std::{Addr, Binary, Uint128};
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
-use crate::state::{bloom::IbcBloomMsg, Config, Headstash, Snip120u};
+use crate::state::{
+    bloom::{BloomConfig, IbcBloomMsg},
+    Config, Headstash, Snip120u,
+};
 
 #[derive(Serialize, Deserialize, Clone, Debug, Eq, PartialEq, JsonSchema)]
 pub struct InstantiateMsg {
@@ -26,6 +29,8 @@ pub struct InstantiateMsg {
     pub viewing_key: String,
     /// channel-id used to IBC transfer tokens back to a destination chain.
     pub channel_id: String,
+    /// optional bloom configuration
+    pub bloom_config: Option<BloomConfig>,
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug, Eq, PartialEq, JsonSchema)]
@@ -35,15 +40,18 @@ pub enum ExecuteMsg {
         headstash: Vec<Headstash>,
     },
     Claim {
-        eth_pubkey: String,
-        eth_sig: String,
+        addr: String,
+        sig: String,
     },
     Clawback {},
-    IbcBloom {
-        eth_pubkey: String,
+    RegisterBloom {
+        addr: String,
         bloom_msg: IbcBloomMsg,
     },
-    HandleIbcBloom {},
+    PrepareBloom {},
+    ProcessBloom {
+        range: u64,
+    },
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug, Eq, PartialEq, JsonSchema)]
