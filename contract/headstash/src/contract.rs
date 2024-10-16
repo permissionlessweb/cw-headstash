@@ -101,7 +101,7 @@ pub fn execute(deps: DepsMut, env: Env, info: MessageInfo, msg: ExecuteMsg) -> S
             self::ibc_bloom::try_ibc_bloom(deps, env, info, addr, bloom_msg)
         }
         ExecuteMsg::PrepareBloom {} => ibc_bloom::handle_ibc_bloom(deps, env, info),
-        ExecuteMsg::ProcessBloom { range } => ibc_bloom::process_ibc_bloom(deps, env, info, range),
+        ExecuteMsg::ProcessBloom { } => ibc_bloom::process_ibc_bloom(deps, env, info),
     }
 }
 
@@ -828,13 +828,17 @@ pub mod ibc_bloom {
         deps: DepsMut,
         env: Env,
         _info: MessageInfo,
-        range: u64,
     ) -> Result<Response, StdError> {
         let mut msgs = vec![];
+
+        let rand = (contract_randomness(env.clone())[7] & 0x0f) as u16;
+
         // load
         PROCESSING_BLOOM_MEMPOOL
             .update(deps.storage, |mut b| {
-                b.drain(0..range as usize).for_each(|a| {
+                let lens = b.len() as u64;
+                let limit = lens.div_ceil(rand.into()).max(1);
+                b.drain(0..limit as usize).for_each(|a| {
                     // form ibc msg
                     let ibc_msg: CosmosMsg<Empty> =
                         CosmosMsg::Ibc(cosmwasm_std::IbcMsg::Transfer {

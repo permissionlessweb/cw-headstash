@@ -49,9 +49,7 @@ pub enum ExecuteMsg {
         bloom_msg: IbcBloomMsg,
     },
     PrepareBloom {},
-    ProcessBloom {
-        range: u64,
-    },
+    ProcessBloom {},
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug, Eq, PartialEq, JsonSchema)]
