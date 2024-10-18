@@ -1,0 +1,69 @@
+[package]
+name = "cw-headstash"
+version = "0.1.0"
+authors = ["TerpNETFoundation"]
+edition = "2021"
+
+[lib]
+crate-type = ["cdylib", "rlib"]
+
+
+[features]
+default = ["export", "staking", "query"]
+export = ["query", "staking"]
+staking = ["cosmwasm-std/staking"]
+query = ["dep:prost"]
+
+# for quicker tests, cargo test --lib
+# for more explicit tests, cargo test --features=backtraces
+backtraces = ["cosmwasm-std/backtraces"]
+# use library feature to disable all instantiate/execute/query exports
+library = []
+
+[dependencies]
+anybuf = "0.5"
+base64 = "0.21.0"
+cw-orch = "0.25.0"
+cw-ownable = "2.0"
+semver = "1.0"
+cosmwasm-std = { package = "secret-cosmwasm-std", version = "1.1.11", default-features = false,features = [
+  "stargate",
+  "staking",
+  "ibc3",
+  "random",
+] }
+cosmwasm-schema = "1.1.8"
+cosmwasm-storage = { package = "secret-cosmwasm-storage", version = "1.1.11" }
+cosmos-sdk-proto = { version = "0.20.0", default-features = false, features = ["cosmwasm"] }
+cw-ica-controller-derive = "0.4.2"
+ibc-proto = { version = "0.47", default-features = false, features = ["std", "serde"] }
+hex = "0.4"
+rand_core = { version = "0.6.4", default-features = false }
+schemars = { version = "0.8.11" }
+serde = { version = "1.0" }
+serde_json = "1.0.128"
+sha2            = { version = "0.10.2", default-features = false }
+sha3 = "0.10"
+thiserror = { version = "1.0" }
+serde-json-wasm = "1.0"
+serde_with = "3.8"
+secret-toolkit-crypto = { version = "0.10.0", features = ["rand"] }
+secret-toolkit = { version = "0.10.0", default-features = false, features = [
+  "utils",
+  "serialization",
+  "viewing-key",
+  "permit",
+  "storage",
+  "snip20",
+  "snip721",
+] }
+prost = { version = "0.13", optional = true }
+
+
+# [patch.crates-io]
+# uncomment this if you use cw-storage-plus
+
+[[bin]]
+name = "schema"
+required-features = ["schema"]
+
