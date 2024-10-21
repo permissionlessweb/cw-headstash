@@ -2,6 +2,7 @@
 /target
 artifacts*
 target*
+/schema
 contract/airdrop/target/*
 Cargo.lock
 contract.wasm*
@@ -24,3 +25,16 @@ node_modules
 *.iml
 .idea
 .wasm
+
+# Text file backups
+**/*.rs.bk
+
+# macOS
+.DS_Store
+
+# IDEs
+*.iml
+.idea
+
+# e2e tests
+vendor
