@@ -2,7 +2,7 @@ use crate::types::callbacks;
 use crate::{
     state::{
         bloom::{BloomConfig, IbcBloomMsg},
-        Config, Headstash, Snip120u,
+        Config, Headstash, snip::Snip120u,
     },
     types::callbacks::IcaControllerCallbackMsg,
 };
@@ -56,29 +56,31 @@ pub enum ExecuteMsg {
     Claim {
         addr: String,
         sig: String,
+        denom: String,
+        amount: Uint128,
     },
     Clawback {},
-    RegisterBloom {
-        addr: String,
-        bloom_msg: IbcBloomMsg,
-    },
-    PrepareBloom {},
-    ProcessBloom {},
-    /// `CreateChannel` makes the contract submit a stargate MsgChannelOpenInit to the chain.
-    /// This is a wrapper around [`options::ChannelOpenInitOptions`] and thus requires the
-    /// same fields. If not specified, then the options specified in the contract instantiation
-    /// are used.
-    CreateChannel {
-        /// The options to initialize the IBC channel.
-        /// If not specified, the options specified in the last channel creation are used.
-        /// Must be `None` if the sender is not the owner.
-        #[serde(skip_serializing_if = "Option::is_none")]
-        channel_open_init_options: Option<options::ChannelOpenInitOptions>,
-    },
-    /// `CloseChannel` closes the IBC channel.
-    CloseChannel {},
-    /// Recieve callbacks to handle good or bad responses from ibc bloom
-    ReceiveIcaCallback(IcaControllerCallbackMsg),
+    // RegisterBloom {
+    //     addr: String,
+    //     bloom_msg: IbcBloomMsg,
+    // },
+    // PrepareBloom {},
+    // ProcessBloom {},
+    // /// `CreateChannel` makes the contract submit a stargate MsgChannelOpenInit to the chain.
+    // /// This is a wrapper around [`options::ChannelOpenInitOptions`] and thus requires the
+    // /// same fields. If not specified, then the options specified in the contract instantiation
+    // /// are used.
+    // CreateChannel {
+    //     /// The options to initialize the IBC channel.
+    //     /// If not specified, the options specified in the last channel creation are used.
+    //     /// Must be `None` if the sender is not the owner.
+    //     #[serde(skip_serializing_if = "Option::is_none")]
+    //     channel_open_init_options: Option<options::ChannelOpenInitOptions>,
+    // },
+    // /// `CloseChannel` closes the IBC channel.
+    // CloseChannel {},
+    // /// Recieve callbacks to handle good or bad responses from ibc bloom
+    // ReceiveIcaCallback(IcaControllerCallbackMsg),
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug, Eq, PartialEq, JsonSchema)]
@@ -121,7 +123,7 @@ pub enum SudoMsg {
 pub mod snip {
     use cosmwasm_std::{to_binary, Coin, CosmosMsg, StdResult, WasmMsg};
 
-    use crate::{contract::utils::space_pad, state::AllowanceAction};
+    use crate::{contract::utils::space_pad, state::snip::AllowanceAction};
 
     use super::*;
 

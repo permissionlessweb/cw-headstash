@@ -47,17 +47,15 @@ sha3 = "0.10"
 thiserror = { version = "1.0" }
 serde-json-wasm = "1.0"
 serde_with = "3.8"
-secret-toolkit-crypto = { version = "0.10.0", features = ["rand"] }
-secret-toolkit = { version = "0.10.0", default-features = false, features = [
-  "utils",
-  "serialization",
-  "viewing-key",
-  "permit",
-  "storage",
-  "snip20",
-  "snip721",
-] }
+# secret-toolkit-crypto = { version = "0.10.0", features = ["rand"] }
+secret-toolkit-crypto = { git = "https://github.com/SolarRepublic/secret-toolkit.git", default-features = false, features = ["hash"] }
+secret-toolkit = { git = "https://github.com/SolarRepublic/secret-toolkit.git", default-features = false, features = ["permit", "storage", "viewing-key", "notification"] }
 prost = { version = "0.13", optional = true }
+serde-big-array = "0.5.1"
+static_assertions = "1.1.0"
+constant_time_eq = "0.3.0"
+primitive-types = { version = "0.12.2", default-features = false }
+rand = { version = "0.8.5", default-features = false }
 
 
 # [patch.crates-io]

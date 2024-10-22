@@ -2,40 +2,49 @@
 
 Transparency-minimized airdrop contract for cosmos bech32 addresses to claim via ownership verification of an ethereum account.
 
-### Future Goals
-- Implement IBC version, handle callbacks for ibc packet transfer success & errors.
-- add optional public contract response support  
-- Reimplement merkle tree 
-- Skip over duplicates when adding new addresses, add config to add or replace value if duplicate is added
-- Update total_amount when additional accepted token is sent, allow claim proportional to distribution amount after each claim.
-- Configure claim hooks 
-
-    
-
-~~- Configure IBC/Clock hooks for tx mempool support~~
-- ~~On contract init, create snip120u contract for each token sent.~~
-- ~~Allow cosmos, eth pubkeys, or solana addr to verify ownership and claim headstash.~~
-- ~~Define custom value for each token denomination~~
-- ~~Entropy generation contracts for post-claim distortion~~
-- ~~Add optional randomness multiplier to airdrop claim.~~
-
 ## Table Of Contents -->
-
 - [Headstash Contract](./contract/headstash/) - CosmWasm contract that verifies eth signatures and distirbutes snip20 tokens.
 - [Snip120u](./contract/snip120u/) - Custom snip120u implementation for headstashes.
 - [Headstash Scripts](./tools/headstash/README.md) - `secretjs` scripts to deploy & interact with headstash instances.
 - [Headstash Feegrant API](https://github.com/hard-nett/community-dashboard/tree/no-merkle/caching-api) - express.js server that provides distribution data to ui, as well as can authorize feegrants by verifying eth signatures.
 - [Headstash UI](https://github.com/hard-nett/community-dashboard/tree/no-merkle) - webapp for claiming a headstash.  -->
 
+### Goals
+- ica: handle callbacks for ibc packet transfer success & errors.
+- feature: Reimplement merkle tree 
+- headstash: Skip over duplicates when adding new addresses, OR enable updating total if duplicate is added, and enabled.
+- headstash: Update total_amount when additional accepted token is sent, allow claim proportional to distribution amount after each claim.
+- headstash: add option to define recipient other than signer during claim.
+- headstash: Configure claim hooks 
+- headstash: mimic delayed-write-buffer for
+    - ~~adding eligible address & amounts~~
+    - ~~claiming headstashes~~
+    - registering ibc-blooms txs 
+    - processing ibc-bloom mempool
+- snip120: implement DWB 
+    
+- ~~Configure IBC/Clock hooks for tx mempool support~~
+- ~~On contract init, create snip120u contract for each token sent.~~
+- ~~Allow cosmos, eth pubkeys, or solana addr to verify ownership and claim headstash.~~
+- ~~Define custom value for each token denomination~~
+- ~~Entropy generation contracts for post-claim distortion~~
+- ~~Add optional randomness multiplier to airdrop claim.~~
+
+## Delayed Write Buffers
+
+
+### Registering IBC Blooms
+
+---
 ## Creating a Headstash 
 To create a headstash contract instance, you will need to have ready the following:
-| value | description| 
-|-|-|
-| `owner` | owner of the headstash instance |
-| `claim_msg_plaintext` | plaintext message used in eth signature
-| `start_date` | optional, start date where headstash claims can begin
-| `end_date` | option, end date where headstash claims are available
-| `snip120u_code_id` | code-id of the custom snip20 contract
+| value | description| type |
+|-|-|-|
+| `owner` | owner of the headstash instance | string | 
+| `claim_msg_plaintext` | plaintext message used in eth signature | string |
+| `start_date` | optional, start date where headstash claims can begin | Option<> |
+| `end_date` | option, end date where headstash claims are available | Option<> |
+| `snip120u_code_id` | code-id of the custom snip20 contract |
 | `snip120u_code_hash` | code-hash of the custom snip20 contract
 | `snips` | define each  `Snip120u` token included in a headstash instance
 | `viewing_key` | a viewing key (may be used in future, not now)
@@ -43,13 +52,17 @@ To create a headstash contract instance, you will need to have ready the followi
 
 ## Contract Functions
 
-### Add
-Contract owner function that will add an eligible address that can verify & claim their headstash allocation.
-| value | description| 
-|-|-|
-| `headstash` | an `eth_addr` starting with 0x1, along with a list of `snip`'s, with the `addr` and the respective `amount` eligible to claim |
+### `AddEligibleHeadStash`
+This function is for a headstash deployers to define a list of accepted snip20 tokens and their allocations for each eligible wallet. When an admin registers public wallet addrs for a headstash instance, they first must ensure that there are no duplicate wallet entries in their allocation-file. A simple script is available [here](./README) to ensure there are no duplicates, & decide what to do if there are duplicates. For each snip a wallet is eligible for, a unique txid is generated and used in the DWB workflow. This sets the public wallet addresss with a balance for each snip. 
+
+| value | description| type |
+|-|-|-|
+| `headstash` | a public address (ETH, SOL, COSMOS), along with a list of Snip20 contract `addr` and the respective `amount` eligible to claim | `Vec<Headstash>` |
 
 ### Claim 
+Claiming a headstash requires an offline signature of the eligible address to be created. This offline signature is generated with a specific text phrase that at minimum must contain the public wallet address that is calling the headstash contract. *More requirements can be added such as signature lifetime, etc*. This signature, along with the public wallet that generated the signature, and also the amount and snip20 address eligible for must be provided to claim a headstash successfully.
+
+The contract will check if claiming is eligible, by ensuring the headstash has started and has not ended, and also ensuring the claimer has not already claimed 100% of their balance. If enabled, a multiplier is randomly chosen to calculate any additional rewards the claimer will be allocated.
 | value | description| 
 |-|-|
 | `eth_pubkey` | the eth wallet address starting with 0x1 that was used to create the offiline signature |
@@ -61,9 +74,12 @@ Contract owner function that will clawback any balance this contract has, into t
 
 ### Ibc-Bloom 
 
-Ibc-Bloom is how participants who have claimed a headstash get tokens to their home chains, without revealing the owner of the tokens. Users submit their desired actioms, and the contract stores them to be run for later. A `min_cadance` is the minimum time all ibc-bloom msgs will process. The longer, the more obfuscation, so users will be able to add a `cadance` length to extend this time. A value called `entropy_ratio` is set by the user and is a 1-10 range of the level of entropy users desire to introduce for completing their ibc-bloom process. The lower this value is, the greater the chance your transaction will be included to finalize by the contracts. 
+Ibc-Bloom is how participants who have claimed a headstash get tokens to their home chains, without revealing the owner of the tokens. Users submit their desired actioms, and the contract stores them to be run for later. A value called `entropy_ratio` is set by the user and is a 1-10 range of the level of entropy users desire to introduce for completing their ibc-bloom process. The lower this value is, the greater the chance your transaction will be included to finalize by the contracts. The contract at random intervals will choose the ibc-bloom specific DWB's to process any transactions involved. 
 
-The contract at random intervals, will randomly choose from an entropy_ratio, a randoom list msgs from a random list of addresses. These msgs will be process and included to facilitate 
+- decide whether to send locally (same network as contract), or via IBC channel.
+- choose which DWB to use for tx (probability gradient for DWB to be chosen to be processed)
+- automate DWB processing via external x/clock module 
+
 
 
 ## Headstash Lifecycle 

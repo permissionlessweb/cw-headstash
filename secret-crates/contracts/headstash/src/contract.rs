@@ -1,3 +1,5 @@
+use crate::btbe::initialize_btbe;
+use crate::dwb::{DelayedWriteBuffer, DWB};
 use crate::error::ContractError;
 use crate::ibc::types::stargate::channel::new_ica_channel_open_init_cosmos_msg;
 use crate::msg::{ExecuteMsg, InstantiateMsg, MigrateMsg, QueryAnswer, QueryMsg};
@@ -56,59 +58,32 @@ pub fn instantiate(
     };
     CONFIG.save(deps.storage, &state)?;
 
-    let callback_contract = ContractInfo {
-        address: env.contract.address.clone(),
-        code_hash: env.contract.code_hash,
-    };
+    // let callback_contract = ContractInfo {
+    //     address: env.contract.address.clone(),
+    //     code_hash: env.contract.code_hash,
+    // };
+    
     // IBC Save the admin. Ica address is determined during handshake. Save headstash params.
-    STATE.save(deps.storage, &ContractState::new(Some(callback_contract)))?;
-    CHANNEL_OPEN_INIT_OPTIONS.save(deps.storage, &msg.channel_open_init_options)?;
-    ALLOW_CHANNEL_OPEN_INIT.save(deps.storage, &true)?;
+    // STATE.save(deps.storage, &ContractState::new(Some(callback_contract)))?;
+    // CHANNEL_OPEN_INIT_OPTIONS.save(deps.storage, &msg.channel_open_init_options)?;
+    // ALLOW_CHANNEL_OPEN_INIT.save(deps.storage, &true)?;
 
-    let ica_channel_open_init_msg = new_ica_channel_open_init_cosmos_msg(
-        env.contract.address.to_string(),
-        msg.channel_open_init_options.connection_id,
-        msg.channel_open_init_options.counterparty_port_id,
-        msg.channel_open_init_options.counterparty_connection_id,
-        None,
-        msg.channel_open_init_options.channel_ordering,
-    );
+    // let ica_channel_open_init_msg = new_ica_channel_open_init_cosmos_msg(
+    //     env.contract.address.to_string(),
+    //     msg.channel_open_init_options.connection_id,
+    //     msg.channel_open_init_options.counterparty_port_id,
+    //     msg.channel_open_init_options.counterparty_connection_id,
+    //     None,
+    //     msg.channel_open_init_options.channel_ordering,
+    // );
 
-    Ok(Response::default().add_message(ica_channel_open_init_msg))
-    // for each coin sent, we instantiate a custom snip120u contract.
-    // sent as submsg to handle reply and save contract addr to state.
-    // let mut submsg = vec![];
-    // let mut attr = vec![];
-    // for coin in info.funds {
-    //     for snip120 in &msg.snips {
-    //         if coin.denom == snip120.token {
-    //             {
-    //                 let custom_config = InitConfig::default(); // todo
+    // initialize the bitwise-trie of bucketed entries
+    initialize_btbe(deps.storage)?;
 
-    //                 let snip20_init = snip20_reference_impl::msg::InstantiateMsg {
-    //                     name: snip120.name.clone(),
-    //                     admin: Some(info.sender.to_string()),
-    //                     symbol: snip120.name.clone(),
-    //                     decimals: 6u8,
-    //                     initial_balances: None,
-    //                     prng_seed: b"skeeeeeeeeeeeerrretrewhjmfgrew234545766uhrgbag3taweu".into(),
-    //                     config: Some(custom_config),
-    //                     supported_denoms: Some(vec![snip120.token.clone()]),
-    //                 };
+    // initialize the delay write buffer
+    DWB.save(deps.storage, &DelayedWriteBuffer::new()?)?;
 
-    //                 let init_msgs = utils::to_cosmos_msg(
-    //                     snip20_init,
-    //                     msg.snip120u_code_hash.clone(),
-    //                     msg.snip120u_code_id,
-    //                 )?;
-
-    //                 submsg.push(SubMsg::reply_on_success(init_msgs, SNIP120U_REPLY));
-    //                 attr.push(Event::new("snip120u").add_attribute("addr", snip120.token.clone()))
-    //             }
-    //         }
-    //     }
-    // }
-    // .add_submessages(submsg).add_events(attr)
+    Ok(Response::default()) // .add_message(ica_channel_open_init_msg))
 }
 
 #[cfg_attr(not(feature = "library"), entry_point)]
@@ -118,24 +93,30 @@ pub fn execute(
     info: MessageInfo,
     msg: ExecuteMsg,
 ) -> Result<Response, ContractError> {
+    let mut rng = ContractPrng::from_env(&env);
     match msg {
         ExecuteMsg::AddEligibleHeadStash { headstash } => {
-            self::headstash::try_add_headstash(deps, env, info, headstash)
+            self::headstash::try_add_headstash(deps, env, info, &mut rng, headstash)
         }
-        ExecuteMsg::Claim { addr, sig } => self::headstash::try_claim(deps, env, info, addr, sig),
+        ExecuteMsg::Claim {
+            addr,
+            sig,
+            amount,
+            denom,
+        } => self::headstash::try_claim(deps, env, info, &mut rng, addr, sig, denom, amount),
         ExecuteMsg::Clawback {} => self::headstash::try_clawback(deps, env, info),
-        ExecuteMsg::RegisterBloom { addr, bloom_msg } => {
-            self::ibc_bloom::try_ibc_bloom(deps, env, info, addr, bloom_msg)
-        }
-        ExecuteMsg::PrepareBloom {} => ibc_bloom::handle_ibc_bloom(deps, env, info),
-        ExecuteMsg::ProcessBloom {} => ibc_bloom::process_ibc_bloom(deps, env, info),
-        ExecuteMsg::CreateChannel {
-            channel_open_init_options,
-        } => ibc::create_channel(deps, env, info, channel_open_init_options),
-        ExecuteMsg::CloseChannel {} => ibc::close_channel(deps, info),
-        ExecuteMsg::ReceiveIcaCallback(ica_controller_callback_msg) => {
-            ibc::ica_callback_handler(deps, info, ica_controller_callback_msg)
-        }
+        // ExecuteMsg::RegisterBloom { addr, bloom_msg } => {
+        //     self::ibc_bloom::try_ibc_bloom(deps, env, info, addr, bloom_msg)
+        // }
+        // ExecuteMsg::PrepareBloom {} => ibc_bloom::handle_ibc_bloom(deps, env, info),
+        // ExecuteMsg::ProcessBloom {} => ibc_bloom::process_ibc_bloom(deps, env, info),
+        // ExecuteMsg::CreateChannel {
+        //     channel_open_init_options,
+        // } => ibc::create_channel(deps, env, info, channel_open_init_options),
+        // ExecuteMsg::CloseChannel {} => ibc::close_channel(deps, info),
+        // ExecuteMsg::ReceiveIcaCallback(ica_controller_callback_msg) => {
+        //     ibc::ica_callback_handler(deps, info, ica_controller_callback_msg)
+        // }
     }
 }
 
@@ -155,48 +136,7 @@ pub fn reply(_deps: DepsMut, _env: Env, reply: Reply) -> StdResult<Response> {
             return Err(StdError::GenericErr {
                 msg: "bad reply".into(),
             })
-        } // SNIP120U_REPLY => {
-          //     match reply.result {
-          //         SubMsgResult::Ok(c) => {
-          //             let mut origin_key = None;
-          //             let mut init_addr = None;
-
-          //             let mut config = config_r(deps.storage).load()?;
-
-          //             for event in c.events {
-          //                 if event.ty == "instantiate" {
-          //                     for attr in &event.attributes {
-          //                         if attr.key == "contract_address" {
-          //                             init_addr = Some(attr.value.clone());
-          //                         }
-          //                     }
-          //                 }
-          //                 if event.ty == "snip120u" {
-          //                     for attr in &event.attributes {
-          //                         if attr.key == "origin" {
-          //                             origin_key = Some(attr.value.clone());
-          //                         }
-          //                     }
-
-          //                     if let Some(coin) = origin_key.clone() {
-          //                         if let Some(addr) = init_addr.clone() {
-          //                             if let Some(matching_snip120) = config
-          //                                 .snip120us
-          //                                 .iter_mut()
-          //                                 .find(|snip120| snip120.token == coin)
-          //                             {
-          //                                 matching_snip120.addr = Some(Addr::unchecked(addr.clone()));
-          //                             }
-          //                             TOTAL_CLAIMED.insert(deps.storage, &addr, &Uint128::zero())?;
-          //                         }
-          //                     }
-          //                 }
-          //             }
-          //         }
-          //         SubMsgResult::Err(_) => todo!(),
-          //     }
-          //     Ok(Response::new())
-          // }
+        }
     }
 }
 
@@ -209,16 +149,23 @@ pub fn migrate(_deps: DepsMut, _env: Env, msg: MigrateMsg) -> StdResult<Response
 
 pub mod headstash {
 
+    use cosmwasm_std::{BlockInfo, Uint128};
+
     use super::*;
-    use crate::state::{
-        AllowanceAction, HeadstashSig, CLAIMED_HEADSTASH, DECAY_CLAIMED, HEADSTASH_SIGS,
-        TOTAL_CLAIMED,
+    use crate::{
+        dwb::DWB,
+        state::{
+            snip::AllowanceAction, HeadstashSig, CLAIMED_HEADSTASH, DECAY_CLAIMED, HEADSTASH_SIGS,
+            TOTAL_CLAIMED,
+        },
+        transaction_history::{store_claim_headstash_action, store_register_headstash_action},
     };
 
     pub fn try_add_headstash(
         deps: DepsMut,
         env: Env,
         info: MessageInfo,
+        rng: &mut ContractPrng,
         headstash: Vec<Headstash>,
     ) -> Result<Response, ContractError> {
         // ensure sender is admin
@@ -236,25 +183,46 @@ pub mod headstash {
         // make sure airdrop has not ended
         queries::available(&config, &env)?;
 
-        add_headstash_to_state(deps, headstash.clone())?;
+        add_headstash_to_state(deps, &env.block, rng, headstash.clone())?;
 
         Ok(Response::default())
     }
 
-    pub fn add_headstash_to_state(deps: DepsMut, headstash: Vec<Headstash>) -> StdResult<()> {
-        // ensure pubkey is not already in KeyMap
+    pub fn add_headstash_to_state(
+        deps: DepsMut,
+        block: &BlockInfo,
+        rng: &mut ContractPrng,
+        headstash: Vec<Headstash>,
+    ) -> StdResult<()> {
         for hs in headstash.into_iter() {
-            let key = hs.addr;
             for snip in hs.snips.into_iter() {
-                let l1 = HEADSTASH_OWNERS.add_suffix(key.as_bytes());
-                let l2 = l1.add_suffix(snip.contract.as_bytes());
-                if l2.may_load(deps.storage)?.is_some() {
-                    return Err(StdError::generic_err(
-                        "pubkey already has been added, not adding again",
-                    ));
-                } else {
-                    l2.save(deps.storage, &snip.amount)?
-                }
+                let raw_amount = snip.amount.u128();
+                let raw_recipient = deps.api.addr_canonicalize(hs.addr.as_str())?;
+
+                // first store the tx information in the global append list of txs and get the new tx id
+                let tx_id = store_register_headstash_action(
+                    deps.storage,
+                    &raw_recipient,
+                    raw_amount,
+                    snip.contract,
+                    None,
+                    block,
+                )?;
+                // load delayed write buffer
+                let mut dwb = DWB.load(deps.storage)?;
+
+                // add the tx info for the recipient to the buffer
+                dwb.add_recipient(
+                    deps.storage,
+                    &mut secret_toolkit_crypto::ContractPrng {
+                        rng: rng.rng.clone(),
+                    },
+                    &raw_recipient,
+                    tx_id,
+                    raw_amount,
+                    #[cfg(feature = "gas_tracking")]
+                    tracker,
+                )?;
             }
         }
 
@@ -265,14 +233,22 @@ pub mod headstash {
         deps: DepsMut,
         env: Env,
         info: MessageInfo,
+        rng: &mut ContractPrng,
         addr: String,
         sig: String,
+        denom: String,
+        amount: Uint128,
     ) -> Result<Response, ContractError> {
         let mut msgs: Vec<CosmosMsg> = vec![];
         let config = CONFIG.load(deps.storage)?;
 
         // make sure airdrop has not ended
         queries::available(&config, &env)?;
+
+        // ensure snip defined is one eligible for this headstash
+        if !config.snip120us.iter().any(|a| a.addr.as_str() == addr) {
+            return Err(ContractError::InvalidSnip120u {});
+        }
 
         // if pubkey does not start with 0x1, we expect it is a solana wallet and we must verify
         if addr.starts_with("0x1") {
@@ -297,75 +273,71 @@ pub mod headstash {
             )?;
         }
 
-        // check if address has already claimed. This occurs after sig is verified, preventing leakage of claim status for a key.
-        let pf = CLAIMED_HEADSTASH.add_suffix(addr.as_bytes());
-        if pf.may_load(deps.storage)? == Some(true) {
-            return Err(ContractError::AlreadyClaimed {});
-        }
+        let raw_sender = deps.api.addr_canonicalize(info.sender.as_str())?;
+        let headstash_amount = self::utils::random_multiplier(rng) * amount;
 
-        // check if we apply bonus to claim
-        let bonus = self::utils::random_multiplier(env.clone());
+        // first store the tx information in the global append list of txs and get the new tx id
+        let tx_id = store_claim_headstash_action(
+            deps.storage,
+            &raw_sender,
+            headstash_amount.u128(),
+            denom.clone(),
+            None,
+            &env.block,
+        )?;
 
-        for snip in config.snip120us {
-            // // ensure each snip configured has this contract set as minter.
-            // let res: Binary = deps.querier.query_wasm_smart(
-            //     config.snip_hash.clone(),
-            //     addr.clone(),
-            //     &snip20_reference_impl::msg::QueryMsg::Minters {},
-            // )?;
-            // let all: MintersResponse = from_binary(&res)?;
-            // if all
-            //     .minters
-            //     .minters
-            //     .into_iter()
-            //     .find(|m| m == &env.contract.address.to_string())
-            //     .is_none()
-            // {
-            //     return Err(StdError::generic_err(
-            //         ContractError::HeadstashNotSnip120uMinter {}.to_string(),
-            //     ));
-            // };
+        // load delayed write buffer
+        let mut dwb = DWB.load(deps.storage)?;
 
-            // get headstash amount from map
-            let l1 = HEADSTASH_OWNERS.add_suffix(addr.clone().as_bytes());
-            let l2 = l1.add_suffix(snip.addr.as_bytes());
-            if let Some(amnt) = l2.may_load(deps.storage)? {
-                let headstash_amount = amnt * bonus;
-                // mint headstash amount to message signer. set allowance for this contract
-                let mint_msg = crate::msg::snip::mint_msg(
-                    info.sender.to_string(), // mint to the throwaway key
-                    headstash_amount,
-                    vec![AllowanceAction {
-                        spender: env.contract.address.to_string(),
-                        amount: headstash_amount,
-                        expiration: config.end_date,
-                        memo: None,
-                        decoys: None,
-                    }],
-                    None,
-                    None,
-                    1usize,
-                    config.snip_hash.clone(),
-                    snip.addr.to_string(),
-                )?;
+        let claim_str = "claim";
 
-                msgs.push(mint_msg);
+        // settle the owner's account.
+        dwb.settle_sender_or_owner_account(
+            deps.storage,
+            &raw_sender,
+            tx_id,
+            headstash_amount.u128(),
+            claim_str,
+            &mut secret_toolkit_crypto::ContractPrng {
+                rng: rng.rng.clone(),
+            },
+            #[cfg(feature = "gas_tracking")]
+            tracker,
+        )?;
 
-                // Update total claimed for specific snip20
-                let tc = TOTAL_CLAIMED.add_suffix(snip.addr.as_str().as_bytes());
-                tc.save(deps.storage, &headstash_amount)?;
-            }
+        // mint headstash amount to message signer. set allowance for this contract
+        let mint_msg = crate::msg::snip::mint_msg(
+            info.sender.to_string(), // mint to the throwaway key
+            headstash_amount,
+            vec![AllowanceAction {
+                spender: env.contract.address.to_string(),
+                amount: headstash_amount,
+                expiration: config.end_date,
+                memo: None,
+                decoys: None,
+            }],
+            None,
+            None,
+            1usize,
+            config.snip_hash.clone(),
+            denom.clone(),
+        )?;
 
-            // saves signature w/ key to item in state as info.sender
-            let hs = HEADSTASH_SIGS.add_suffix(info.sender.as_str().as_bytes());
-            hs.save(
-                deps.storage,
-                &HeadstashSig {
-                    addr: addr.clone(),
-                    sig: sig.clone(),
-                },
-            )?;
-        }
+        msgs.push(mint_msg);
+
+        // Update total claimed for specific snip20
+        let tc = TOTAL_CLAIMED.add_suffix(denom.as_str().as_bytes());
+        tc.update(deps.storage, |a| Ok(a + headstash_amount))?;
+
+        // saves signature w/ key to item in state as info.sender
+        let hs = HEADSTASH_SIGS.add_suffix(info.sender.as_str().as_bytes());
+        hs.save(
+            deps.storage,
+            &HeadstashSig {
+                addr: addr.clone(),
+                sig: sig.clone(),
+            },
+        )?;
 
         Ok(Response::default().add_messages(msgs))
     }
@@ -922,9 +894,8 @@ pub mod utils {
         prng.rand_bytes()
     }
 
-    pub fn random_multiplier(env: Env) -> Decimal {
+    pub fn random_multiplier(prng: &mut ContractPrng) -> Decimal {
         let mut bonus: Decimal = Decimal::one();
-        let mut prng = ContractPrng::from_env(&env);
         let mut random_numbers = vec![0u8; (7 * 32) as usize];
         prng.fill_bytes(&mut random_numbers);
         let r = prng.rand_bytes();
@@ -1095,7 +1066,7 @@ mod tests {
         let rand1 = prng.rand_bytes();
         let result = general_purpose::STANDARD.encode(rand1.clone());
 
-        let dec1 = self::utils::random_multiplier(env.clone());
+        let dec1 = self::utils::random_multiplier(&mut prng);
 
         // simulate new randomness seed from environment
         env.block.random = Some(Binary::from_base64(&result).unwrap());
@@ -1104,7 +1075,7 @@ mod tests {
         let mut prng = ContractPrng::from_env(&env.clone());
         let rand2 = prng.rand_bytes();
 
-        let dec2 = self::utils::random_multiplier(env);
+        let dec2 = self::utils::random_multiplier(&mut prng);
         // assert not equal
         assert_ne!(rand1, rand2);
         assert_ne!(dec1, dec2);

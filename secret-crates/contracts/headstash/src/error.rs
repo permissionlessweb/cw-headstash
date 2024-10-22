@@ -1,10 +1,13 @@
-use cosmwasm_std::StdError;
+use cosmwasm_std::{CheckedFromRatioError, StdError};
 use thiserror::Error;
 
 #[derive(Error, Debug)]
 pub enum ContractError {
     #[error("{0}")]
     Std(#[from] StdError),
+
+    #[error("{0}")]
+    CheckedFromRatioError(#[from] CheckedFromRatioError),
 
     #[error("This headstash contract has not been set as an eligible minter yet.")]
     HeadstashNotSnip120uMinter {},
@@ -29,7 +32,7 @@ pub enum ContractError {
 
     #[error("aint no bloomin happenin!")]
     BloomDisabled {},
-    
+
     #[error("unable to process bloom. No headstash found")]
     BloomNotFound {},
 
@@ -134,6 +137,9 @@ pub enum ContractError {
 
     #[error("the msg you sent contained an empty value!")]
     EmptyValue,
+
+    #[error("Invalid snip120u!")]
+    InvalidSnip120u,
 
     #[error("unknown reply id: {0}")]
     UnknownReplyId(u64),

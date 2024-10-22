@@ -25,6 +25,8 @@ pub const KEY_PROCESSING_BLOOM_MEMPOOL: &[u8] = b"pbmp";
 pub const KEY_BLOOM_TX_COUNT_MAP: &[u8] = b"btxcm";
 pub const KEY_BLOOM_CLAIMED_KEY: &[u8] = b"bck";
 
+pub const KEY_TX_COUNT: &[u8] = b"tx-count";
+
 pub const PREFIX_CONFIG: &[u8] = b"c";
 pub const PREFIX_HEADSTASH_OWNERS: &[u8] = b"hso";
 pub const PREFIX_HEADSTASH_SIGS: &[u8] = b"hs";
@@ -52,7 +54,7 @@ pub static BLOOM_TX_COUNT_MAP: Item<bloom::BloomTxCountMap> = Item::new(KEY_BLOO
 pub static BLOOM_CLAIMED_KEY: Item<bool> = Item::new(KEY_BLOOM_CLAIMED_KEY);
 pub static BLOOMSBLOOMS: Keymap<String, bloom::BloomBloom> = Keymap::new(b"blomblom");
 
-// IBC STATE
+// IBC CONTRACT STATE
 pub const STATE: Item<ibc::State> = Item::new(b"state");
 pub const CHANNEL_STATE: Item<channel::ChannelState> = Item::new(b"ica_channel");
 pub const CHANNEL_OPEN_INIT_OPTIONS: Item<ChannelOpenInitOptions> =
@@ -60,12 +62,17 @@ pub const CHANNEL_OPEN_INIT_OPTIONS: Item<ChannelOpenInitOptions> =
 pub const ALLOW_CHANNEL_OPEN_INIT: Item<bool> = Item::new(b"allow_channel_open_init");
 pub const ALLOW_CHANNEL_CLOSE_INIT: Item<bool> = Item::new(b"allow_channel_close_init");
 
+// DWB
+pub static TX_COUNT: Item<u64> = Item::new(KEY_TX_COUNT);
+
+// An eligible addr, along with a vector of snip120u contracts and their allocations.
 #[derive(Serialize, Deserialize, Clone, Debug, Eq, PartialEq, JsonSchema)]
 pub struct Headstash {
     pub addr: String,
-    pub snips: Vec<Snip>,
+    pub snips: Vec<snip::Snip>,
 }
 
+// The public address and signature
 #[derive(Serialize, Deserialize, Clone, Debug, Eq, PartialEq, JsonSchema)]
 pub struct HeadstashSig {
     pub addr: String,
@@ -78,36 +85,11 @@ pub struct Config {
     pub claim_msg_plaintext: String,
     pub start_date: u64,
     pub end_date: Option<u64>,
-    pub snip120us: Vec<Snip120u>,
+    pub snip120us: Vec<snip::Snip120u>,
     pub snip_hash: String,
     pub viewing_key: String,
     pub channel_id: String,
     pub bloom: Option<BloomConfig>,
-}
-
-#[derive(Serialize, Deserialize, Clone, Debug, Eq, PartialEq, JsonSchema)]
-pub struct AllowanceAction {
-    pub spender: String,
-    pub amount: Uint128,
-    pub expiration: Option<u64>,
-    pub memo: Option<String>,
-    pub decoys: Option<Vec<Addr>>,
-}
-
-#[derive(Serialize, Deserialize, Clone, Debug, Eq, PartialEq, JsonSchema)]
-pub struct Snip {
-    pub contract: String,
-    pub amount: Uint128,
-}
-
-#[derive(Serialize, Deserialize, Clone, Debug, Eq, PartialEq, JsonSchema)]
-pub struct Snip120u {
-    // native x/bank token for this snip120u
-    pub native_token: String,
-    // pub name: String,
-    pub addr: Addr,
-    // total amount of this to be distributed during this headstash
-    pub total_amount: Uint128,
 }
 
 pub mod ibc {
@@ -419,3 +401,59 @@ pub fn assert_owner(
     }
     Ok(())
 }
+
+pub mod snip {
+    use super::*;
+    #[derive(Serialize, Deserialize, Clone, Debug, Eq, PartialEq, JsonSchema)]
+    pub struct AllowanceAction {
+        pub spender: String,
+        pub amount: Uint128,
+        pub expiration: Option<u64>,
+        pub memo: Option<String>,
+        pub decoys: Option<Vec<Addr>>,
+    }
+
+    #[derive(Serialize, Deserialize, Clone, Debug, Eq, PartialEq, JsonSchema)]
+    pub struct Snip {
+        pub contract: String,
+        pub amount: Uint128,
+    }
+
+    #[derive(Serialize, Deserialize, Clone, Debug, Eq, PartialEq, JsonSchema)]
+    pub struct Snip120u {
+        // native x/bank token for this snip120u
+        pub native_token: String,
+        // pub name: String,
+        pub addr: Addr,
+        // total amount of this to be distributed during this headstash
+        pub total_amount: Uint128,
+    }
+}
+
+// To avoid balance guessing attacks based on balance overflow we need to perform safe addition and don't expose overflows to the caller.
+// Assuming that max of u128 is probably an unreachable balance, we want the addition to be bounded the max of u128
+// Currently the logic here is very straight forward yet the existence of the function is mandatory for future changes if needed.
+pub fn safe_add(balance: &mut u128, amount: u128) -> u128 {
+    // Note that new_amount can be equal to base after this operation.
+    // Currently we do nothing maybe on other implementations we will have something to add here
+    let prev_balance: u128 = *balance;
+    *balance = balance.saturating_add(amount);
+
+    // Won't underflow as the minimal value possible is 0
+    *balance - prev_balance
+}
+
+// To avoid balance guessing attacks based on balance overflow we need to perform safe addition and don't expose overflows to the caller.
+// Assuming that max of u64 is probably an unreachable balance, we want the addition to be bounded the max of u64
+// Currently the logic here is very straight forward yet the existence of the function is mandatory for future changes if needed.
+pub fn safe_add_u64(balance: &mut u64, amount: u64) -> u64 {
+    // Note that new_amount can be equal to base after this operation.
+    // Currently we do nothing maybe on other implementations we will have something to add here
+    let prev_balance: u64 = *balance;
+    *balance = balance.saturating_add(amount);
+
+    // Won't underflow as the minimal value possible is 0
+    *balance - prev_balance
+}
+
+pub static INTERNAL_SECRET: Item<Vec<u8>> = Item::new(b"internal-secret");
