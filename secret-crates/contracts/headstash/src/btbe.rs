@@ -177,17 +177,16 @@ impl HeadstashStoredEntry {
         let amount_spent = amount_u64(amount_spent)?;
 
         // if multiplier is not 1, add additional tokens to balance to prevent error on next step
-        // THIS MATH 'WORKS'... BUT MORE THAN LIKELY INTRODUCES VULNERABILITY
         if multiplier != Decimal::one() {
-            let amount = balance as u128;
-            let amount_atomic_decimal = Decimal::from_atomics(amount, 0)
+            let amount_atomic_decimal = Decimal::from_atomics(balance as u128, 0)
                 .map_err::<StdError, _>(|_| StdError::generic_err("ovaflo"))?;
             let result_decimal = amount_atomic_decimal
                 .checked_div(multiplier)
                 .map_err::<StdError, _>(|_| StdError::generic_err("divzero"))?;
-            let result_u128: u128 = Uint128::from_str(&result_decimal.to_string())?.u128();
-            let result_u64: u64 = result_u128 as u64;
-            balance = result_u64;
+            let result_u128 = Uint128::from_str(&result_decimal.to_string())?.u128();
+            balance = result_u128
+                .try_into()
+                .map_err::<StdError, _>(|_| StdError::generic_err("int conv"))?;
         }
 
         // error should never happen because already checked in `settle_sender_or_owner_account`
