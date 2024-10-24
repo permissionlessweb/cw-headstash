@@ -5,7 +5,7 @@ use crate::ibc::types::stargate::channel::new_ica_channel_open_init_cosmos_msg;
 use crate::msg::{ExecuteMsg, InstantiateMsg, MigrateMsg, QueryAnswer, QueryMsg};
 use crate::state::{
     Config, ContractState, Headstash, ALLOW_CHANNEL_OPEN_INIT, CHANNEL_OPEN_INIT_OPTIONS, CONFIG,
-    HEADSTASH_OWNERS, STATE,
+    ICA_ENABLED, STATE,
 };
 use base64::{engine::general_purpose, Engine};
 // use crate::SNIP120U_REPLY;
@@ -53,29 +53,34 @@ pub fn instantiate(
         start_date,
         viewing_key: msg.viewing_key,
         snip_hash: msg.snip120u_code_hash,
-        channel_id: msg.channel_id,
+        channel_id: "removing".into(),
         bloom: msg.bloom_config,
     };
+    let mut ica_msg = vec![];
     CONFIG.save(deps.storage, &state)?;
+    if let Some(ica) = msg.channel_open_init_options {
+        let callback_contract = ContractInfo {
+            address: env.contract.address.clone(),
+            code_hash: env.contract.code_hash,
+        };
 
-    // let callback_contract = ContractInfo {
-    //     address: env.contract.address.clone(),
-    //     code_hash: env.contract.code_hash,
-    // };
-    
-    // IBC Save the admin. Ica address is determined during handshake. Save headstash params.
-    // STATE.save(deps.storage, &ContractState::new(Some(callback_contract)))?;
-    // CHANNEL_OPEN_INIT_OPTIONS.save(deps.storage, &msg.channel_open_init_options)?;
-    // ALLOW_CHANNEL_OPEN_INIT.save(deps.storage, &true)?;
+        // IBC Save the admin. Ica address is determined during handshake. Save headstash params.
+        STATE.save(deps.storage, &ContractState::new(Some(callback_contract)))?;
+        CHANNEL_OPEN_INIT_OPTIONS.save(deps.storage, &ica)?;
+        ALLOW_CHANNEL_OPEN_INIT.save(deps.storage, &true)?;
 
-    // let ica_channel_open_init_msg = new_ica_channel_open_init_cosmos_msg(
-    //     env.contract.address.to_string(),
-    //     msg.channel_open_init_options.connection_id,
-    //     msg.channel_open_init_options.counterparty_port_id,
-    //     msg.channel_open_init_options.counterparty_connection_id,
-    //     None,
-    //     msg.channel_open_init_options.channel_ordering,
-    // );
+        let ica_channel_open_init_msg = new_ica_channel_open_init_cosmos_msg(
+            env.contract.address.to_string(),
+            ica.connection_id,
+            ica.counterparty_port_id,
+            ica.counterparty_connection_id,
+            None,
+            ica.channel_ordering,
+        );
+        ica_msg.push(ica_channel_open_init_msg);
+    } else {
+        ICA_ENABLED.save(deps.storage, &false)?;
+    }
 
     // initialize the bitwise-trie of bucketed entries
     initialize_btbe(deps.storage)?;
@@ -83,7 +88,7 @@ pub fn instantiate(
     // initialize the delay write buffer
     DWB.save(deps.storage, &DelayedWriteBuffer::new()?)?;
 
-    Ok(Response::default()) // .add_message(ica_channel_open_init_msg))
+    Ok(Response::default().add_message(ica_msg[0].clone()))
 }
 
 #[cfg_attr(not(feature = "library"), entry_point)]
@@ -105,18 +110,19 @@ pub fn execute(
             denom,
         } => self::headstash::try_claim(deps, env, info, &mut rng, addr, sig, denom, amount),
         ExecuteMsg::Clawback {} => self::headstash::try_clawback(deps, env, info),
+        // ExecuteMsg::Redeem {} => todo!(),
         // ExecuteMsg::RegisterBloom { addr, bloom_msg } => {
         //     self::ibc_bloom::try_ibc_bloom(deps, env, info, addr, bloom_msg)
         // }
         // ExecuteMsg::PrepareBloom {} => ibc_bloom::handle_ibc_bloom(deps, env, info),
         // ExecuteMsg::ProcessBloom {} => ibc_bloom::process_ibc_bloom(deps, env, info),
-        // ExecuteMsg::CreateChannel {
-        //     channel_open_init_options,
-        // } => ibc::create_channel(deps, env, info, channel_open_init_options),
-        // ExecuteMsg::CloseChannel {} => ibc::close_channel(deps, info),
-        // ExecuteMsg::ReceiveIcaCallback(ica_controller_callback_msg) => {
-        //     ibc::ica_callback_handler(deps, info, ica_controller_callback_msg)
-        // }
+        ExecuteMsg::CreateChannel {
+            channel_open_init_options,
+        } => ibc::create_channel(deps, env, info, channel_open_init_options),
+        ExecuteMsg::CloseChannel {} => ibc::close_channel(deps, info),
+        ExecuteMsg::ReceiveIcaCallback(ica_controller_callback_msg) => {
+            ibc::ica_callback_handler(deps, info, ica_controller_callback_msg)
+        }
     }
 }
 
@@ -622,6 +628,11 @@ pub mod ibc_bloom {
     ) -> Result<Response, ContractError> {
         //  TODO: add global bloomId to increment & make use of to handle callback responses.
         let config = CONFIG.load(deps.storage)?;
+        if config.bloom.is_none() {
+            return Err(ContractError::BloomDisabled {});
+        }
+
+        // create new tx id
         // verify msg sender has been authorized with public address signature
         let hs = HEADSTASH_SIGS.add_suffix(info.sender.as_str().as_bytes());
         if let Some(sig) = hs.may_load(deps.storage)? {
@@ -836,6 +847,9 @@ pub mod ibc_bloom {
         // load
         PROCESSING_BLOOM_MEMPOOL
             .update(deps.storage, |mut b| {
+                if b.len().lt(&1) {
+                    return Ok(b);
+                }
                 let lens = b.len() as u64;
                 let limit = lens.div_ceil(rand.into()).max(1);
                 b.drain(0..limit as usize).for_each(|a| {
@@ -855,7 +869,7 @@ pub mod ibc_bloom {
             })
             .unwrap();
 
-        /// IBC implementation
+        // IBC implementation
         let contract_state = STATE.load(deps.storage)?;
         let ica_packet = IcaPacketData::new(to_binary(&msgs)?.to_vec(), None);
         let ica_info = contract_state.get_ica_info()?;

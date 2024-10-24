@@ -13,12 +13,12 @@ use crate::msg::options::ChannelOpenInitOptions;
 pub static SNIP120US: Keymap<String, Uint128> = Keymap::new(b"snip");
 
 pub const KEY_CONFIG: &[u8] = b"c";
-pub const KEY_HEADSTASH_OWNERS: &[u8] = b"hso";
 pub const KEY_HEADSTASH_SIGS: &[u8] = b"hs";
 pub const KEY_DECAY_CLAIMED: &[u8] = b"dc";
 pub const KEY_TOTAL_CLAIMED: &[u8] = b"tc";
 pub const KEY_CLAIMED_HEADSTASH: &[u8] = b"chs";
 
+pub const KEY_ICA_ENABLED: &[u8] = b"ibc-enabled";
 pub const KEY_B_CONFIG: &[u8] = b"bc";
 pub const KEY_BLOOM_MEMPOOL: &[u8] = b"bpm";
 pub const KEY_PROCESSING_BLOOM_MEMPOOL: &[u8] = b"pbmp";
@@ -28,7 +28,6 @@ pub const KEY_BLOOM_CLAIMED_KEY: &[u8] = b"bck";
 pub const KEY_TX_COUNT: &[u8] = b"tx-count";
 
 pub const PREFIX_CONFIG: &[u8] = b"c";
-pub const PREFIX_HEADSTASH_OWNERS: &[u8] = b"hso";
 pub const PREFIX_HEADSTASH_SIGS: &[u8] = b"hs";
 pub const PREFIX_DECAY_CLAIMED: &[u8] = b"dc";
 pub const PREFIX_TOTAL_CLAIMED: &[u8] = b"tc";
@@ -41,12 +40,12 @@ pub const PREFIX_BLOOM_TX_COUNT_MAP: &[u8] = b"btxcm";
 pub const PREFIX_BLOOM_CLAIMED_KEY: &[u8] = b"bck";
 
 pub static CONFIG: Item<Config> = Item::new(KEY_B_CONFIG);
-pub static HEADSTASH_OWNERS: Item<Uint128> = Item::new(KEY_HEADSTASH_OWNERS);
 pub static HEADSTASH_SIGS: Item<HeadstashSig> = Item::new(KEY_B_CONFIG);
 pub static DECAY_CLAIMED: Item<bool> = Item::new(KEY_DECAY_CLAIMED);
 pub static TOTAL_CLAIMED: Item<Uint128> = Item::new(KEY_TOTAL_CLAIMED);
 pub static CLAIMED_HEADSTASH: Item<bool> = Item::new(KEY_CLAIMED_HEADSTASH);
 
+pub static ICA_ENABLED: Item<bool> = Item::new(KEY_ICA_ENABLED);
 pub static BLOOM_MEMPOOL: Item<Vec<bloom::IbcBloomMsg>> = Item::new(KEY_BLOOM_MEMPOOL);
 pub static PROCESSING_BLOOM_MEMPOOL: Item<Vec<bloom::ProcessingBloomMsg>> =
     Item::new(KEY_BLOOM_MEMPOOL);
