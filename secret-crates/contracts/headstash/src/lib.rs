@@ -8,6 +8,7 @@ pub mod ibc;
 pub mod msg;
 pub mod state;
 mod transaction_history;
+mod gas_tracker;
 mod dwb;
 pub mod types;
 mod verify;
