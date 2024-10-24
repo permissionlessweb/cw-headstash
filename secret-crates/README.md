@@ -22,7 +22,11 @@ Transparency-minimized airdrop contract for cosmos bech32 addresses to claim via
     - registering ibc-blooms txs 
     - processing ibc-bloom mempool
 - snip120: implement DWB 
-    
+
+
+- ~~headstash: use dwb for each snip120 total_claim (not needed, non-unique value)~~
+- ~~headstash: implement gas_tracker feature~~
+- ~~scripts: check and handle and duplicates~~
 - ~~Configure IBC/Clock hooks for tx mempool support~~
 - ~~On contract init, create snip120u contract for each token sent.~~
 - ~~Allow cosmos, eth pubkeys, or solana addr to verify ownership and claim headstash.~~
@@ -41,19 +45,20 @@ To create a headstash contract instance, you will need to have ready the followi
 | value | description| type |
 |-|-|-|
 | `owner` | owner of the headstash instance | string | 
-| `claim_msg_plaintext` | plaintext message used in eth signature | string |
-| `start_date` | optional, start date where headstash claims can begin | Option<> |
-| `end_date` | option, end date where headstash claims are available | Option<> |
-| `snip120u_code_id` | code-id of the custom snip20 contract |
-| `snip120u_code_hash` | code-hash of the custom snip20 contract
-| `snips` | define each  `Snip120u` token included in a headstash instance
-| `viewing_key` | a viewing key (may be used in future, not now)
+| `claim_msg_plaintext` | plaintext message used when signing offline signature | `String` |
+| `start_date` | optional, start date where headstash claims can begin | `Option<u64>` |
+| `end_date` | option, end date where headstash claims are available | `Option<u64>` |
+| `snip120u_code_hash` | code-hash of the custom snip20 contract | `String` |
+| `snips` | define each  `Snip120u` token included in a headstash instance | `Vec<Snip120u>` |
+| `viewing_key` | a viewing key (may be used in future, not now) | `String` |
+| `bloom_config` | optional configuration for the bloom function | `Option<BloomConfig>` |
+<!-- | `snip120u_code_id` | code-id of the custom snip20 contract | -->
 
 
 ## Contract Functions
 
 ### `AddEligibleHeadStash`
-This function is for a headstash deployers to define a list of accepted snip20 tokens and their allocations for each eligible wallet. When an admin registers public wallet addrs for a headstash instance, they first must ensure that there are no duplicate wallet entries in their allocation-file. A simple script is available [here](./README) to ensure there are no duplicates, & decide what to do if there are duplicates. For each snip a wallet is eligible for, a unique txid is generated and used in the DWB workflow. This sets the public wallet addresss with a balance for each snip. 
+This function is for a headstash deployers to define a list of accepted snip20 tokens and their allocations for each eligible wallet. When an admin registers public wallet addrs for a headstash instance, they first must ensure that there are no duplicate wallet entries in their allocation-file. A simple script is available [here](./scripts/secretjs/check4Duplicates.js) to ensure there are no duplicates, & decide what to do if there are duplicates. For each snip a wallet is eligible for, a unique txid is generated and used in the DWB workflow. This sets the public wallet addresss with a balance for each snip. 
 
 | value | description| type |
 |-|-|-|
@@ -104,6 +109,7 @@ Ibc-Bloom is how participants who have claimed a headstash get tokens to their h
 ## SecretJS scripts
 | Command | Description |
 | --- | --- |
+| `-duplicate-check` | Checks the distribution.json for duplicates |
 | `-upload-headstash` | Stores an airdrop contract |
 | `-upload-snip120u` | Stores an airdrop contract |
 | `-i-snip1` | Instantiates SNIP-20 version of token ONE |

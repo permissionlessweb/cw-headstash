@@ -28,22 +28,22 @@ export const snip120uNative2 = "ibc/7477828AC3E19352BA2D63352EA6D0680E3F29C126B8
 
 export const counterpartyChannelId = "channel-165"
 export const chain_id = "secret-4";
-export const cw_headstash_blob = fs.readFileSync("../../artifacts/cw_headstash.wasm");
-export const snip120u_blob = fs.readFileSync("../../artifacts/snip120u_impl.wasm");
+// export const cw_headstash_blob = fs.readFileSync("../../artifacts/cw_headstash.wasm");
+// export const snip120u_blob = fs.readFileSync("../../artifacts/snip120u_impl.wasm");
 export const entropy = "eretskeretjableret";
 export const permitKey = entropy;
 export const txEncryptionSeed = EncryptionUtilsImpl.GenerateNewSeed();
 
 export const snip120us = [
   {
-      native_token: "uterp",
-      addr: snip120uAddr1,
-      total_amount: "7100000"
+    native_token: "uterp",
+    addr: snip120uAddr1,
+    total_amount: "7100000"
   },
   {
-      native_token: "uthiol",
-      addr: snip120uAddr2,
-      total_amount: "7100000"
+    native_token: "uthiol",
+    addr: snip120uAddr2,
+    total_amount: "7100000"
   }];
 
 // signing client 
@@ -137,6 +137,8 @@ if (args.length < 1) {
   printBatch(0)
     .then(() => { console.log("generated them jawns"); })
     .catch((error) => { console.error("Failed:", error); });
+} else if (args[0] === '-duplicate-check') { // create an account, claims airdrop 
+  claim(args[1])
 } else {
   console.error('Invalid option.');
 }

@@ -12,6 +12,7 @@
     "license": "ISC",
     "dependencies": {
         "@shadeprotocol/shadejs": "^1.1.7",
+        "inquirer": "^12.0.0",
         "secretjs": "^1.12.5"
     }
 }
