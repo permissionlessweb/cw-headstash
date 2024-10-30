@@ -176,7 +176,8 @@ impl HeadstashStoredEntry {
 
         let amount_spent = amount_u64(amount_spent)?;
 
-        // if multiplier is not 1, add additional tokens to balance to prevent error on next step
+        // if multiplier is not 1, add additional tokens eligible to balance to prevent error on next step.
+        // This is needed because the multiplier is not calculated until an eligible addr broadcasts their message to claim their headstash.
         if multiplier != Decimal::one() {
             let amount_atomic_decimal = Decimal::from_atomics(balance as u128, 0)
                 .map_err::<StdError, _>(|_| StdError::generic_err("ovaflo"))?;

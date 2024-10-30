@@ -22,8 +22,7 @@ Transparency-minimized airdrop contract for cosmos bech32 addresses to claim via
     - registering ibc-blooms txs 
     - processing ibc-bloom mempool
 - snip120: implement DWB 
-
-
+- IBC: add support for polytone ( in order to successfully handle cross chain )
 - ~~headstash: use dwb for each snip120 total_claim (not needed, non-unique value)~~
 - ~~headstash: implement gas_tracker feature~~
 - ~~scripts: check and handle and duplicates~~

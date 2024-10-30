@@ -244,3 +244,17 @@ pub fn store_claim_headstash_action(
     let action = StoredTxAction::claim_headstash(sender.clone());
     append_new_stored_tx(store, &action, amount, denom, memo, block)
 }
+
+#[allow(clippy::too_many_arguments)] // We just need them
+pub fn store_register_bloom_action(
+    store: &mut dyn Storage,
+    sender: &CanonicalAddr,
+    recipient: &CanonicalAddr,
+    amount: u128,
+    denom: String,
+    memo: Option<String>,
+    block: &BlockInfo,
+) -> StdResult<u64> {
+    let action = StoredTxAction::register_ibc_bloom(sender.clone());
+    append_new_stored_tx(store, &action, amount, denom, memo, block)
+}

@@ -1,6 +1,6 @@
 // source: https://github.com/SolarRepublic/snip20-reference-impl/blob/master/src/dwb.rs
 use constant_time_eq::constant_time_eq;
-use cosmwasm_std::{Api, CanonicalAddr, Decimal, StdError, StdResult, Storage, Uint128};
+use cosmwasm_std::{Api, CanonicalAddr, Decimal, StdError, StdResult, Storage, Uint128, Uint64};
 use rand::RngCore;
 use secret_toolkit_crypto::ContractPrng;
 use serde::{Deserialize, Serialize};
@@ -17,6 +17,7 @@ use crate::{
     transaction_history::{Tx, TRANSACTIONS},
 };
 
+pub const KEY_BDWB: &[u8] = b"bdwb";
 pub const KEY_DWB: &[u8] = b"dwb";
 pub const KEY_TX_NODES_COUNT: &[u8] = b"dwb-node-cnt";
 pub const KEY_TX_NODES: &[u8] = b"dwb-tx-nodes";
@@ -38,6 +39,7 @@ const DWB_RECIPIENT_BYTES: usize = 20;
 const DWB_AMOUNT_BYTES: usize = 8; // Max 16 (u128)
 const DWB_HEAD_NODE_BYTES: usize = 5; // Max 8  (u64)
 const DWB_LIST_LEN_BYTES: usize = 2; // u16
+const BLOOM_TOKEN_BYTES: usize = 36; // byte length of a tokens ibc denom
 
 const_assert!(DWB_AMOUNT_BYTES <= U128_BYTES);
 const_assert!(DWB_HEAD_NODE_BYTES <= U64_BYTES);
@@ -49,6 +51,7 @@ const DWB_ENTRY_BYTES: usize =
 pub const ZERO_ADDR: [u8; DWB_RECIPIENT_BYTES] = [0u8; DWB_RECIPIENT_BYTES];
 
 pub static DWB: Item<DelayedWriteBuffer> = Item::new(KEY_DWB);
+pub static BLOOM_DWB: Item<DelayedWriteBuffer> = Item::new(KEY_BDWB);
 // use with add_suffix tx id (u64)
 // does not need to be an AppendStore because we never need to iterate over global list of txs
 pub static TX_NODES: Item<TxNode> = Item::new(KEY_TX_NODES);
@@ -108,13 +111,12 @@ impl DelayedWriteBuffer {
         tx_id: u64,
         amount_spent: u128,
         op_name: &str,
-        rng: &mut ContractPrng,
+        multiplier: Decimal,
         #[cfg(feature = "gas_tracking")] tracker: &mut GasTracker,
     ) -> StdResult<()> {
         #[cfg(feature = "gas_tracking")]
         let mut group1 = tracker.group("settle_sender_or_owner_account.1");
         let mut amount = amount_spent;
-        let mut multiplier = Decimal::one();
 
         // release the address from the buffer
         let (balance, mut dwb_entry) = self.release_dwb_recipient(store, address)?;
@@ -130,9 +132,6 @@ impl DelayedWriteBuffer {
 
         // randomly update default multiplier if claiming headstash
         if op_name == "claim" {
-            multiplier = crate::contract::utils::random_multiplier(&mut ContractPrng {
-                rng: rng.rng.clone(),
-            });
             amount = (Uint128::from(amount) * multiplier).u128();
         }
 
@@ -175,6 +174,7 @@ impl DelayedWriteBuffer {
         matched_index
     }
 
+    /// Adds an eligible recipient to the DWB. 
     pub fn add_recipient<'a>(
         &mut self,
         store: &mut dyn Storage,
@@ -275,7 +275,7 @@ impl DelayedWriteBuffer {
             store,
             &dwb_entry,
             None,
-            Decimal::one(),
+            Decimal::one(),  // multiplier is static at 1.00 
             #[cfg(feature = "gas_tracking")]
             tracker,
         )?;
@@ -304,6 +304,143 @@ impl DelayedWriteBuffer {
 
         Ok(())
     }
+
+
+    // pub fn add_bloom_recipient<'a>(
+    //     &mut self,
+    //     store: &mut dyn Storage,
+    //     rng: &mut ContractPrng,
+    //     recipient: &CanonicalAddr,
+    //     tx_id: u64,
+    //     amount: u128,
+    //     denom: String,
+    //     // cadance: u64,
+    //     #[cfg(feature = "gas_tracking")] tracker: &mut GasTracker<'a>,
+    // ) -> StdResult<()> {
+    //     #[cfg(feature = "gas_tracking")]
+    //     let mut group1 = tracker.group("add_recipient.1");
+
+    //     // check if `recipient` is already a recipient in the delayed write buffer
+    //     let recipient_index = self.recipient_match(recipient);
+    //     #[cfg(feature = "gas_tracking")]
+    //     group1.log("recipient_match");
+
+    //     // the new entry will either derive from a prior entry for the recipient or the dummy entry
+    //     let mut new_entry = self.entries[recipient_index].clone();
+
+    //     new_entry.set_recipient(recipient)?;
+    //     #[cfg(feature = "gas_tracking")]
+    //     group1.log("set_recipient");
+
+    //     new_entry.add_tx_node(store, tx_id)?;
+    //     #[cfg(feature = "gas_tracking")]
+    //     group1.log("add_tx_node");
+
+    //     new_entry.add_amount(amount)?;
+    //     #[cfg(feature = "gas_tracking")]
+    //     group1.log("add_amount");
+
+    //     new_entry.set_bloom_token(denom)?;
+    //     #[cfg(feature = "gas_tracking")]
+    //     group1.log("set_bloom_token");
+
+    //     // whether or not recipient is in the buffer (non-zero index)
+    //     // casting to i32 will never overflow, so long as dwb length is limited to a u16 value
+    //     let if_recipient_in_buffer = constant_time_is_not_zero(recipient_index as i32);
+    //     #[cfg(feature = "gas_tracking")]
+    //     group1.logf(format!(
+    //         "@if_recipient_in_buffer: {}",
+    //         if_recipient_in_buffer
+    //     ));
+
+    //     // whether or not the buffer is fully saturated yet
+    //     let if_undersaturated = constant_time_is_not_zero(self.empty_space_counter as i32);
+    //     #[cfg(feature = "gas_tracking")]
+    //     group1.logf(format!("@if_undersaturated: {}", if_undersaturated));
+
+    //     // find the next empty entry in the buffer
+    //     let next_empty_index = (DWB_LEN - self.empty_space_counter) as usize;
+    //     #[cfg(feature = "gas_tracking")]
+    //     group1.logf(format!("@next_empty_index: {}", next_empty_index));
+
+    //     // which entry to settle (not yet considering if recipient's entry has capacity in history list)
+    //     //   if recipient is in buffer or buffer is undersaturated then settle the dummy entry
+    //     //   otherwise, settle a random entry
+    //     let presumptive_settle_index = constant_time_if_else(
+    //         if_recipient_in_buffer,
+    //         0,
+    //         constant_time_if_else(
+    //             if_undersaturated,
+    //             0,
+    //             random_in_range(rng, 1, DWB_LEN as u32)? as usize,
+    //         ),
+    //     );
+    //     #[cfg(feature = "gas_tracking")]
+    //     group1.logf(format!(
+    //         "@presumptive_settle_index: {}",
+    //         presumptive_settle_index
+    //     ));
+
+    //     // check if we have any open slots in the linked list
+    //     let if_list_can_grow = constant_time_is_not_zero(
+    //         (DWB_MAX_TX_EVENTS - self.entries[recipient_index].list_len()?) as i32,
+    //     );
+    //     #[cfg(feature = "gas_tracking")]
+    //     group1.logf(format!("@if_list_can_grow: {}", if_list_can_grow));
+
+    //     // if we would overflow the list by updating the existing entry, then just settle that recipient
+    //     let actual_settle_index =
+    //         constant_time_if_else(if_list_can_grow, presumptive_settle_index, recipient_index);
+    //     #[cfg(feature = "gas_tracking")]
+    //     group1.logf(format!("@actual_settle_index: {}", actual_settle_index));
+
+    //     // where to write the new/replacement entry
+    //     //   if recipient is in buffer then update it
+    //     //   otherwise, if buffer is undersaturated then put new entry at next open slot
+    //     //   otherwise, the buffer is saturated so replace the entry that is getting settled
+    //     let write_index = constant_time_if_else(
+    //         if_recipient_in_buffer,
+    //         recipient_index,
+    //         constant_time_if_else(if_undersaturated, next_empty_index, actual_settle_index),
+    //     );
+    //     #[cfg(feature = "gas_tracking")]
+    //     group1.logf(format!("@write_index: {}", write_index));
+
+    //     // settle the entry
+    //     let dwb_entry = self.entries[actual_settle_index];
+    //     merge_dwb_entry(
+    //         store,
+    //         &dwb_entry,
+    //         None,
+    //         Decimal::one(), // multiplier is static at 1.00
+    //         #[cfg(feature = "gas_tracking")]
+    //         tracker,
+    //     )?;
+
+    //     #[cfg(feature = "gas_tracking")]
+    //     let mut group2 = tracker.group("add_recipient.2");
+
+    //     #[cfg(feature = "gas_tracking")]
+    //     group2.log("merge_dwb_entry");
+
+    //     // write the new entry, which either overwrites the existing one for the same recipient,
+    //     // replaces a randomly settled one, or inserts into an "empty" slot in the buffer
+    //     self.entries[write_index] = new_entry;
+
+    //     // decrement empty space counter if it is undersaturated and the recipient was not already in the buffer
+    //     self.empty_space_counter -= constant_time_if_else(
+    //         if_undersaturated,
+    //         constant_time_if_else(if_recipient_in_buffer, 0, 1),
+    //         0,
+    //     ) as u16;
+    //     #[cfg(feature = "gas_tracking")]
+    //     group2.logf(format!(
+    //         "@empty_space_counter: {}",
+    //         self.empty_space_counter
+    //     ));
+
+    //     Ok(())
+    // }
 }
 
 /// A delayed write buffer entry consists of the following bytes in this order:
@@ -436,6 +573,45 @@ impl DelayedWriteBufferEntry {
         self.set_amount(amount)?;
 
         Ok(amount)
+    }
+
+    // pub fn cadance(&self) -> StdResult<Uint64> {
+    //     let start = DWB_RECIPIENT_BYTES + DWB_AMOUNT_BYTES + DWB_HEAD_NODE_BYTES;
+    //     let end = start + U64_BYTES;
+    //     let cadance_slice = &self.0[start..end];
+    //     let result = u64::from_be_bytes(
+    //         cadance_slice
+    //             .try_into()
+    //             .map_err(|_| StdError::generic_err("unable to parse cadance bytes"))?,
+    //     );
+    //     Ok(Uint64::new(result))
+    // }
+
+    // fn set_cadance(&mut self, val: u64) -> StdResult<()> {
+    //     let start = DWB_RECIPIENT_BYTES + DWB_AMOUNT_BYTES + DWB_HEAD_NODE_BYTES;
+    //     let end = start + U64_BYTES;
+    //     self.0[start..end].copy_from_slice(&val.to_be_bytes());
+    //     Ok(())
+    // }
+
+    pub fn bloom_token(&self) -> StdResult<String> {
+        let start = DWB_RECIPIENT_BYTES + DWB_AMOUNT_BYTES + DWB_HEAD_NODE_BYTES;
+        let end = start + BLOOM_TOKEN_BYTES;
+        let bloom_token_slice = &self.0[start..end];
+
+        let result = String::from_utf8(
+            bloom_token_slice
+                .try_into()
+                .map_err(|_| StdError::generic_err("unable to parse bloom_token bytes"))?,
+        )?;
+        Ok(result)
+    }
+
+    fn set_bloom_token(&mut self, val: String) -> StdResult<()> {
+        let start = DWB_RECIPIENT_BYTES + DWB_AMOUNT_BYTES + DWB_HEAD_NODE_BYTES;
+        let end = start + BLOOM_TOKEN_BYTES;
+        self.0[start..end].copy_from_slice(&val.as_bytes());
+        Ok(())
     }
 }
 

@@ -1,7 +1,7 @@
 use crate::error::ContractError;
 use bloom::BloomConfig;
 use cosmwasm_schema::cw_serde;
-use cosmwasm_std::{Addr, StdError, StdResult, Storage, Uint128};
+use cosmwasm_std::{Addr, Decimal, StdError, StdResult, Storage, Uint128, Uint64};
 use schemars::JsonSchema;
 use secret_toolkit::storage::{Item, Keymap};
 use serde::{Deserialize, Serialize};
@@ -27,6 +27,8 @@ pub const KEY_BLOOM_CLAIMED_KEY: &[u8] = b"bck";
 
 pub const KEY_TX_COUNT: &[u8] = b"tx-count";
 
+pub const KEY_MULTIPLIER: &[u8] = b"mp";
+
 pub const PREFIX_CONFIG: &[u8] = b"c";
 pub const PREFIX_HEADSTASH_SIGS: &[u8] = b"hs";
 pub const PREFIX_DECAY_CLAIMED: &[u8] = b"dc";
@@ -44,6 +46,7 @@ pub static HEADSTASH_SIGS: Item<HeadstashSig> = Item::new(KEY_B_CONFIG);
 pub static DECAY_CLAIMED: Item<bool> = Item::new(KEY_DECAY_CLAIMED);
 pub static TOTAL_CLAIMED: Item<Uint128> = Item::new(KEY_TOTAL_CLAIMED);
 pub static CLAIMED_HEADSTASH: Item<bool> = Item::new(KEY_CLAIMED_HEADSTASH);
+pub static MULTIPLIER: Item<Decimal> = Item::new(KEY_MULTIPLIER);
 
 pub static ICA_ENABLED: Item<bool> = Item::new(KEY_ICA_ENABLED);
 pub static BLOOM_MEMPOOL: Item<Vec<bloom::IbcBloomMsg>> = Item::new(KEY_BLOOM_MEMPOOL);
@@ -87,7 +90,6 @@ pub struct Config {
     pub snip120us: Vec<snip::Snip120u>,
     pub snip_hash: String,
     pub viewing_key: String,
-    pub channel_id: String,
     pub bloom: Option<BloomConfig>,
 }
 
@@ -261,58 +263,9 @@ pub mod bloom {
     use super::*;
     use cosmwasm_std::Timestamp;
 
-    pub struct IbcBloomStore {}
-    impl IbcBloomStore {
-        // loads pending msgs from store for a given sender
-        pub fn load_blooms_in_rango_from_mempool(
-            _storage: &dyn Storage,
-            _sender: &Addr,
-        ) -> Vec<IbcBloomMsg> {
-            // todo:
-            // - get random entropy_range prefix
-            // - get random_addrs in entropy range array
-            // - get random # of msg to process for addr. If none, get another random address.
-            // - push all msgs
-
-            // // get random entropy_range to use as suffix in KepMap lookup
-            // let random_entropy_suffix = utils::weighted_random(rand) as u128;
-            // let msgs = BLOOM_MEMPOOL
-            //     .add_suffix(&random_entropy_suffix.to_string().into_bytes())
-            //     .add_suffix(sender.as_str().as_bytes());
-
-            // return msgs.load(storage).unwrap_or(vec![]);
-            return vec![];
-        }
-
-        // saves a new pending msg to the store
-        pub fn save_bloom_to_mempool(
-            storage: &mut dyn Storage,
-            sender: &Addr,
-            msgs: Vec<IbcBloomMsg>,
-        ) -> StdResult<()> {
-            let mempool = BLOOM_MEMPOOL.add_suffix(sender.as_str().as_bytes());
-            mempool.save(storage, &msgs)
-        }
-
-        // updates the amounts
-        pub fn update_bloom_msg(
-            _store: &mut dyn Storage,
-            _sender: &Addr,
-            mut old: BloomRecipient,
-            new: BloomRecipient,
-        ) -> StdResult<()> {
-            if let Some(amnt) = old.amount.checked_sub(new.amount) {
-                old.amount = amnt
-            } else {
-                return Err(StdError::generic_err(format!("beat!")));
-            }
-            Ok(())
-        }
-    }
-
     #[derive(Serialize, Debug, Deserialize, Clone, Eq, PartialEq, JsonSchema, Default)]
     pub struct BloomBloom {
-        pub timestamp: Timestamp,
+        pub block_height: u64,
         pub msg: IbcBloomMsg,
     }
 
@@ -321,9 +274,9 @@ pub mod bloom {
         pub owner: String,
         // total amount to be sent via ibc-bloom protocol. Must never be > allowance set for headstash contract.
         pub total: Uint128,
-        // native token of snip120u being redeemed
+        /// Native token denomination of snip120u being redeemed. This should always match one of the eligible `native_token` set by headstash owner during contract initializatiion.
         pub source_token: String,
-        // additional delay before including blooms into msgs
+        // additional delay before including blooms into msgs (blocks)
         pub cadance: u64,
         // ratio used to classify bloom-mempool tx priority
         //  0 == no entropy, most chance of being included in finality process.
@@ -335,21 +288,19 @@ pub mod bloom {
 
     #[derive(Serialize, Debug, Deserialize, Clone, Eq, PartialEq, JsonSchema, Default)]
     pub struct ProcessingBloomMsg {
-        // recipient addr
+        /// recipient addr of
         pub addr: String,
         // amount pending to send to recipient. Owner sets this first, and is update by contract while processing ibc-bloom
         pub amount: u64,
         // Coin token string
         pub token: String,
-        // IBC channel id to transfer tokens to
-        pub channel: String,
     }
 
     #[derive(Serialize, Debug, Deserialize, Clone, Eq, PartialEq, JsonSchema, Default)]
     pub struct BloomRecipient {
-        // recipient addr
+        /// recipient addr
         pub addr: String,
-        // amount pending to send to recipient. Owner sets this first, and is update by contract while processing ibc-bloom
+        /// amount pending to send to recipient. Owner sets this first, and is update by contract while processing ibc-bloom
         pub amount: u64,
         /// Optional timeout in seconds to include with the ibc packet.
         /// If not specified, the [default timeout](crate::ibc::types::packet::DEFAULT_TIMEOUT_SECONDS) is used.
@@ -365,16 +316,16 @@ pub mod bloom {
         pub amount: u64,
     }
 
-    #[derive(Serialize, Deserialize, Clone, Debug, Eq, PartialEq, JsonSchema)]
+    #[derive(Serialize, Deserialize, Clone, Debug, Eq, PartialEq, Copy, JsonSchema)]
     pub struct BloomConfig {
         /// minimum cadance before messages are eligible to be added to mempool (in blocks)
         pub default_cadance: u64,
         /// minimum cadance that can be set before messages are eligible for mempool. if 0, default_cadance is set.
         pub min_cadance: u64,
-        /// if enabled, randomness seed is used to add random value to cadance.
-        pub random_cadance: bool,
         /// maximum number of transactions a bloom msg will process  
         pub max_granularity: u64,
+        // if enabled, randomness seed is used to add random value to cadance.
+        // pub random_cadance: bool,
         // /// if enabled, decoy messages are included in batches to create noise
         // pub decoys: bool,
     }
@@ -420,7 +371,7 @@ pub mod snip {
 
     #[derive(Serialize, Deserialize, Clone, Debug, Eq, PartialEq, JsonSchema)]
     pub struct Snip120u {
-        // native x/bank token for this snip120u
+        // native x/bank token denomination for this snip120u
         pub native_token: String,
         // pub name: String,
         pub addr: Addr,

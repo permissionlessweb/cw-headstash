@@ -1,12 +1,9 @@
 use crate::btbe::initialize_btbe;
-use crate::dwb::{DelayedWriteBuffer, DWB};
+use crate::dwb::{DelayedWriteBuffer, BLOOM_DWB, DWB};
 use crate::error::ContractError;
 use crate::ibc::types::stargate::channel::new_ica_channel_open_init_cosmos_msg;
 use crate::msg::{ExecuteMsg, InstantiateMsg, MigrateMsg, QueryAnswer, QueryMsg};
-use crate::state::{
-    Config, ContractState, Headstash, ALLOW_CHANNEL_OPEN_INIT, CHANNEL_OPEN_INIT_OPTIONS, CONFIG,
-    ICA_ENABLED, STATE,
-};
+use crate::state::{Config, ContractState, Headstash, CONFIG, ICA_ENABLED, STATE};
 use base64::{engine::general_purpose, Engine};
 // use crate::SNIP120U_REPLY;
 
@@ -15,7 +12,7 @@ use cosmwasm_std::entry_point;
 
 use cosmwasm_std::{
     to_binary, Binary, ContractInfo, CosmosMsg, Deps, DepsMut, Env, MessageInfo, Reply, Response,
-    StdError, StdResult,
+    StdError, StdResult, Uint64,
 };
 use rand_core::RngCore;
 use secret_toolkit::crypto::ContractPrng;
@@ -29,22 +26,24 @@ pub fn instantiate(
 ) -> StdResult<Response> {
     let start_date = match msg.start_date {
         None => env.block.time.seconds(),
-        Some(date) => date,
+        Some(date) => date.into(),
     };
 
     validation::validate_plaintext_msg(msg.claim_msg_plaintext.clone())?;
 
+    let mut unique_snips: Vec<crate::state::snip::Snip120u> = Vec::new();
     for snip in msg.snips.clone() {
-        let snips = msg.snips.iter();
-        if snips
-            .clone()
+        if unique_snips
+            .iter()
             .any(|a| a.native_token == snip.native_token || a.addr == snip.addr)
         {
             return Err(StdError::generic_err(
                 ContractError::DuplicateSnip120u {}.to_string(),
             ));
         }
+        unique_snips.push(snip);
     }
+
     let state = Config {
         owner: info.sender,
         claim_msg_plaintext: msg.claim_msg_plaintext,
@@ -53,42 +52,44 @@ pub fn instantiate(
         start_date,
         viewing_key: msg.viewing_key,
         snip_hash: msg.snip120u_code_hash,
-        channel_id: "removing".into(),
         bloom: msg.bloom_config,
     };
-    let mut ica_msg = vec![];
+
     CONFIG.save(deps.storage, &state)?;
-    if let Some(ica) = msg.channel_open_init_options {
-        let callback_contract = ContractInfo {
-            address: env.contract.address.clone(),
-            code_hash: env.contract.code_hash,
-        };
+    // let mut ica_msg = vec![];
+    // if let Some(ica) = msg.channel_open_init_options {
+    //     let callback_contract = ContractInfo {
+    //         address: env.contract.address.clone(),
+    //         code_hash: env.contract.code_hash,
+    //     };
 
-        // IBC Save the admin. Ica address is determined during handshake. Save headstash params.
-        STATE.save(deps.storage, &ContractState::new(Some(callback_contract)))?;
-        CHANNEL_OPEN_INIT_OPTIONS.save(deps.storage, &ica)?;
-        ALLOW_CHANNEL_OPEN_INIT.save(deps.storage, &true)?;
+    //     // IBC Save the admin. Ica address is determined during handshake. Save headstash params.
+    //     STATE.save(deps.storage, &ContractState::new(Some(callback_contract)))?;
+    //     CHANNEL_OPEN_INIT_OPTIONS.save(deps.storage, &ica)?;
+    //     ALLOW_CHANNEL_OPEN_INIT.save(deps.storage, &true)?;
 
-        let ica_channel_open_init_msg = new_ica_channel_open_init_cosmos_msg(
-            env.contract.address.to_string(),
-            ica.connection_id,
-            ica.counterparty_port_id,
-            ica.counterparty_connection_id,
-            None,
-            ica.channel_ordering,
-        );
-        ica_msg.push(ica_channel_open_init_msg);
-    } else {
-        ICA_ENABLED.save(deps.storage, &false)?;
-    }
+    //     let ica_channel_open_init_msg = new_ica_channel_open_init_cosmos_msg(
+    //         env.contract.address.to_string(),
+    //         ica.connection_id,
+    //         ica.counterparty_port_id,
+    //         ica.counterparty_connection_id,
+    //         None,
+    //         ica.channel_ordering,
+    //     );
+    //     ica_msg.push(ica_channel_open_init_msg);
+    // } else {
+    //     ICA_ENABLED.save(deps.storage, &false)?;
+    // }
 
+    // generate 10 DWB for ibc-bloom
+    // if msg.bloom_config.is_some() {}
     // initialize the bitwise-trie of bucketed entries
     initialize_btbe(deps.storage)?;
 
     // initialize the delay write buffer
     DWB.save(deps.storage, &DelayedWriteBuffer::new()?)?;
 
-    Ok(Response::default().add_message(ica_msg[0].clone()))
+    Ok(Response::default()) // .add_message(ica_msg[0].clone())
 }
 
 #[cfg_attr(not(feature = "library"), entry_point)]
@@ -116,13 +117,13 @@ pub fn execute(
         // }
         // ExecuteMsg::PrepareBloom {} => ibc_bloom::handle_ibc_bloom(deps, env, info),
         // ExecuteMsg::ProcessBloom {} => ibc_bloom::process_ibc_bloom(deps, env, info),
-        ExecuteMsg::CreateChannel {
-            channel_open_init_options,
-        } => ibc::create_channel(deps, env, info, channel_open_init_options),
-        ExecuteMsg::CloseChannel {} => ibc::close_channel(deps, info),
-        ExecuteMsg::ReceiveIcaCallback(ica_controller_callback_msg) => {
-            ibc::ica_callback_handler(deps, info, ica_controller_callback_msg)
-        }
+        // ExecuteMsg::CreateChannel {
+        //     channel_open_init_options,
+        // } => ibc::create_channel(deps, env, info, channel_open_init_options),
+        // ExecuteMsg::CloseChannel {} => ibc::close_channel(deps, info),
+        // ExecuteMsg::ReceiveIcaCallback(ica_controller_callback_msg) => {
+        //     ibc::ica_callback_handler(deps, info, ica_controller_callback_msg)
+        // }
     }
 }
 
@@ -155,14 +156,14 @@ pub fn migrate(_deps: DepsMut, _env: Env, msg: MigrateMsg) -> StdResult<Response
 
 pub mod headstash {
 
-    use cosmwasm_std::{BlockInfo, Uint128};
+    use cosmwasm_std::{BlockInfo, Decimal, Uint128};
 
     use super::*;
     use crate::{
         dwb::DWB,
         state::{
             snip::AllowanceAction, HeadstashSig, CLAIMED_HEADSTASH, DECAY_CLAIMED, HEADSTASH_SIGS,
-            TOTAL_CLAIMED,
+            MULTIPLIER, TOTAL_CLAIMED,
         },
         transaction_history::{store_claim_headstash_action, store_register_headstash_action},
     };
@@ -240,7 +241,7 @@ pub mod headstash {
         env: Env,
         info: MessageInfo,
         rng: &mut ContractPrng,
-        addr: String,
+        sig_addr: String,
         sig: String,
         denom: String,
         amount: Uint128,
@@ -248,20 +249,26 @@ pub mod headstash {
         let mut msgs: Vec<CosmosMsg> = vec![];
         let config = CONFIG.load(deps.storage)?;
 
+        let multiplier: Decimal;
+
         // make sure airdrop has not ended
         queries::available(&config, &env)?;
 
         // ensure snip defined is one eligible for this headstash
-        if !config.snip120us.iter().any(|a| a.addr.as_str() == addr) {
+        if !config
+            .snip120us
+            .iter()
+            .any(|a| a.native_token.as_str() == denom)
+        {
             return Err(ContractError::InvalidSnip120u {});
         }
 
         // if pubkey does not start with 0x1, we expect it is a solana wallet and we must verify
-        if addr.starts_with("0x1") {
+        if sig_addr.starts_with("0x1") {
             validation::verify_headstash_sig(
                 deps.api,
                 info.sender.clone(),
-                addr.to_string(),
+                sig_addr.to_string(),
                 sig.clone(),
                 config.claim_msg_plaintext.clone(),
                 false,
@@ -271,7 +278,7 @@ pub mod headstash {
             validation::verify_headstash_sig(
                 deps.api,
                 info.sender.clone(),
-                addr.clone(),
+                sig_addr.clone(),
                 sig.clone(),
                 config.claim_msg_plaintext,
                 false,
@@ -280,9 +287,20 @@ pub mod headstash {
         }
 
         let raw_sender = deps.api.addr_canonicalize(info.sender.as_str())?;
-        let headstash_amount = self::utils::random_multiplier(rng) * amount;
+        // determine any extra eligible amount rewarded. Since multiple claims of an allocation are possible,
+        // if the eligible addr has claimed atleast once, we use the multiplier determined during that claim,
+        // rather than generating a new multiplier for each claim.
+        if let Some(mult) = MULTIPLIER
+            .add_suffix(sig_addr.as_bytes())
+            .may_load(deps.storage)?
+        {
+            multiplier = mult
+        } else {
+            multiplier = self::utils::random_multiplier(rng);
+        }
+        let headstash_amount = amount * multiplier;
 
-        // first store the tx information in the global append list of txs and get the new tx id
+        // first store the tx information in the global append list of txs and get the new tx id.
         let tx_id = store_claim_headstash_action(
             deps.storage,
             &raw_sender,
@@ -297,28 +315,26 @@ pub mod headstash {
 
         let claim_str = "claim";
 
-        // settle the owner's account.
+        // settle the owner's account. This will error if the sender tries to redeem more than allocated
         dwb.settle_sender_or_owner_account(
             deps.storage,
             &raw_sender,
             tx_id,
             headstash_amount.u128(),
             claim_str,
-            &mut secret_toolkit_crypto::ContractPrng {
-                rng: rng.rng.clone(),
-            },
+            multiplier.clone(),
             #[cfg(feature = "gas_tracking")]
             tracker,
         )?;
 
-        // mint headstash amount to message signer. set allowance for this contract
+        // mint headstash amount to message signer. set allowance for this contract during mint
         let mint_msg = crate::msg::snip::mint_msg(
             info.sender.to_string(), // mint to the throwaway key
             headstash_amount,
             vec![AllowanceAction {
                 spender: env.contract.address.to_string(),
                 amount: headstash_amount,
-                expiration: config.end_date,
+                expiration: config.end_date.into(),
                 memo: None,
                 decoys: None,
             }],
@@ -335,12 +351,12 @@ pub mod headstash {
         let tc = TOTAL_CLAIMED.add_suffix(denom.as_str().as_bytes());
         tc.update(deps.storage, |a| Ok(a + headstash_amount))?;
 
-        // saves signature w/ key to item in state as info.sender
+        // msgs sender used as prefix for storage map. Saves addr and signature derived from addr to state for recall during registering a bloom.
         let hs = HEADSTASH_SIGS.add_suffix(info.sender.as_str().as_bytes());
         hs.save(
             deps.storage,
             &HeadstashSig {
-                addr: addr.clone(),
+                addr: sig_addr.clone(),
                 sig: sig.clone(),
             },
         )?;
@@ -354,9 +370,9 @@ pub mod headstash {
         info: MessageInfo,
     ) -> Result<Response, ContractError> {
         let mut msgs: Vec<CosmosMsg> = vec![];
-        // ensure sender is admin
         let config = CONFIG.load(deps.storage)?;
 
+        // ensure sender is admin
         let admin = config.owner;
         if info.sender != admin {
             return Err(ContractError::ClawbackError {});
@@ -390,10 +406,8 @@ pub mod headstash {
                         snip.addr.to_string(),
                     )?;
                     msgs.push(mint_msg);
-                    Ok(new)
+                    Ok(snip.total_amount)
                 })?;
-
-                // Update total claimed
             }
         } else {
             return Err(ContractError::ClawbackError {});
@@ -552,14 +566,18 @@ pub mod validation {
 }
 
 pub mod ibc_bloom {
+    use std::cmp::min;
+
     use super::*;
 
-    use cosmwasm_std::{coin, Addr, DepsMut, Empty, IbcTimeout, StdError, Uint128, WasmMsg};
+    use cosmwasm_std::{coin, coins, Addr, DepsMut, Empty, IbcTimeout, StdError, Uint128, WasmMsg};
     use utils::contract_randomness;
     use validation::compute_plaintxt_msg;
 
     use crate::{
-        ibc::types::packet::IcaPacketData,
+        // dwb::BLOOM_DWB,
+        // ibc::types::packet::IcaPacketData,
+        // transaction_history::{store_register_bloom_action, store_register_headstash_action},
         state::{
             bloom::{BloomBloom, IbcBloomMsg, ProcessingBloomMsg},
             BLOOMSBLOOMS, HEADSTASH_SIGS, PROCESSING_BLOOM_MEMPOOL,
@@ -618,27 +636,26 @@ pub mod ibc_bloom {
         }
     }
 
-    /// Entry point to register an ibc bloom to be processed
+    /// Register IBC bloom msgs to one of the dwb's dedicated for IBC-bloom.
     pub fn try_ibc_bloom(
         deps: DepsMut,
         env: Env,
         info: MessageInfo,
+        rng: ContractPrng,
         addr: String,
         bloom_msg: IbcBloomMsg,
     ) -> Result<Response, ContractError> {
-        //  TODO: add global bloomId to increment & make use of to handle callback responses.
         let config = CONFIG.load(deps.storage)?;
         if config.bloom.is_none() {
             return Err(ContractError::BloomDisabled {});
         }
 
-        // create new tx id
         // verify msg sender has been authorized with public address signature
         let hs = HEADSTASH_SIGS.add_suffix(info.sender.as_str().as_bytes());
         if let Some(sig) = hs.may_load(deps.storage)? {
-            if sig.addr.ne(info.sender.as_str()) {
-                return Err(ContractError::BloomMismatchSigner {});
-            }
+            // if sig.addr.ne(info.sender.as_str()) {
+            //     return Err(ContractError::BloomMismatchSigner {});
+            // }
             if (bloom_msg.bloom.len() as u64)
                 .gt(&config.bloom.expect("bloom not setup").max_granularity)
             {
@@ -656,7 +673,7 @@ pub mod ibc_bloom {
                     deps.storage,
                     &sig.addr,
                     &BloomBloom {
-                        timestamp: env.block.time,
+                        block_height: env.block.height,
                         msg: bloom_msg,
                     },
                 )?;
@@ -665,7 +682,7 @@ pub mod ibc_bloom {
                     deps.storage,
                     &sig.addr,
                     &BloomBloom {
-                        timestamp: env.block.time,
+                        block_height: env.block.height,
                         msg: bloom_msg,
                     },
                 )?;
@@ -697,46 +714,14 @@ pub mod ibc_bloom {
             return Err(ContractError::BloomNotFound {});
         };
 
-        // for snip in snip120us {
-        // if ibc_bloom_status_r(deps.storage).load(sig.as_bytes())? {
-        //     return Err(StdError::generic_err("already ibc-bloomed"));
-        // }
-
-        //     // if let Some(address) = config.snip120us.iter().find(|e| e.addr == snip.address) {
-        //     //     let redeem_msg = crate::msg::snip::Redeem {
-        //     //         amount: snip.amount,
-        //     //         denom: None,
-        //     //         decoys: None,
-        //     //         entropy: None,
-        //     //         padding: None,
-        //     //     };
-        //     //     let snip120_msg = into_cosmos_msg(
-        //     //         redeem_msg,
-        //     //         1usize, // ?
-        //     //         config.snip_hash.clone(),
-        //     //         snip.address.to_string(),
-        //     //         None,
-        //     //     )?;
-
-        //     //     let ibc_send = IbcMsg::Transfer {
-        //     //         channel_id: config.channel_id.clone(),
-        //     //         to_address: destination_addr.clone(),
-        //     //         amount: Coin::new(snip.amount.u128(), address.native_token.clone()),
-        //     //         timeout: IbcTimeout::with_timestamp(env.block.time.plus_seconds(300u64)),
-        //     //         memo: "".into(),
-        //     //     };
-
-        //     //     msgs.push(snip120_msg);
-        //     //     msgs.push(ibc_send.into())
-        //     // } else {
-        //     //     return Err(StdError::generic_err("no snip20 addr provided"));
-        //     // }
-        // }
-
         Ok(Response::new())
+        // TODO:
+        // a. generate tx-id
+        // b. save tx-id to one of bloom dwb's
     }
 
-    pub fn handle_ibc_bloom(
+    /// Choose dwb to load and process redeem msgs.
+    pub fn prepare_ibc_bloom(
         deps: DepsMut,
         env: Env,
         info: MessageInfo,
@@ -744,8 +729,7 @@ pub mod ibc_bloom {
         let mut msgs = vec![];
         // ensure sender is admin
         let config = CONFIG.load(deps.storage)?;
-        let admin = config.owner;
-        if info.sender != admin {
+        if info.sender != config.owner {
             return Err(ContractError::BloomDisabled {});
         }
 
@@ -757,15 +741,15 @@ pub mod ibc_bloom {
         let random_number = (digit1 * 100) + (digit2 * 10) + digit3;
 
         // define map key from random bytes
-        let key = utils::weighted_random(random_number as u64);
-        let blooms = BLOOMSBLOOMS.add_suffix(key.to_string().as_bytes());
+        let rand_key = utils::weighted_random(random_number as u64);
+        let blooms = BLOOMSBLOOMS.add_suffix(rand_key.to_string().as_bytes());
 
-        // grab all map keys
+        // grab keys from randomly selected map (addrs that registered ibc-bloom)
         let pending_keys = blooms.paging_keys(deps.storage, 0, 30)?;
 
         // loop through keys
         for key in pending_keys {
-            if let Some(mut bloom) = blooms.get(deps.storage, &key) {
+            if let Some(bloom) = blooms.get(deps.storage, &key) {
                 let cade = bloom.msg.cadance
                     + config
                         .bloom
@@ -773,23 +757,20 @@ pub mod ibc_bloom {
                         .expect("smokin big doinks in amish")
                         .default_cadance;
 
-                if !env
-                    .block
-                    .time
-                    .minus_nanos(bloom.timestamp.nanos())
-                    .seconds()
-                    .gt(&cade)
-                {
+                if !env.block.height.gt(&(cade + bloom.block_height)) {
                     break;
                 };
 
                 let token = bloom.msg.source_token.clone();
-                // pop out granular msgs to form snip120u redeem msgs
-                let redeem_msgs = bloom
-                    .msg
-                    .bloom
-                    .drain(0..1) // TODO: replace w. variable
+
+                // pop out each granular msg to form snip120u redeem msgs
+                let mut blooms_to_process = bloom.msg.bloom.clone();
+                let amnt = min(10, blooms_to_process.len());
+
+                let redeem_msgs = blooms_to_process[..amnt]
+                    .iter()
                     .map(|br| {
+                        // form redeem msg for this contract to redeem on behalf of bloomer
                         let msg = crate::msg::snip::Redeem {
                             amount: Uint128::from(br.amount),
                             denom: Some(token.clone()),
@@ -808,10 +789,9 @@ pub mod ibc_bloom {
                         PROCESSING_BLOOM_MEMPOOL
                             .update(deps.storage, |mut a| {
                                 a.push(ProcessingBloomMsg {
-                                    addr: br.addr,
+                                    addr: br.addr.clone(),
                                     amount: br.amount,
                                     token: token.clone(),
-                                    channel: config.channel_id.clone(),
                                 });
                                 Ok(a)
                             })
@@ -829,10 +809,24 @@ pub mod ibc_bloom {
 
                 // push snip120u msgs
                 msgs.extend(redeem_msgs);
+
+                // Remove processed blooms from the map
+                if amnt == bloom.msg.bloom.len() {
+                    blooms.remove(deps.storage, &key).unwrap();
+                } else {
+                    // Update the blooms map
+                    let mut updated_bloom = bloom.clone();
+                    updated_bloom.msg.bloom.drain(0..amnt);
+                }
             }
         }
 
         Ok(Response::new().add_messages(msgs))
+        // TODO:
+        // a. determine which bloom-dwb to load from randomness
+        // b. load n # of tx-ids to process
+        // c. get tx details for each tx-id to prepare redeem_msg
+        // d. save imminent bloom msg to simple map
     }
 
     pub fn process_ibc_bloom(
@@ -847,34 +841,29 @@ pub mod ibc_bloom {
         // load
         PROCESSING_BLOOM_MEMPOOL
             .update(deps.storage, |mut b| {
-                if b.len().lt(&1) {
+                let lens = b.len() as u64;
+                if lens.lt(&1u64) {
                     return Ok(b);
                 }
-                let lens = b.len() as u64;
-                let limit = lens.div_ceil(rand.into()).max(1);
-                b.drain(0..limit as usize).for_each(|a| {
-                    // form ibc msg
-                    let ibc_msg: CosmosMsg<Empty> =
-                        CosmosMsg::Ibc(cosmwasm_std::IbcMsg::Transfer {
-                            channel_id: a.channel, // single transfer channel
-                            to_address: a.addr,
-                            amount: coin(Uint128::from(a.amount).u128(), a.token),
-                            timeout: IbcTimeout::with_timestamp(env.block.time.plus_seconds(60)), // remove hardcode
-                            memo: "more life".into(),
+                let limit = lens.div_ceil(rand.into()).max(5); // TODO: add config to set max tx to process
+                let limit = limit as usize;
+                let mut drained: Vec<ProcessingBloomMsg> = b.drain(..).collect();
+                let unprocessed = drained.split_off(limit);
+                drained.iter().for_each(|a| {
+                    // form transfer msg
+                    let transfer_msg: CosmosMsg<Empty> =
+                        CosmosMsg::Bank(cosmwasm_std::BankMsg::Send {
+                            to_address: a.addr.clone(),
+                            amount: coins(Uint128::from(a.amount).u128(), a.token.clone()),
                         });
 
-                    msgs.push(ibc_msg);
+                    msgs.push(transfer_msg);
                 });
+                b.extend(unprocessed);
                 Ok(b)
             })
             .unwrap();
-
-        // IBC implementation
-        let contract_state = STATE.load(deps.storage)?;
-        let ica_packet = IcaPacketData::new(to_binary(&msgs)?.to_vec(), None);
-        let ica_info = contract_state.get_ica_info()?;
-        let send_packet_msg = ica_packet.to_ibc_msg(&env, ica_info.channel_id, None)?;
-        Ok(Response::new().add_message(send_packet_msg))
+        Ok(Response::new().add_messages(msgs))
     }
 }
 
@@ -882,24 +871,6 @@ pub mod utils {
     use cosmwasm_std::Decimal;
 
     use super::*;
-    // pub fn to_cosmos_msg(
-    //     msg: Snip120uInitMsg,
-    //     code_hash: String,
-    //     code_id: u64,
-    // ) -> StdResult<CosmosMsg> {
-    //     let msg = to_binary(&msg)?;
-
-    //     let funds = Vec::new();
-    //     let execute = WasmMsg::Instantiate {
-    //         code_id,
-    //         code_hash,
-    //         msg,
-    //         label: "instantiate-snip".into(),
-    //         funds,
-    //         admin: None,
-    //     };
-    //     Ok(execute.into())
-    // }
 
     pub fn contract_randomness(env: Env) -> [u8; 32] {
         let mut prng = ContractPrng::from_env(&env);
@@ -1071,52 +1042,187 @@ mod tests {
         assert_ne!(err, expected_result.to_string());
     }
 
-    #[test]
-    fn test_randomness() {
-        let mut env = mock_env();
+    #[cfg(test)]
+    mod test {
+        use crate::{
+            dwb::TX_NODES_COUNT,
+            state::{
+                bloom::BloomConfig,
+                snip::{Snip, Snip120u},
+                TX_COUNT,
+            },
+        };
 
-        // get first randomness value
-        let mut prng = ContractPrng::from_env(&env.clone());
-        let rand1 = prng.rand_bytes();
-        let result = general_purpose::STANDARD.encode(rand1.clone());
+        use super::*;
+        use cosmwasm_std::{
+            from_binary, testing::*, Api, BlockInfo, ContractInfo, MessageInfo, OwnedDeps,
+            QueryResponse, ReplyOn, SubMsg, Timestamp, TransactionInfo, Uint128, WasmMsg,
+        };
 
-        let dec1 = self::utils::random_multiplier(&mut prng);
+        fn init_helper() -> (
+            StdResult<Response>,
+            OwnedDeps<MockStorage, MockApi, MockQuerier>,
+        ) {
+            let mut deps = mock_dependencies_with_balance(&[]);
+            let env = mock_env();
+            let info = mock_info("instantiator", &[]);
 
-        // simulate new randomness seed from environment
-        env.block.random = Some(Binary::from_base64(&result).unwrap());
+            // todo: setup snip120u
+            let fist_eligible_snip = Snip120u {
+                native_token: "snip1".into(),
+                addr: Addr::unchecked("snip1Addr"),
+                total_amount: Uint128::new(420u128),
+            };
+            let second_eligible_snip = Snip120u {
+                native_token: "snip2".into(),
+                addr: Addr::unchecked("snip2Addr"),
+                total_amount: Uint128::new(710u128),
+            };
 
-        // get second randomness value, should be different with new seed
-        let mut prng = ContractPrng::from_env(&env.clone());
-        let rand2 = prng.rand_bytes();
+            let init_msg = crate::msg::InstantiateMsg {
+                owner: Addr::unchecked("admin"),
+                claim_msg_plaintext: PLAINTXT.to_string(),
+                start_date: None,
+                end_date: None,
+                // snip120u_code_id: 2,
+                snip120u_code_hash: "HASH".into(),
+                snips: vec![fist_eligible_snip, second_eligible_snip],
+                viewing_key: "viewing_key".into(),
+                bloom_config: Some(BloomConfig {
+                    default_cadance: 5u64,
+                    min_cadance: 0u64,
+                    max_granularity: 5u64,
+                }),
+                channel_open_init_options: None,
+            };
 
-        let dec2 = self::utils::random_multiplier(&mut prng);
-        // assert not equal
-        assert_ne!(rand1, rand2);
-        assert_ne!(dec1, dec2);
+            (instantiate(deps.as_mut(), env, info, init_msg), deps)
+        }
+
+        // Init test
+
+        #[test]
+        fn test_init_sanity() {
+            let (init_result, mut deps) = init_helper();
+            assert_eq!(init_result.unwrap(), Response::default());
+            let env = mock_env();
+
+            let constants = CONFIG.load(&deps.storage).unwrap();
+            assert_eq!(constants.owner.as_str(), "instantiator");
+            assert_eq!(constants.claim_msg_plaintext.as_str(), PLAINTXT);
+            assert_eq!(
+                constants.bloom,
+                Some(BloomConfig {
+                    default_cadance: 5u64,
+                    min_cadance: 0u64,
+                    max_granularity: 5u64,
+                })
+            );
+            assert_eq!(constants.end_date, None);
+            assert_eq!(constants.start_date, env.block.time.seconds());
+            assert_eq!(
+                constants.snip120us,
+                vec![
+                    Snip120u {
+                        native_token: "snip1".into(),
+                        addr: Addr::unchecked("snip1Addr"),
+                        total_amount: Uint128::new(420u128)
+                    },
+                    Snip120u {
+                        native_token: "snip2".into(),
+                        addr: Addr::unchecked("snip2Addr"),
+                        total_amount: Uint128::new(710u128)
+                    }
+                ]
+            );
+            assert_eq!(constants.snip_hash.as_str(), "HASH");
+            assert_eq!(constants.viewing_key.as_str(), "viewing_key");
+        }
+
+        // Handle test
+        #[test]
+        fn test_add_eligible_headstasher_dwb() {
+            let (init_result, mut deps) = init_helper();
+
+            assert!(
+                init_result.is_ok(),
+                "Init failed: {}",
+                init_result.err().unwrap()
+            );
+
+            let tx_nodes_count = TX_NODES_COUNT.load(&deps.storage).unwrap_or_default();
+            assert_eq!(0, tx_nodes_count);
+            let tx_count = TX_COUNT.load(&deps.storage).unwrap_or_default();
+            assert_eq!(0, tx_count);
+
+            let handle_msg = ExecuteMsg::AddEligibleHeadStash {
+                headstash: vec![
+                    Headstash {
+                        addr: "hs1".into(),
+                        snips: vec![Snip {
+                            amount: 100u128.into(),
+                            contract: "snip1Addr".into(),
+                        }],
+                    },
+                    Headstash {
+                        addr: "hs2".into(),
+                        snips: vec![Snip {
+                            amount: 200u128.into(),
+                            contract: "snip2Addr".into(),
+                        }],
+                    },
+                ],
+            };
+            let info = mock_info("instantiator", &[]);
+            let mut env = mock_env();
+            env.block.random = Some(Binary::from(&[0u8; 32]));
+            let handle_result = execute(deps.as_mut(), env, info, handle_msg);
+            println!("{:#?}", handle_result);
+            // assert we have two entries in eligible dwb 
+
+            // assert we have two tx counts (one for each hs allocation)
+
+        }
+
+        #[test]
+        fn test_claim_headstash_dwb() {
+
+            // assert eligible addr can claim 
+            // assert cannot claim more than eligilbe 
+        }
+
+        #[test]
+        fn test_register_bloom() {
+
+            // assert we have new entries in bloom dwb 
+        }
+
+        #[test]
+        fn test_process_bloom() {
+
+        }
+
+        #[test]
+        fn test_randomness() {
+            let mut env = mock_env();
+
+            // get first randomness value
+            let mut prng = ContractPrng::from_env(&env.clone());
+            let rand1 = prng.rand_bytes();
+            let result = general_purpose::STANDARD.encode(rand1.repeat(3).clone());
+            let dec1 = self::utils::random_multiplier(&mut prng);
+
+            // simulate new randomness seed from environment1
+            env.block.random = Some(Binary::from_base64(&result).unwrap());
+
+            // get second randomness value, should be different with new seed
+            prng = ContractPrng::from_env(&env.clone());
+            let rand2 = prng.rand_bytes();
+
+            let dec2 = self::utils::random_multiplier(&mut prng);
+            // assert not equal
+            assert_ne!(rand1, rand2);
+            assert_ne!(dec1, dec2);
+        }
     }
-
-    // fn _init_helper() -> (
-    //     StdResult<Response>,
-    //     OwnedDeps<MockStorage, MockApi, MockQuerier>,
-    // ) {
-    //     let mut deps = mock_dependencies_with_balance(&[]);
-    //     let env = mock_env();
-    //     let info = mock_info("instantiator", &[]);
-
-    //     // todo: setup snip120u
-
-    //     let init_msg = crate::msg::InstantiateMsg {
-    //         owner: todo!(),
-    //         claim_msg_plaintext: PLAINTXT.to_string(),
-    //         start_date: None,
-    //         end_date: None,
-    //         // snip120u_code_id: 2,
-    //         snip120u_code_hash: "HASH".into(),
-    //         snips: vec![],
-    //         viewing_key: todo!(),
-    //         channel_id: todo!(),
-    //     };
-
-    //     (instantiate(deps.as_mut(), env, info, init_msg), deps)
-    // }
 }

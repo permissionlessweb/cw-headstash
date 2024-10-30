@@ -36,6 +36,9 @@ pub enum ContractError {
     #[error("unable to process bloom. No headstash found")]
     BloomNotFound {},
 
+    #[error("incorrect denom length. the maximum length is 36 bytes, the same length as ibc-denoms")]
+    BloomIncorrectStringLength {},
+
     #[error("The number of msgs you have set to granularize your bloomMsg into is greater than the maximum set by contract owner.")]
     BloomTooManyGrains {},
 
