@@ -26,6 +26,7 @@ library = []
 [dependencies]
 anybuf = "0.5"
 base64 = "0.21.0"
+bs58 = "0.5.1"
 cw-orch = "0.25.0"
 cw-ownable = "2.0"
 semver = "1.0"

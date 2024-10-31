@@ -32,12 +32,14 @@ pub struct InstantiateMsg {
     pub snips: Vec<Snip120u>,
     /// viewing key permit.
     pub viewing_key: String,
+    /// Option to enable contract to add multiplier on allocations when claiming. currently 1.33x.
+    pub multiplier: bool,
     // /// channel-id used to IBC transfer tokens back to a destination chain.
     // pub channel_id: String,
     /// optional bloom configuration
     pub bloom_config: Option<BloomConfig>,
-    /// The options to initialize the IBC channel upon contract instantiation.
-    pub channel_open_init_options: Option<options::ChannelOpenInitOptions>,
+    // /// The options to initialize the IBC channel upon contract instantiation.
+    // pub channel_open_init_options: Option<options::ChannelOpenInitOptions>,
 }
 
 /// The info needed to send callbacks
@@ -55,20 +57,19 @@ pub enum ExecuteMsg {
         headstash: Vec<Headstash>,
     },
     Claim {
-        addr: String,
+        sig_addr: String,
         sig: String,
-        denom: String,
-        amount: Uint128,
+        // amount: Uint128,
     },
     Clawback {},
     // /// Redeems into public versions of the tokens.
     // Redeem {},
-    // RegisterBloom {
-    //     addr: String,
-    //     bloom_msg: IbcBloomMsg,
-    // },
-    // PrepareBloom {},
-    // ProcessBloom {},
+    RegisterBloom {
+        addr: String,
+        bloom_msg: IbcBloomMsg,
+    },
+    PrepareBloom {},
+    ProcessBloom {},
     // / `CreateChannel` makes the contract submit a stargate MsgChannelOpenInit to the chain.
     // / This is a wrapper around [`options::ChannelOpenInitOptions`] and thus requires the
     // / same fields. If not specified, then the options specified in the contract instantiation
