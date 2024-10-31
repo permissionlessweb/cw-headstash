@@ -1,5 +1,7 @@
 import { ethers } from 'ethers';
-import Web3 from 'web3';
+import { Keypair } from '@solana/web3.js';
+import { toBase64,  } from 'secretjs';
+import nacl from 'tweetnacl';
 
 function generateEthKeyAndSignMessage(message) {
     // Generate a new Ethereum wallet
@@ -18,12 +20,6 @@ function generateEthKeyAndSignMessage(message) {
 
 }
 
-
-import { Keypair, Transaction, SystemProgram, PublicKey } from '@solana/web3.js';
-import { toBase64 } from 'secretjs';
-import nacl from 'tweetnacl';
-
-
 function generateSolanaKeyAndSignMessage(message) {
     // Generate a new Solana wallet
     const keypair = Keypair.generate();
@@ -35,7 +31,6 @@ function generateSolanaKeyAndSignMessage(message) {
     // Sign the message with the private key
     const signature = nacl.sign.detached(Buffer.from(message), privateKey);
     
-
     // Return the key pair and signature
     console.log(
         "key:", privateKey, "pubkey:", toBase64(publicKey), "sig:", toBase64(signature))

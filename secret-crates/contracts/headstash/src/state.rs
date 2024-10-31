@@ -26,7 +26,7 @@ pub const KEY_PROCESSING_BLOOM_MEMPOOL: &[u8] = b"pbmp";
 pub const KEY_BLOOM_TX_COUNT_MAP: &[u8] = b"btxcm";
 pub const KEY_BLOOM_CLAIMED_KEY: &[u8] = b"bck";
 
-pub const KEY_TX_COUNT: &[u8] = b"tx-count";
+pub const KEY_SNIP_COUNT: &[u8] = b"snip-count";
 
 pub const KEY_MULTIPLIER: &[u8] = b"mp";
 
@@ -47,15 +47,16 @@ pub static HEADSTASH_OWNERS: Item<Uint128> = Item::new(KEY_HEADSTASH_OWNERS);
 pub static HEADSTASH_SIGS: Item<HeadstashSig> = Item::new(KEY_B_CONFIG);
 pub static DECAY_CLAIMED: Item<bool> = Item::new(KEY_DECAY_CLAIMED);
 pub static TOTAL_CLAIMED: Item<Uint128> = Item::new(KEY_TOTAL_CLAIMED);
-pub static CLAIMED_HEADSTASH: Item<bool> = Item::new(KEY_CLAIMED_HEADSTASH);
+pub static CLAIMED_HEADSTASH: Item<Uint128> = Item::new(KEY_CLAIMED_HEADSTASH);
+pub static SNIP_COUNT: Item<Uint128> = Item::new(KEY_SNIP_COUNT);
 
 pub static ICA_ENABLED: Item<bool> = Item::new(KEY_ICA_ENABLED);
-pub static BLOOM_MEMPOOL: Item<Vec<bloom::IbcBloomMsg>> = Item::new(KEY_BLOOM_MEMPOOL);
+pub static BLOOM_MEMPOOL: Item<Vec<bloom::BloomMsg>> = Item::new(KEY_BLOOM_MEMPOOL);
 pub static PROCESSING_BLOOM_MEMPOOL: Item<Vec<bloom::ProcessingBloomMsg>> =
     Item::new(KEY_BLOOM_MEMPOOL);
 pub static BLOOM_TX_COUNT_MAP: Item<bloom::BloomTxCountMap> = Item::new(KEY_BLOOM_TX_COUNT_MAP);
 pub static BLOOM_CLAIMED_KEY: Item<bool> = Item::new(KEY_BLOOM_CLAIMED_KEY);
-pub static BLOOMSBLOOMS: Keymap<String, bloom::BloomBloom> = Keymap::new(b"blomblom");
+pub static STORED_BLOOMS: Keymap<String, bloom::StoredBlooms> = Keymap::new(b"sb");
 
 // IBC CONTRACT STATE
 pub const STATE: Item<ibc::State> = Item::new(b"state");
@@ -64,7 +65,6 @@ pub const CHANNEL_OPEN_INIT_OPTIONS: Item<ChannelOpenInitOptions> =
     Item::new(b"channel_open_init_options");
 pub const ALLOW_CHANNEL_OPEN_INIT: Item<bool> = Item::new(b"allow_channel_open_init");
 pub const ALLOW_CHANNEL_CLOSE_INIT: Item<bool> = Item::new(b"allow_channel_close_init");
-
 
 // An eligible addr, along with a vector of snip120u contracts and their allocations.
 #[derive(Serialize, Deserialize, Clone, Debug, Eq, PartialEq, JsonSchema)]
@@ -264,25 +264,24 @@ pub mod bloom {
     use cosmwasm_std::Timestamp;
 
     #[derive(Serialize, Debug, Deserialize, Clone, Eq, PartialEq, JsonSchema, Default)]
-    pub struct BloomBloom {
+    pub struct StoredBlooms {
         pub block_height: u64,
-        pub msg: IbcBloomMsg,
+        pub msg: BloomMsg,
     }
 
     #[derive(Serialize, Debug, Deserialize, Clone, Eq, PartialEq, JsonSchema, Default)]
-    pub struct IbcBloomMsg {
-        pub owner: String,
-        // total amount to be sent via ibc-bloom protocol. Must never be > allowance set for headstash contract.
+    pub struct BloomMsg {
+        /// total amount to be sent via bloom protocol. Must never be greater than allowance set for headstash contract.
         pub total: Uint128,
-        /// Native token denomination of snip120u being redeemed. This should always match one of the eligible `native_token` set by headstash owner during contract initializatiion.
-        pub source_token: String,
-        // additional delay before including blooms into msgs (blocks)
+        /// the snip120 to redeem and use in bloom.
+        pub snip120_addr: String,
+        /// additional delay before including blooms into msgs (in blocks)
         pub cadance: u64,
-        // ratio used to classify bloom-mempool tx priority
-        //  0 == no entropy, most chance of being included in finality process.
-        // 10 == maximize entropy, least possible chance of being included in finality process
+        /// ratio used to classify bloom-mempool tx priority\
+        ///  0 == no entropy, most chance of being included in finality process.\
+        /// 10 == maximize entropy, least possible chance of being included in finality process
         pub entropy_key: u64,
-        // recipient and amount to send.
+        /// recipient and amount to send.
         pub bloom: Vec<BloomRecipient>,
     }
 
@@ -290,7 +289,7 @@ pub mod bloom {
     pub struct ProcessingBloomMsg {
         /// recipient addr of
         pub addr: String,
-        // amount pending to send to recipient. Owner sets this first, and is update by contract while processing ibc-bloom
+        // amount pending to send to recipient.
         pub amount: u64,
         // Coin token string
         pub token: String,
@@ -300,12 +299,8 @@ pub mod bloom {
     pub struct BloomRecipient {
         /// recipient addr
         pub addr: String,
-        /// amount pending to send to recipient. Owner sets this first, and is update by contract while processing ibc-bloom
+        /// amount pending to send to recipient.
         pub amount: u64,
-        /// Optional timeout in seconds to include with the ibc packet.
-        /// If not specified, the [default timeout](crate::ibc::types::packet::DEFAULT_TIMEOUT_SECONDS) is used.
-        #[serde(skip_serializing_if = "Option::is_none")]
-        timeout_seconds: Option<u64>,
     }
     #[derive(Serialize, Debug, Deserialize, Clone, JsonSchema, Default)]
     #[cfg_attr(test, derive(Eq, PartialEq))]

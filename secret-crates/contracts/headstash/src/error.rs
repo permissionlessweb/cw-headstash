@@ -1,7 +1,7 @@
 use cosmwasm_std::{CheckedFromRatioError, StdError};
 use thiserror::Error;
 
-#[derive(Error, Debug)]
+#[derive(Error, Debug, PartialEq)]
 pub enum ContractError {
     #[error("{0}")]
     Std(#[from] StdError),
@@ -11,6 +11,9 @@ pub enum ContractError {
 
     #[error("This headstash contract has not been set as an eligible minter yet.")]
     HeadstashNotSnip120uMinter {},
+
+    #[error("It does not seem you are eligible for this headstash")]
+    NotEligible {},
 
     #[error("You have already claimed your headstash, homie!")]
     AlreadyClaimed {},
@@ -24,23 +27,30 @@ pub enum ContractError {
     #[error("unauthorized")]
     Unauthorized {},
 
-    #[error("serde_json error")]
-    SerdeJSON(#[from] serde_json::Error),
-
+    // #[error("serde_json error")]
+    // SerdeJSON(#[from] serde_json::Error),
     #[error("Unable to process bloom. Headstash signer does not match message sender.")]
     BloomMismatchSigner {},
 
     #[error("aint no bloomin happenin!")]
     BloomDisabled {},
 
-    #[error("unable to process bloom. No headstash found")]
+    #[error("unable to process bloom. Either you have not claimed your headstash yet, you provided an invalid snip120u addr, or you are not eligible.")]
     BloomNotFound {},
 
-    #[error("incorrect denom length. the maximum length is 36 bytes, the same length as ibc-denoms")]
+    #[error(
+        "incorrect denom length. the maximum length is 36 bytes, the same length as ibc-denoms"
+    )]
     BloomIncorrectStringLength {},
 
     #[error("The number of msgs you have set to granularize your bloomMsg into is greater than the maximum set by contract owner.")]
     BloomTooManyGrains {},
+
+    #[error("Provide atleast 1 msg to process.")]
+    BloomNotEnoughGrains {},
+
+    #[error("the total amount specificed in you granular messages does not equal the total amount set")]
+    BloomTotalError {},
 
     #[error("Blooming for this token has already begun! There is no current support to update or add additional bloom msgs for the same source token.If you would like this feature, lets make it happen :)")]
     BloomDuplicate {},
@@ -54,9 +64,8 @@ pub enum ContractError {
     #[error("FromUtf8Error: {0}")]
     JsonSerde(#[from] std::string::FromUtf8Error),
 
-    #[error("json_serde_wasm serialization error: {0}")]
-    JsonWasmSerialize(#[from] serde_json_wasm::ser::Error),
-
+    // #[error("json_serde_wasm serialization error: {0}")]
+    // JsonWasmSerialize(#[from] serde_json_wasm::ser::Error),
     #[error("json_serde_wasm deserialization error: {0}")]
     JsonWasmDeserialize(#[from] serde_json_wasm::de::Error),
 
@@ -66,15 +75,13 @@ pub enum ContractError {
     #[error("prost decoding error: {0}")]
     ProstDecodeError(#[from] cosmos_sdk_proto::prost::DecodeError),
 
-    #[error("semver parse error: {0}")]
-    SemverError(#[from] semver::Error),
-
+    // #[error("semver parse error: {0}")]
+    // SemverError(#[from] semver::Error),
     #[error("{0}")]
     OwnershipError(#[from] cw_ownable::OwnershipError),
 
-    #[error("{0}")]
-    BufanyError(#[from] anybuf::BufanyError),
-
+    // #[error("{0}")]
+    // BufanyError(#[from] anybuf::BufanyError),
     #[error("this contract must have an owner")]
     OwnershipCannotBeRenounced,
 

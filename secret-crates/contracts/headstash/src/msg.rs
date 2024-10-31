@@ -1,7 +1,7 @@
 use crate::types::callbacks;
 use crate::{
     state::{
-        bloom::{BloomConfig, IbcBloomMsg},
+        bloom::{BloomConfig, BloomMsg},
         snip::Snip120u,
         Config, Headstash,
     },
@@ -65,8 +65,7 @@ pub enum ExecuteMsg {
     // /// Redeems into public versions of the tokens.
     // Redeem {},
     RegisterBloom {
-        addr: String,
-        bloom_msg: IbcBloomMsg,
+        bloom_msg: BloomMsg,
     },
     PrepareBloom {},
     ProcessBloom {},

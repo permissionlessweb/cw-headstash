@@ -1,13 +1,13 @@
 use crate::error::ContractError;
 use crate::msg::{ExecuteMsg, InstantiateMsg, MigrateMsg, QueryAnswer, QueryMsg};
-use crate::state::{Config, Headstash, CONFIG};
+use crate::state::{Config, Headstash, CONFIG, SNIP_COUNT};
 
 #[cfg(not(feature = "library"))]
 use cosmwasm_std::entry_point;
 
 use cosmwasm_std::{
     to_binary, Binary, CosmosMsg, Deps, DepsMut, Env, MessageInfo, Reply, Response, StdError,
-    StdResult,
+    StdResult, Uint128,
 };
 use rand_core::RngCore;
 use secret_toolkit::crypto::ContractPrng;
@@ -36,6 +36,9 @@ pub fn instantiate(
                 ContractError::DuplicateSnip120u {}.to_string(),
             ));
         }
+        SNIP_COUNT
+            .add_suffix(snip.addr.as_bytes())
+            .save(deps.storage, &Uint128::zero())?;
         unique_snips.push(snip);
     }
 
@@ -97,7 +100,7 @@ pub fn execute(
         }
         ExecuteMsg::Clawback {} => self::headstash::try_clawback(deps, env, info),
         // ExecuteMsg::Redeem {} => todo!(),
-        ExecuteMsg::RegisterBloom { bloom_msg, .. } => {
+        ExecuteMsg::RegisterBloom { bloom_msg } => {
             self::ibc_bloom::try_ibc_bloom(deps, env, info, bloom_msg)
         }
         ExecuteMsg::PrepareBloom {} => ibc_bloom::prepare_ibc_bloom(deps, env, info),
@@ -145,8 +148,9 @@ pub mod headstash {
 
     use super::*;
     use crate::state::{
-        snip::AllowanceAction, HeadstashSig, CLAIMED_HEADSTASH, DECAY_CLAIMED, HEADSTASH_OWNERS,
-        HEADSTASH_SIGS, TOTAL_CLAIMED,
+        snip::{AllowanceAction, Snip120u},
+        HeadstashSig, CLAIMED_HEADSTASH, DECAY_CLAIMED, HEADSTASH_OWNERS, HEADSTASH_SIGS,
+        SNIP_COUNT, TOTAL_CLAIMED,
     };
 
     pub fn try_add_headstash(
@@ -158,7 +162,6 @@ pub mod headstash {
     ) -> Result<Response, ContractError> {
         // ensure sender is admin
         let config = CONFIG.load(deps.storage)?;
-
         if headstash.is_empty() {
             return Err(ContractError::EmptyValue {});
         }
@@ -171,12 +174,16 @@ pub mod headstash {
         // make sure airdrop has not ended
         queries::available(&config, &env)?;
 
-        add_headstash_to_state(deps, headstash.clone())?;
+        add_headstash_to_state(deps, headstash.clone(), config.snip120us)?;
 
         Ok(Response::default())
     }
 
-    pub fn add_headstash_to_state(deps: DepsMut, headstash: Vec<Headstash>) -> StdResult<()> {
+    pub fn add_headstash_to_state(
+        deps: DepsMut,
+        headstash: Vec<Headstash>,
+        eligible: Vec<Snip120u>,
+    ) -> StdResult<()> {
         // ensure pubkey is not already in KeyMap
         for hs in headstash.into_iter() {
             let key = hs.addr;
@@ -190,6 +197,23 @@ pub mod headstash {
                         "pubkey already has been added, not adding again",
                     ));
                 } else {
+                    // match current snip with one in eligible to get the total_amount
+                    let matching_snip = eligible
+                        .iter()
+                        .find(|es| es.addr.to_string() == snip.contract)
+                        .ok_or_else(|| StdError::generic_err("No matching snip found"))?;
+
+                    SNIP_COUNT
+                        .add_suffix(snip.contract.as_bytes())
+                        .update(deps.storage, |a| {
+                            // ensure the expected total amount is not exceeded
+                            let na = a + snip.amount;
+                            if na > matching_snip.total_amount {
+                                return Err(StdError::generic_err("Total amount exceeded"));
+                            }
+                            Ok(na)
+                        })?;
+
                     l2.save(deps.storage, &snip.amount)?
                 }
             }
@@ -208,8 +232,6 @@ pub mod headstash {
     ) -> Result<Response, ContractError> {
         let mut msgs: Vec<CosmosMsg> = vec![];
         let config = CONFIG.load(deps.storage)?;
-
-        let multiplier: Decimal;
 
         // make sure airdrop has not ended
         queries::available(&config, &env)?;
@@ -246,13 +268,14 @@ pub mod headstash {
             )?;
         }
 
-        // check if address has already claimed. This occurs after sig is verified, preventing leakage of claim status for a key.
-        let pf = CLAIMED_HEADSTASH.add_suffix(sig_addr.as_bytes());
-        if pf.may_load(deps.storage)? == Some(true) {
-            return Err(ContractError::AlreadyClaimed {});
-        }
-
         for snip in config.snip120us {
+            // check if address has already claimed. This occurs after sig is verified, preventing leakage of claim status for a key.
+            let pf = CLAIMED_HEADSTASH
+                .add_suffix(snip.addr.as_bytes())
+                .add_suffix(sig_addr.as_bytes());
+            if pf.may_load(deps.storage)?.is_some() {
+                return Err(ContractError::AlreadyClaimed {});
+            }
             // check if we apply bonus to claim
             let bonus = self::utils::random_multiplier(rng);
 
@@ -281,23 +304,28 @@ pub mod headstash {
 
                 msgs.push(mint_msg);
 
-                // Update total claimed for specific snip20
+                // update total claimed for specific snip120u
                 let tc = TOTAL_CLAIMED.add_suffix(snip.addr.as_str().as_bytes());
                 tc.save(deps.storage, &Uint128::zero())?;
-            }
 
-            CLAIMED_HEADSTASH
-                .add_suffix(sig_addr.as_bytes())
-                .save(deps.storage, &true)?;
-            // msgs sender used as prefix for storage map. Saves addr and signature derived from addr to state for recall during registering a bloom.
-            let hs = HEADSTASH_SIGS.add_suffix(info.sender.as_str().as_bytes());
-            hs.save(
-                deps.storage,
-                &HeadstashSig {
-                    addr: sig_addr.clone(),
-                    sig: sig.clone(),
-                },
-            )?;
+                // set signature addr claimed state for snip120u
+                CLAIMED_HEADSTASH
+                    .add_suffix(snip.addr.as_bytes())
+                    .add_suffix(sig_addr.as_bytes())
+                    .save(deps.storage, &headstash_amount)?;
+
+                // set signature for snip with sender as key
+                let hs = HEADSTASH_SIGS
+                    .add_suffix(snip.addr.as_bytes())
+                    .add_suffix(info.sender.as_str().as_bytes());
+                hs.save(
+                    deps.storage,
+                    &HeadstashSig {
+                        addr: sig_addr.clone(),
+                        sig: sig.clone(),
+                    },
+                )?;
+            }
         }
         Ok(Response::default().add_messages(msgs))
     }
@@ -444,27 +472,28 @@ pub mod validation {
                 let signature = Binary::from_base64(&sig)?;
                 let signer = Binary::from_base64(&signer)?;
 
-                match api.secp256k1_verify(
+                // match api.secp256k1_verify(
+                //     computed_plaintxt.clone().into_bytes().as_slice(),
+                //     Binary::from_base64(&sig)?.as_slice(),
+                //     signer.clone().as_slice(),
+                // ) {
+                // Ok(true) => Ok(()),
+                // Ok(false) | Err(_) =>
+                api.ed25519_verify(
                     computed_plaintxt.clone().into_bytes().as_slice(),
-                    Binary::from_base64(&sig)?.as_slice(),
-                    signer.clone().as_slice(),
-                ) {
-                    Ok(true) => Ok(()),
-                    Ok(false) | Err(_) => api
-                        .ed25519_verify(
-                            computed_plaintxt.clone().into_bytes().as_slice(),
-                            signature.as_slice(),
-                            signer.as_slice(),
-                        )
-                        .map_err(|err| StdError::generic_err(err.to_string()))
-                        .and_then(|verified| {
-                            if verified {
-                                Ok(())
-                            } else {
-                                Err(StdError::generic_err("Verification failed"))
-                            }
-                        }),
-                }
+                    signature.as_slice(),
+                    signer.as_slice(),
+                )
+                .map_err(|err| StdError::generic_err(err.to_string()))
+                .and_then(|verified| {
+                    if verified {
+                        Ok(())
+                    } else {
+                        Err(StdError::generic_err("Verification failed"))
+                    }
+                })?;
+                // }
+                Ok(())
             }
             true => match validate_ethereum_text(
                 api,
@@ -509,19 +538,39 @@ pub mod ibc_bloom {
 
     use super::*;
 
-    use cosmwasm_std::{coin, coins, Addr, DepsMut, Empty, IbcTimeout, StdError, Uint128, WasmMsg};
+    use cosmwasm_std::{
+        coin, coins, Addr, DepsMut, Empty, IbcTimeout, StdError, Storage, Uint128, WasmMsg,
+    };
     use utils::contract_randomness;
     use validation::compute_plaintxt_msg;
 
-    use crate::{
-        // dwb::BLOOM_DWB,
-        // ibc::types::packet::IcaPacketData,
-        // transaction_history::{store_register_bloom_action, store_register_headstash_action},
-        state::{
-            bloom::{BloomBloom, IbcBloomMsg, ProcessingBloomMsg},
-            BLOOMSBLOOMS, HEADSTASH_SIGS, PROCESSING_BLOOM_MEMPOOL,
-        },
+    use crate::state::{
+        bloom::{BloomMsg, ProcessingBloomMsg, StoredBlooms},
+        CLAIMED_HEADSTASH, HEADSTASH_SIGS, PROCESSING_BLOOM_MEMPOOL, STORED_BLOOMS,
     };
+
+    pub fn validate_bloom(
+        storage: &mut dyn Storage,
+        snip_addr: String,
+        sig_addr: String,
+        bloom_total: Uint128,
+    ) -> Result<(), StdError> {
+        // ensure total is not more than what addr was eligible for
+        CLAIMED_HEADSTASH
+            .add_suffix(snip_addr.as_bytes())
+            .add_suffix(sig_addr.as_bytes())
+            .update(storage, |a| {
+                if a < bloom_total {
+                    return Err(StdError::generic_err(
+                        "You are trying to bloom more than eligible for this snip120u",
+                    ));
+                } else {
+                    let new = a - bloom_total;
+                    Ok(new)
+                }
+            })?;
+        Ok(())
+    }
 
     // verifies the computed plaintxt includes both the sender and the destination wallet
     pub fn validate_bloom_plaintext_msg(
@@ -540,54 +589,94 @@ pub mod ibc_bloom {
         Ok(())
     }
 
-    /// Register IBC bloom msgs to one of the dwb's dedicated for IBC-bloom.
+    /// 1. register a bloom msg to be processed
     pub fn try_ibc_bloom(
         deps: DepsMut,
         env: Env,
         info: MessageInfo,
         // rng: ContractPrng,
         // addr: String,
-        bloom_msg: IbcBloomMsg,
+        bloom_msg: BloomMsg,
     ) -> Result<Response, ContractError> {
         let config = CONFIG.load(deps.storage)?;
         if config.bloom.is_none() {
             return Err(ContractError::BloomDisabled {});
         }
 
-        // verify msg sender has been authorized with public address signature
-        let hs = HEADSTASH_SIGS.add_suffix(info.sender.as_str().as_bytes());
+        // verify sender is able to bloom
+        let hs = HEADSTASH_SIGS
+            .add_suffix(bloom_msg.snip120_addr.as_bytes())
+            .add_suffix(info.sender.as_str().as_bytes());
+
         if let Some(sig) = hs.may_load(deps.storage)? {
             // if sig.addr.ne(info.sender.as_str()) {
             //     return Err(ContractError::BloomMismatchSigner {});
             // }
-            if (bloom_msg.bloom.len() as u64)
-                .gt(&config.bloom.expect("bloom not setup").max_granularity)
-            {
+            let lens = bloom_msg.bloom.len() as u64;
+            if lens.gt(&config.bloom.expect("bloom not setup").max_granularity) {
                 return Err(ContractError::BloomTooManyGrains {});
+            } else if lens == 0u64 {
+                return Err(ContractError::BloomNotEnoughGrains {});
             }
-            let entropy_key = bloom_msg.entropy_key.clamp(1, 10) as u128;
+
+            // ensure bloom_msg.total = sum of all amounts in granular msgs
+            let total: u64 = bloom_msg.bloom.iter().map(|bloom| bloom.amount).sum();
+            if Uint128::from(total) != bloom_msg.total {
+                return Err(ContractError::BloomTotalError {});
+            }
+
+            let entropy_key = bloom_msg.entropy_key.clamp(1, 10) as u64;
+            // println!("entropy_key: {:#?}", entropy_key);
+            let cadance = match bloom_msg.cadance > 0u64 {
+                true => config.bloom.unwrap().default_cadance + bloom_msg.cadance,
+                false => config.bloom.unwrap().min_cadance,
+            };
 
             // set bloomMsg keyMap key as (b' + entropy_ratio + sender)
-            let blooms = BLOOMSBLOOMS.add_suffix(entropy_key.to_string().as_bytes());
+            let blooms = STORED_BLOOMS.add_suffix(entropy_key.to_string().as_bytes());
             if let Some(bloom) = blooms.get(deps.storage, &info.sender.to_string()) {
-                if bloom.msg.source_token == bloom_msg.source_token {
+                if bloom.msg.snip120_addr == bloom_msg.snip120_addr {
                     return Err(ContractError::BloomDuplicate {});
                 }
+                validate_bloom(
+                    deps.storage,
+                    bloom.msg.snip120_addr,
+                    sig.addr,
+                    bloom.msg.total,
+                )?;
                 blooms.insert(
                     deps.storage,
-                    &sig.addr,
-                    &BloomBloom {
+                    &info.sender.into(),
+                    &StoredBlooms {
                         block_height: env.block.height,
-                        msg: bloom_msg,
+                        msg: BloomMsg {
+                            total: bloom_msg.total,
+                            snip120_addr: bloom_msg.snip120_addr,
+                            cadance,
+                            entropy_key,
+                            bloom: bloom_msg.bloom,
+                        },
                     },
                 )?;
             } else {
+                validate_bloom(
+                    deps.storage,
+                    bloom_msg.snip120_addr.clone(),
+                    sig.addr,
+                    bloom_msg.total,
+                )?;
                 blooms.insert(
                     deps.storage,
-                    &sig.addr,
-                    &BloomBloom {
+                    &info.sender.into(),
+                    &StoredBlooms {
                         block_height: env.block.height,
-                        msg: bloom_msg,
+                        msg: BloomMsg {
+                            total: bloom_msg.total,
+                            snip120_addr: bloom_msg.snip120_addr,
+                            cadance,
+                            entropy_key,
+                            bloom: bloom_msg.bloom,
+                        },
                     },
                 )?;
             };
@@ -646,7 +735,7 @@ pub mod ibc_bloom {
 
         // define map key from random bytes
         let rand_key = utils::weighted_random(random_number as u64);
-        let blooms = BLOOMSBLOOMS.add_suffix(rand_key.to_string().as_bytes());
+        let blooms = STORED_BLOOMS.add_suffix(rand_key.to_string().as_bytes());
 
         // grab keys from randomly selected map (addrs that registered ibc-bloom)
         let pending_keys = blooms.paging_keys(deps.storage, 0, 30)?;
@@ -665,7 +754,7 @@ pub mod ibc_bloom {
                     break;
                 };
 
-                let token = bloom.msg.source_token.clone();
+                let token = bloom.msg.snip120_addr.clone();
 
                 // pop out each granular msg to form snip120u redeem msgs
                 let blooms_to_process = bloom.msg.bloom.clone();
@@ -945,9 +1034,9 @@ mod tests {
     #[cfg(test)]
     mod test {
         use crate::state::{
-            bloom::BloomConfig,
+            bloom::{BloomConfig, BloomMsg, BloomRecipient},
             snip::{Snip, Snip120u},
-            HEADSTASH_OWNERS,
+            HEADSTASH_OWNERS, STORED_BLOOMS,
         };
 
         use super::*;
@@ -1042,6 +1131,10 @@ mod tests {
         #[test]
         fn test_headstash_workflow() {
             let (init_result, mut deps) = init_helper();
+            let info = mock_info("instantiator", &[]);
+            let mut env = mock_env();
+            env.block.random = Some(Binary::from(&[0u8; 32]));
+            let constants = CONFIG.load(&deps.storage).unwrap();
 
             assert!(
                 init_result.is_ok(),
@@ -1053,24 +1146,24 @@ mod tests {
             let handle_msg = ExecuteMsg::AddEligibleHeadStash {
                 headstash: vec![
                     Headstash {
-                        addr: "0xF20B72c0d3992F53D0b28a190D060B6b999d861D".into(),
+                        addr: "0xF20B72c0d3992F53D0b28a190D060B6b999d861D".into(), // hs1
                         snips: vec![Snip {
                             amount: 100u128.into(),
                             contract: "snip1Addr".into(),
                         }],
                     },
                     Headstash {
-                        addr: "vzRrBXAlQ8SJN33bcrzG7biwCMVW3iAOGqj4ekA7EsE=".into(),
+                        addr: "vzRrBXAlQ8SJN33bcrzG7biwCMVW3iAOGqj4ekA7EsE=".into(), // hs2
                         snips: vec![Snip {
                             amount: 300u128.into(),
                             contract: "snip1Addr".into(),
                         }],
                     },
                     Headstash {
-                        addr: "0x5c49a098BFe24cCEA4Aa66ac0416fD3F831Cd007".into(),
+                        addr: "0x5c49a098BFe24cCEA4Aa66ac0416fD3F831Cd007".into(), // hs3
                         snips: vec![
                             Snip {
-                                amount: 200u128.into(),
+                                amount: 20u128.into(),
                                 contract: "snip1Addr".into(),
                             },
                             Snip {
@@ -1079,12 +1172,17 @@ mod tests {
                             },
                         ],
                     },
+                    Headstash {
+                        addr: "0xdf303dc89E6d4A6122fa2889CCBE923236635b68=".into(), // hs5
+                        snips: vec![Snip {
+                            amount: 100u128.into(),
+                            contract: "snip2Addr".into(),
+                        }],
+                    },
                 ],
             };
-            let info = mock_info("instantiator", &[]);
-            let mut env = mock_env();
-            env.block.random = Some(Binary::from(&[0u8; 32]));
-            let handle_result = execute(deps.as_mut(), env, info, handle_msg);
+
+            let handle_result = execute(deps.as_mut(), env.clone(), info.clone(), handle_msg);
             handle_result.unwrap();
 
             // assert eligible map is accurate
@@ -1105,8 +1203,37 @@ mod tests {
                 .unwrap();
 
             assert_eq!(hs1.u128(), 100u128);
-            assert_eq!(hs2.u128(), 200u128);
+            assert_eq!(hs2.u128(), 20u128);
             assert_eq!(hs2_1.u128(), 200u128);
+
+            // try to add duplicate addr
+            let handle_msg = ExecuteMsg::AddEligibleHeadStash {
+                headstash: vec![Headstash {
+                    addr: "0xF20B72c0d3992F53D0b28a190D060B6b999d861D".into(),
+                    snips: vec![Snip {
+                        amount: 100u128.into(),
+                        contract: "snip1Addr".into(),
+                    }],
+                }],
+            };
+            let handle_result = execute(deps.as_mut(), env.clone(), info.clone(), handle_msg);
+            handle_result.expect_err("pubkey already has been added, not adding again");
+
+            // try to add more than total expected for a snip
+            let bad_msg = ExecuteMsg::AddEligibleHeadStash {
+                headstash: vec![Headstash {
+                    addr: "0x3498E3F526fD2B482c1DbDC08D1330ebd07Bc178".into(),
+                    snips: vec![Snip {
+                        amount: 400u128.into(),
+                        contract: "snip1Addr".into(),
+                    }],
+                }],
+            };
+            let handle_result = execute(deps.as_mut(), env.clone(), info, bad_msg).unwrap_err();
+            assert_eq!(
+                handle_result,
+                ContractError::Std(StdError::generic_err("Total amount exceeded"))
+            );
 
             // CLAIMING HEADSTASH
 
@@ -1116,7 +1243,6 @@ mod tests {
                 sig: "e96dfa73bee55043a003440f3a4c2cc04a7bff6ef757539fa58c8d6ffc5ff60d3bd573d05ca10cea57e870c82c1fd40090f08eac9bdc3cfb241f6dd983338ac01c".into(),
             };
             let info = mock_info("hs1", &[]);
-            let mut env = mock_env();
             env.block.random = Some(Binary::from(&[0u8; 32]));
             let handle_result = execute(
                 deps.as_mut(),
@@ -1145,39 +1271,293 @@ mod tests {
 
             // try to claim with someone elses signature
             let env = mock_env();
-            let info = mock_info("hs1", &[]);
+            let hs1 = mock_info("hs1", &[]);
             let stolen_signature_claim =
-                execute(deps.as_mut(), env.clone(), info, hs2_claim_msg.clone());
+                execute(deps.as_mut(), env.clone(), hs1, hs2_claim_msg.clone());
 
-            stolen_signature_claim.expect_err("cannot validate eth_sig.");
+            assert_eq!(
+                stolen_signature_claim.unwrap_err(),
+                ContractError::Std(StdError::generic_err("cannot validate offline_sig"))
+            );
 
             // ensure all tokens that are eligible are minted
-            let new_info = mock_info("hs2", &[]);
+            let hs2 = mock_info("hs2", &[]);
             let handle_result = execute(
                 deps.as_mut(),
                 env.clone(),
-                new_info.clone(),
+                hs2.clone(),
                 hs2_claim_msg.clone(),
             )
             .unwrap();
             assert_eq!(handle_result.messages.len(), 2);
-            // hs3
+
+            // claim with solana wallet (addr & signature is base64 encoded)
             let hs3_claim_msg = ExecuteMsg::Claim {
                 sig_addr: "vzRrBXAlQ8SJN33bcrzG7biwCMVW3iAOGqj4ekA7EsE=".into(),
                 sig: "bEcF5BOHG0zKvdr02Xy+ZlMyGEkHQR5TweMEWC6pfo+XzdvL5F6az9EZ8ErDh0czYRWluMunKuRveF7N4RDxBw==".into(),
             };
-            let new_info = mock_info("hs3", &[]);
-            let handle_result =
-                execute(deps.as_mut(), env, new_info.clone(), hs3_claim_msg.clone()).unwrap();
 
-            println!("{:#?}", handle_result);
-        }
+            let hs3 = mock_info("hs3", &[]);
+            let handle_result = execute(
+                deps.as_mut(),
+                env.clone(),
+                hs3.clone(),
+                hs3_claim_msg.clone(),
+            )
+            .unwrap();
 
-        #[test]
-        fn test_claim_headstash_dwb() {
+            assert_eq!(handle_result.messages.len(), 1);
 
-            // assert eligible addr can claim
-            // assert cannot claim more than eligilbe
+            // cannot claim if not eligible
+            let hs69_claim_msg = ExecuteMsg::Claim {
+                sig_addr: "0x5f4E77f85212c99Ca4f444663452Fb0bccA3c559".into(),
+                sig: "b372207341055a5ddb337b99900466d42b3fc779157dc8004fa3dff71a4d6d647e69323998e9e8ea5bc78f55fcd381ebf145af5364dac4ddf9ba8ddd8a770c9d1c".into(),
+            };
+            let hs69 = mock_info("hs69", &[]);
+            let res = execute(
+                deps.as_mut(),
+                env.clone(),
+                hs69.clone(),
+                hs69_claim_msg.clone(),
+            )
+            .unwrap();
+            assert_eq!(res.messages.len(), 0);
+
+            // REGISTER BLOOMS
+
+            // someone who is eligible but has not claimed yet cannot register
+            let hs5_register_bloom = ExecuteMsg::RegisterBloom {
+                bloom_msg: BloomMsg {
+                    total: 99u128.into(),
+                    snip120_addr: "snip2Addr".into(),
+                    cadance: 2u64,
+                    entropy_key: 10u64,
+                    bloom: vec![BloomRecipient {
+                        addr: "privateAddr1".into(),
+                        amount: 99u64,
+                    }],
+                },
+            };
+            let hs5 = mock_info("hs5", &[]);
+            let err = execute(
+                deps.as_mut(),
+                env.clone(),
+                hs5.clone(),
+                hs5_register_bloom.clone(),
+            )
+            .unwrap_err();
+            assert_eq!(err, ContractError::BloomNotFound {});
+
+            // someone who is not eligible cannot register
+            let hs6_register_bloom = ExecuteMsg::RegisterBloom {
+                bloom_msg: BloomMsg {
+                    total: 121u128.into(),
+                    snip120_addr: "snip2Addr".into(),
+                    cadance: 2u64,
+                    entropy_key: 10u64,
+                    bloom: vec![BloomRecipient {
+                        addr: "privateAddr1".into(),
+                        amount: 121u64,
+                    }],
+                },
+            };
+            let new_info = mock_info("hs6", &[]);
+            let err = execute(
+                deps.as_mut(),
+                env.clone(),
+                new_info.clone(),
+                hs6_register_bloom.clone(),
+            )
+            .unwrap_err();
+            assert_eq!(err, ContractError::BloomNotFound {});
+            // cannot register bloom with total more than allowance
+
+            // cannot register bloom with non-eligible snip120u
+            let hs1_register_bloom = ExecuteMsg::RegisterBloom {
+                bloom_msg: BloomMsg {
+                    total: 123u128.into(),
+                    snip120_addr: "snip666Addr".into(),
+                    cadance: 2u64,
+                    entropy_key: 0u64,
+                    bloom: vec![BloomRecipient {
+                        addr: "privateAddr1".into(),
+                        amount: 123u64,
+                    }],
+                },
+            };
+            let hs1 = mock_info("hs1", &[]);
+            let err = execute(
+                deps.as_mut(),
+                env.clone(),
+                hs1.clone(),
+                hs1_register_bloom.clone(),
+            )
+            .unwrap_err();
+            assert_eq!(err, ContractError::BloomNotFound {});
+
+            // needs atleast 1 granular bloom msg in vec to register
+            let hs1_register_bloom = ExecuteMsg::RegisterBloom {
+                bloom_msg: BloomMsg {
+                    total: 101u128.into(),
+                    snip120_addr: "snip1Addr".into(),
+                    cadance: 2u64,
+                    entropy_key: 0u64,
+                    bloom: vec![],
+                },
+            };
+            let err = execute(
+                deps.as_mut(),
+                env.clone(),
+                hs1.clone(),
+                hs1_register_bloom.clone(),
+            )
+            .unwrap_err();
+            assert_eq!(err, ContractError::BloomNotEnoughGrains {});
+
+            // sum of granular bloom msgs cannot be more than total
+            let hs1_register_bloom = ExecuteMsg::RegisterBloom {
+                bloom_msg: BloomMsg {
+                    total: 41u128.into(),
+                    snip120_addr: "snip1Addr".into(),
+                    cadance: 2u64,
+                    entropy_key: 0u64,
+                    bloom: vec![
+                        BloomRecipient {
+                            addr: "privateAddr1".into(),
+                            amount: 19u64,
+                        },
+                        BloomRecipient {
+                            addr: "privateAddr2".into(),
+                            amount: 61u64,
+                        },
+                    ],
+                },
+            };
+            let err = execute(
+                deps.as_mut(),
+                env.clone(),
+                hs1.clone(),
+                hs1_register_bloom.clone(),
+            )
+            .unwrap_err();
+            assert_eq!(err, ContractError::BloomTotalError {});
+
+            // sum of granular bloom msgs must equal total
+            let hs1_register_bloom = ExecuteMsg::RegisterBloom {
+                bloom_msg: BloomMsg {
+                    total: 35u128.into(),
+                    snip120_addr: "snip1Addr".into(),
+                    cadance: 2u64,
+                    entropy_key: 0u64,
+                    bloom: vec![BloomRecipient {
+                        addr: "privateAddr1".into(),
+                        amount: 34u64,
+                    }],
+                },
+            };
+            let err = execute(
+                deps.as_mut(),
+                env.clone(),
+                hs1.clone(),
+                hs1_register_bloom.clone(),
+            )
+            .unwrap_err();
+            assert_eq!(err, ContractError::BloomTotalError {});
+
+            // cannot register for more blooms than eligible for
+            let hs2_register_bloom = ExecuteMsg::RegisterBloom {
+                bloom_msg: BloomMsg {
+                    total: 400u128.into(),
+                    snip120_addr: "snip1Addr".into(),
+                    cadance: 2u64,
+                    entropy_key: 0u64,
+                    bloom: vec![
+                        BloomRecipient {
+                            addr: "privateAddr1".into(),
+                            amount: 300u64,
+                        },
+                        BloomRecipient {
+                            addr: "privateAddr2".into(),
+                            amount: 100u64,
+                        },
+                    ],
+                },
+            };
+            let hs2 = mock_info("hs2", &[]);
+            let err = execute(
+                deps.as_mut(),
+                env.clone(),
+                hs2.clone(),
+                hs2_register_bloom.clone(),
+            )
+            .unwrap_err();
+            assert_eq!(
+                err,
+                ContractError::Std(StdError::generic_err(
+                    "You are trying to bloom more than eligible for this snip120u"
+                ))
+            );
+
+            // someone who has claimed can register
+            let hs1_register_bloom = ExecuteMsg::RegisterBloom {
+                bloom_msg: BloomMsg {
+                    total: 100u128.into(),
+                    snip120_addr: "snip1Addr".into(),
+                    cadance: 2u64,
+                    entropy_key: 0u64,
+                    bloom: vec![
+                        BloomRecipient {
+                            addr: "privateAddr1".into(),
+                            amount: 70u64,
+                        },
+                        BloomRecipient {
+                            addr: "privateAddr2".into(),
+                            amount: 30u64,
+                        },
+                    ],
+                },
+            };
+            let hs1 = mock_info("hs1", &[]);
+            execute(
+                deps.as_mut(),
+                env.clone(),
+                hs1.clone(),
+                hs1_register_bloom.clone(),
+            )
+            .unwrap();
+
+            // cannot set entropy key out of range
+
+            // confirm blooms were set inside the correct mempool
+            let blooms = STORED_BLOOMS
+                .add_suffix(1u64.to_string().as_bytes())
+                .get(&deps.storage, &"hs1".to_string());
+
+            assert!(blooms.is_some());
+            let bloom = blooms.unwrap();
+            assert_eq!(bloom.block_height, 12345u64);
+            assert_eq!(bloom.msg.total, Uint128::new(100u128));
+            assert_eq!(
+                bloom.msg.cadance,
+                constants.bloom.unwrap().default_cadance + 2u64
+            );
+            assert_eq!(bloom.msg.entropy_key, 1u64);
+            assert_eq!(bloom.msg.bloom.len(), 2);
+
+            // someone who has claimed and registered cannot register again
+            let res = execute(
+                deps.as_mut(),
+                env.clone(),
+                hs1.clone(),
+                hs1_register_bloom.clone(),
+            )
+            .unwrap_err();
+
+            assert_eq!(res, ContractError::BloomDuplicate {})
+
+            // PROCESS BLOOMS
+
+            // only specific addr can process blooms
         }
 
         #[test]

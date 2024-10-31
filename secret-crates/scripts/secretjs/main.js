@@ -8,7 +8,7 @@ import { upload_headstash_contract, instantiate_headstash_contract } from "./hea
 // wallet
 export const wallet = new Wallet("");
 
-import { generateEthKeyAndSignMessage, generateEthKeyAndSignMessage } from './testKeys.js';
+import { generateEthKeyAndSignMessage, generateSolanaKeyAndSignMessage } from './testKeys.js';
 
 // headstash contract
 export const headstashCodeId = 1944;
@@ -142,7 +142,7 @@ if (args.length < 1) {
   claim(args[1])
 } else if (args[0] === '-gen-test-eth-sig') { // create an account, claims airdrop 
   // Example usage
-  const message = "H.R.E.A.M. Sender: hs2";
+  const message = "H.R.E.A.M. Sender: hs69";
   generateEthKeyAndSignMessage(message);
 } else if (args[0] === '-gen-test-sol-sig') { // create an account, claims airdrop 
   // Example usage
