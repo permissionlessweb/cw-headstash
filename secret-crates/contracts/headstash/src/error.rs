@@ -49,6 +49,9 @@ pub enum ContractError {
     #[error("Provide atleast 1 msg to process.")]
     BloomNotEnoughGrains {},
 
+    #[error("Invalid batch value.")]
+    InvalidBatchAmount {},
+
     #[error("the total amount specificed in you granular messages does not equal the total amount set")]
     BloomTotalError {},
 

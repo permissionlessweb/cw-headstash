@@ -1,7 +1,7 @@
 use crate::error::ContractError;
 use bloom::BloomConfig;
 use cosmwasm_schema::cw_serde;
-use cosmwasm_std::{Addr, Decimal, StdError, StdResult, Storage, Uint128, Uint64};
+use cosmwasm_std::{Addr, Storage, Uint128};
 use schemars::JsonSchema;
 use secret_toolkit::storage::{Item, Keymap};
 use serde::{Deserialize, Serialize};
@@ -97,7 +97,7 @@ pub mod ibc {
 
     use super::*;
     use crate::ibc::types::metadata::TxEncoding;
-    use cosmwasm_std::{ContractInfo, Timestamp};
+    use cosmwasm_std::ContractInfo;
 
     /// State is the state of the contract.
     #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
@@ -261,22 +261,27 @@ pub mod channel {
 
 pub mod bloom {
     use super::*;
-    use cosmwasm_std::Timestamp;
 
     #[derive(Serialize, Debug, Deserialize, Clone, Eq, PartialEq, JsonSchema, Default)]
     pub struct StoredBlooms {
+        /// block height in which tx was processed
         pub block_height: u64,
+        ///
         pub msg: BloomMsg,
     }
 
     #[derive(Serialize, Debug, Deserialize, Clone, Eq, PartialEq, JsonSchema, Default)]
     pub struct BloomMsg {
+        /// owner of snip120u (needed for RedeemFrom)
+        pub owner: String,
         /// total amount to be sent via bloom protocol. Must never be greater than allowance set for headstash contract.
         pub total: Uint128,
         /// the snip120 to redeem and use in bloom.
         pub snip120_addr: String,
         /// additional delay before including blooms into msgs (in blocks)
         pub cadance: u64,
+        /// amount of tx to process per batch
+        pub batch_amnt: u64,
         /// ratio used to classify bloom-mempool tx priority\
         ///  0 == no entropy, most chance of being included in finality process.\
         /// 10 == maximize entropy, least possible chance of being included in finality process
@@ -288,10 +293,10 @@ pub mod bloom {
     #[derive(Serialize, Debug, Deserialize, Clone, Eq, PartialEq, JsonSchema, Default)]
     pub struct ProcessingBloomMsg {
         /// recipient addr of
-        pub addr: String,
+        pub recipient_addr: String,
         // amount pending to send to recipient.
         pub amount: u64,
-        // Coin token string
+        /// native denomination of token being bloomed
         pub token: String,
     }
 
@@ -366,9 +371,10 @@ pub mod snip {
 
     #[derive(Serialize, Deserialize, Clone, Debug, Eq, PartialEq, JsonSchema)]
     pub struct Snip120u {
-        // native x/bank token denomination for this snip120u
+        /// native x/bank token denomination for this snip120u
         pub native_token: String,
         // pub name: String,
+        /// smart contract addr of snip120u
         pub addr: Addr,
         // total amount of this to be distributed during this headstash
         pub total_amount: Uint128,

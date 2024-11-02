@@ -1,15 +1,14 @@
-use crate::types::callbacks;
+// use cw_ica_controller_derive::ica_callback_execute;
 use crate::{
     state::{
         bloom::{BloomConfig, BloomMsg},
         snip::Snip120u,
         Config, Headstash,
     },
-    types::callbacks::IcaControllerCallbackMsg,
+    // types::callbacks::IcaControllerCallbackMsg,
 };
 use cosmwasm_schema::cw_serde;
-use cosmwasm_std::{Addr, Binary, Uint128, Uint64};
-use cw_ica_controller_derive::ica_callback_execute;
+use cosmwasm_std::{Addr, Binary, Uint128};
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
@@ -141,28 +140,28 @@ pub mod snip {
         pub supported_denoms: Option<Vec<String>>,
     }
 
-    #[derive(Serialize, Deserialize, Clone, Debug, Eq, PartialEq, JsonSchema)]
-    pub struct SetMinters {
-        pub minters: Vec<String>,
-        pub padding: Option<String>,
-    }
-
-    #[derive(Serialize, Deserialize, Clone, Debug, Eq, PartialEq, JsonSchema)]
-    pub struct MintMsg {
-        pub recipient: String,
-        pub amount: Uint128,
-        pub allowance: Option<Vec<AllowanceAction>>,
-        pub memo: Option<String>,
-        pub padding: Option<String>,
-    }
-
-    #[derive(Serialize, Deserialize, Clone, Debug, Eq, PartialEq, JsonSchema)]
-    pub struct Redeem {
-        pub amount: Uint128,
-        pub denom: Option<String>,
-        pub decoys: Option<Vec<Addr>>,
-        pub entropy: Option<Binary>,
-        pub padding: Option<String>,
+    #[derive(Serialize, Deserialize, JsonSchema, Clone, Debug)]
+    #[serde(rename_all = "snake_case")]
+    pub enum ExecuteMsg {
+        RedeemFrom {
+            owner: String,
+            amount: Uint128,
+            denom: Option<String>,
+            decoys: Option<Vec<Addr>>,
+            entropy: Option<Binary>,
+            padding: Option<String>,
+        },
+        MintMsg {
+            recipient: String,
+            amount: Uint128,
+            allowance: Option<Vec<AllowanceAction>>,
+            memo: Option<String>,
+            padding: Option<String>,
+        },
+        SetMinters {
+            minters: Vec<String>,
+            padding: Option<String>,
+        },
     }
 
     #[derive(Serialize, Deserialize, Clone, Debug, Eq, PartialEq, JsonSchema)]
@@ -199,7 +198,7 @@ pub mod snip {
         contract_addr: String,
     ) -> StdResult<CosmosMsg> {
         to_cosmos_msg(
-            MintMsg {
+            ExecuteMsg::MintMsg {
                 recipient,
                 amount,
                 allowance: Some(allowance),
@@ -214,7 +213,7 @@ pub mod snip {
     }
 
     pub fn into_cosmos_msg(
-        msg: Redeem,
+        msg: ExecuteMsg,
         mut block_size: usize,
         code_hash: String,
         contract_addr: String,
@@ -243,7 +242,7 @@ pub mod snip {
     }
 
     pub fn to_cosmos_msg(
-        msg: MintMsg,
+        msg: ExecuteMsg,
         mut block_size: usize,
         code_hash: String,
         contract_addr: String,
