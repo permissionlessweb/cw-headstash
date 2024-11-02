@@ -463,6 +463,7 @@ pub mod validation {
         eth: bool,
     ) -> Result<(), StdError> {
         match eth {
+            // source: https://github.com/SecretSaturn/SecretPath/blob/aae6c61ff755aa22112945eab308e9037044980b/TNLS-Gateways/secret/src/msg.rs#L109
             false => {
                 let computed_plaintxt = compute_plaintxt_msg(plaintxt, sender);
                 let signature = Binary::from_base64(&sig)?;
@@ -602,9 +603,6 @@ pub mod ibc_bloom {
             .add_suffix(info.sender.as_str().as_bytes());
 
         if let Some(sig) = hs.may_load(deps.storage)? {
-            // if sig.addr.ne(info.sender.as_str()) {
-            //     return Err(ContractError::BloomMismatchSigner {});
-            // }
             let lens = msg.bloom.len() as u64;
             if lens.gt(&config.bloom.expect("bloom not setup").max_granularity) {
                 return Err(ContractError::BloomTooManyGrains {});

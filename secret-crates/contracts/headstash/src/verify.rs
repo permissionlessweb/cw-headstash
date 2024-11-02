@@ -1,3 +1,5 @@
+// source: https://github.com/public-awesome/launchpad/blob/main/contracts/sg-eth-airdrop/src/claim_airdrop.rs#L84
+
 use cosmwasm_std::{Api, StdError, StdResult};
 use secret_toolkit::crypto::secp256k1::PublicKey;
 use sha2::Digest;
