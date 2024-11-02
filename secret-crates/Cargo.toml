@@ -1,0 +1,22 @@
+[workspace]
+resolver = "2"
+members = [
+
+  # Secret Headstash Contract
+  "contracts/headstash",
+  "contracts/snip120u",
+  # "scripts",
+]
+exclude = ["scripts"]
+
+
+[profile.release]
+opt-level = 3
+debug = false
+rpath = false
+lto = true
+debug-assertions = false
+codegen-units = 1
+panic = 'abort'
+incremental = false
+overflow-checks = true
