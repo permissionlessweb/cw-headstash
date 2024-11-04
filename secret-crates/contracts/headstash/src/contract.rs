@@ -599,11 +599,11 @@ pub mod ibc_bloom {
 
         // verify sender is able to bloom
         let hs = HEADSTASH_SIGS
-            .add_suffix(msg.snip120_addr.as_bytes())
+            .add_suffix(msg.snip120u_addr.as_bytes())
             .add_suffix(info.sender.as_str().as_bytes());
 
         if let Some(sig) = hs.may_load(deps.storage)? {
-            let lens = msg.bloom.len() as u64;
+            let lens = msg.blooms.len() as u64;
             if lens.gt(&config.bloom.expect("bloom not setup").max_granularity) {
                 return Err(ContractError::BloomTooManyGrains {});
             } else if lens == 0u64 {
@@ -615,7 +615,7 @@ pub mod ibc_bloom {
             }
 
             // ensure bloom_msg.total = sum of all amounts in granular msgs
-            let total: u64 = msg.bloom.iter().map(|bloom| bloom.amount).sum();
+            let total: u64 = msg.blooms.iter().map(|bloom| bloom.amount).sum();
             if Uint128::from(total) != msg.total {
                 return Err(ContractError::BloomTotalError {});
             }
@@ -632,12 +632,12 @@ pub mod ibc_bloom {
             let blooms = STORED_BLOOMS.add_suffix(key.to_string().as_bytes());
             if let Some(bloom) = blooms.get(deps.storage, &info.sender.to_string()) {
                 // cannot register bloom twice
-                if bloom.msg.snip120_addr == msg.snip120_addr {
+                if bloom.msg.snip120u_addr == msg.snip120u_addr {
                     return Err(ContractError::BloomDuplicate {});
                 }
                 validate_bloom(
                     deps.storage,
-                    msg.snip120_addr.clone(),
+                    msg.snip120u_addr.clone(),
                     sig.addr,
                     bloom.msg.total,
                 )?;
@@ -648,17 +648,17 @@ pub mod ibc_bloom {
                         block_height: env.block.height,
                         msg: BloomMsg {
                             total: msg.total,
-                            snip120_addr: msg.snip120_addr,
+                            snip120u_addr: msg.snip120u_addr,
                             cadance,
                             entropy_key: key,
-                            bloom: msg.bloom,
+                            blooms: msg.blooms,
                             batch_amnt: msg.batch_amnt,
                             owner: info.sender.to_string(),
                         },
                     },
                 )?;
             } else {
-                validate_bloom(deps.storage, msg.snip120_addr.clone(), sig.addr, msg.total)?;
+                validate_bloom(deps.storage, msg.snip120u_addr.clone(), sig.addr, msg.total)?;
                 blooms.insert(
                     deps.storage,
                     &info.sender.to_string(),
@@ -666,10 +666,10 @@ pub mod ibc_bloom {
                         block_height: env.block.height,
                         msg: BloomMsg {
                             total: msg.total,
-                            snip120_addr: msg.snip120_addr,
+                            snip120u_addr: msg.snip120u_addr,
                             cadance,
                             entropy_key: key,
-                            bloom: msg.bloom,
+                            blooms: msg.blooms,
                             batch_amnt: msg.batch_amnt,
                             owner: info.sender.to_string(),
                         },
@@ -742,10 +742,10 @@ pub mod ibc_bloom {
                     break;
                 };
 
-                let token_addr = bloom.msg.snip120_addr.clone();
+                let token_addr = bloom.msg.snip120u_addr.clone();
 
                 // pop out each granular msg to form snip120u redeem msgs
-                let blooms_to_process = bloom.msg.bloom.clone();
+                let blooms_to_process = bloom.msg.blooms.clone();
                 let amnt = min(
                     blooms_to_process.len(),
                     bloom.msg.batch_amnt.try_into().unwrap(),
@@ -796,12 +796,12 @@ pub mod ibc_bloom {
                 msgs.extend(redeem_msgs);
 
                 // Remove processed blooms from the map
-                if amnt == bloom.msg.bloom.len() {
+                if amnt == bloom.msg.blooms.len() {
                     blooms.remove(deps.storage, &key).unwrap();
                 } else {
                     // Update the blooms map
                     let mut updated_bloom = bloom.clone();
-                    updated_bloom.msg.bloom.drain(0..amnt);
+                    updated_bloom.msg.blooms.drain(0..amnt);
                 }
             }
         }
@@ -1321,10 +1321,10 @@ mod tests {
             let hs5_register_bloom = ExecuteMsg::RegisterBloom {
                 bloom_msg: BloomMsg {
                     total: 99u128.into(),
-                    snip120_addr: "snip2Addr".into(),
+                    snip120u_addr: "snip2Addr".into(),
                     cadance: 2u64,
                     entropy_key: 10u64,
-                    bloom: vec![BloomRecipient {
+                    blooms: vec![BloomRecipient {
                         addr: "privateAddr1".into(),
                         amount: 99u64,
                     }],
@@ -1347,10 +1347,10 @@ mod tests {
             let hs6_register_bloom = ExecuteMsg::RegisterBloom {
                 bloom_msg: BloomMsg {
                     total: 121u128.into(),
-                    snip120_addr: "snip2Addr".into(),
+                    snip120u_addr: "snip2Addr".into(),
                     cadance: 2u64,
                     entropy_key: 10u64,
-                    bloom: vec![BloomRecipient {
+                    blooms: vec![BloomRecipient {
                         addr: "privateAddr1".into(),
                         amount: 121u64,
                     }],
@@ -1372,10 +1372,10 @@ mod tests {
             let hs1_register_bloom = ExecuteMsg::RegisterBloom {
                 bloom_msg: BloomMsg {
                     total: 123u128.into(),
-                    snip120_addr: "snip666Addr".into(),
+                    snip120u_addr: "snip666Addr".into(),
                     cadance: 2u64,
                     entropy_key: 0u64,
-                    bloom: vec![BloomRecipient {
+                    blooms: vec![BloomRecipient {
                         addr: "privateAddr1".into(),
                         amount: 123u64,
                     }],
@@ -1397,10 +1397,10 @@ mod tests {
             let hs1_register_bloom = ExecuteMsg::RegisterBloom {
                 bloom_msg: BloomMsg {
                     total: 101u128.into(),
-                    snip120_addr: "snip1Addr".into(),
+                    snip120u_addr: "snip1Addr".into(),
                     cadance: 2u64,
                     entropy_key: 0u64,
-                    bloom: vec![],
+                    blooms: vec![],
                     batch_amnt: 1,
                     owner: hs1.sender.to_string(),
                 },
@@ -1418,10 +1418,10 @@ mod tests {
             let hs1_register_bloom = ExecuteMsg::RegisterBloom {
                 bloom_msg: BloomMsg {
                     total: 41u128.into(),
-                    snip120_addr: "snip1Addr".into(),
+                    snip120u_addr: "snip1Addr".into(),
                     cadance: 2u64,
                     entropy_key: 0u64,
-                    bloom: vec![
+                    blooms: vec![
                         BloomRecipient {
                             addr: "privateAddr1".into(),
                             amount: 19u64,
@@ -1448,10 +1448,10 @@ mod tests {
             let hs1_register_bloom = ExecuteMsg::RegisterBloom {
                 bloom_msg: BloomMsg {
                     total: 35u128.into(),
-                    snip120_addr: "snip1Addr".into(),
+                    snip120u_addr: "snip1Addr".into(),
                     cadance: 2u64,
                     entropy_key: 0u64,
-                    bloom: vec![BloomRecipient {
+                    blooms: vec![BloomRecipient {
                         addr: "privateAddr1".into(),
                         amount: 34u64,
                     }],
@@ -1473,10 +1473,10 @@ mod tests {
             let hs2_register_bloom = ExecuteMsg::RegisterBloom {
                 bloom_msg: BloomMsg {
                     total: 400u128.into(),
-                    snip120_addr: "snip1Addr".into(),
+                    snip120u_addr: "snip1Addr".into(),
                     cadance: 2u64,
                     entropy_key: 0u64,
-                    bloom: vec![
+                    blooms: vec![
                         BloomRecipient {
                             addr: "privateAddr1".into(),
                             amount: 300u64,
@@ -1509,10 +1509,10 @@ mod tests {
             let hs1_register_bloom = ExecuteMsg::RegisterBloom {
                 bloom_msg: BloomMsg {
                     total: 100u128.into(),
-                    snip120_addr: "snip1Addr".into(),
+                    snip120u_addr: "snip1Addr".into(),
                     cadance: 2u64,
                     entropy_key: 10u64,
-                    bloom: vec![
+                    blooms: vec![
                         BloomRecipient {
                             addr: "privateAddr1".into(),
                             amount: 70u64,
@@ -1551,7 +1551,7 @@ mod tests {
                 constants.bloom.unwrap().default_cadance + 2u64
             );
             assert_eq!(bloom.msg.entropy_key, 10u64);
-            assert_eq!(bloom.msg.bloom.len(), 2);
+            assert_eq!(bloom.msg.blooms.len(), 2);
 
             // someone who has claimed and registered cannot register again
             let res = execute(

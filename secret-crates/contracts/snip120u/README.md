@@ -1,5 +1,6 @@
 # SNIP-20 Reference Implementation
 
+## SOURCE: https://github.com/SolarRepublic/snip20-reference-impl
 This is an implementation of a [SNIP-20](https://github.com/SecretFoundation/SNIPs/blob/master/SNIP-20.md), [SNIP-21](https://github.com/SecretFoundation/SNIPs/blob/master/SNIP-21.md), [SNIP-22](https://github.com/SecretFoundation/SNIPs/blob/master/SNIP-22.md), [SNIP-23](https://github.com/SecretFoundation/SNIPs/blob/master/SNIP-23.md), [SNIP-24](https://github.com/SecretFoundation/SNIPs/blob/master/SNIP-24.md), [SNIP-25](https://github.com/SecretFoundation/SNIPs/blob/master/SNIP-25.md) and [SNIP-26](https://github.com/SecretFoundation/SNIPs/blob/master/SNIP-26.md) compliant token contract.
 
 > **Note:**
