@@ -1,8 +1,8 @@
 #[cfg(not(feature = "library"))]
 use cosmwasm_std::entry_point;
 use cosmwasm_std::{
-    to_json_binary, Addr, Attribute, Binary, CosmosMsg, Deps, DepsMut, Env, Event, MessageInfo,
-    Response, StdError, StdResult, Storage,
+    to_json_binary, Addr, Attribute, Binary, Deps, DepsMut, Env, Event, MessageInfo, Response,
+    StdError, StdResult, Storage,
 };
 use cw2::set_contract_version;
 
@@ -35,12 +35,18 @@ pub fn execute(
 ) -> Result<Response, ContractError> {
     match msg {
         ExecuteMsg::AddGlob { globs } => add_glob(deps.storage, info.sender, globs),
-        ExecuteMsg::TakeGlob { sender, key, id } => manifest_wasm_blob(
+        ExecuteMsg::TakeGlob {
+            sender,
+            key,
+            memo,
+            timeout,
+        } => manifest_wasm_blob(
             deps.storage,
             info.sender,
             deps.api.addr_validate(&sender)?,
             key,
-            id,
+            memo,
+            timeout,
         ),
     }
 }
@@ -70,16 +76,16 @@ fn manifest_wasm_blob(
     owner: Addr,
     sender: Addr,
     wasm: String,
-    id: u64,
+    memo: Option<String>,
+    timeout: Option<u64>,
 ) -> Result<Response, ContractError> {
     cw_ownable::assert_owner(storage, &owner.clone())?;
-    let msg = headstash::get_ica_upload_msg(sender.clone(), &wasm)?;
-    Ok(Response::new().add_event(
+    let msg = headstash::take_glob(&wasm)?;
+    Ok(Response::new().set_data(msg).add_event(
         Event::new("headstash")
-            .add_attribute("ica-upload-msg", &to_json_binary(&msg)?.to_base64())
             .add_attribute("sender", sender.to_string())
-            .add_attribute("owner", owner.to_string())
-            .add_attribute("ica-id", id.to_string()),
+            .add_attribute("memo", memo.unwrap_or_default())
+            .add_attribute("timeout", timeout.unwrap_or(600).to_string()),
     ))
 }
 
@@ -88,18 +94,12 @@ pub fn query(_deps: Deps, _env: Env, _msg: QueryMsg) -> StdResult<Binary> {
     unimplemented!()
 }
 
-#[cfg(test)]
-mod tests {}
-
 mod headstash {
     use super::*;
     use anybuf::Anybuf;
 
-    /// Defines the msg to upload the nested wasm blobs.
-    pub fn get_ica_upload_msg(
-        sender: ::cosmwasm_std::Addr,
-        wasm: &str,
-    ) -> Result<CosmosMsg, StdError> {
+    /// Defines the Stargate msg to upload the nested wasm blobs.
+    pub fn take_glob(wasm: &str) -> Result<Vec<u8>, StdError> {
         // define headstash wasm binary
         let headstash_bin = match wasm {
             "cw-headstash" => include_bytes!("../../../../globs/cw_headstash.wasm.gz").to_vec(),
@@ -107,16 +107,14 @@ mod headstash {
             _ => return Err(StdError::generic_err("bad contract upload")),
         };
 
-        Ok(
-            #[allow(deprecated)]
-            CosmosMsg::Stargate {
-                type_url: "/secret.compute.v1beta1.MsgStoreCode".into(),
-                value: Anybuf::new()
-                    .append_string(1, sender.clone()) // sender (DAO)
-                    .append_bytes(2, &headstash_bin) // updated binary of transfer msg.
-                    .into_vec()
-                    .into(),
-            },
-        )
+        Ok(headstash_bin)
     }
+}
+
+#[cfg(test)]
+mod tests {
+
+    // assure we can grab proper upload msg
+
+    // track gas_consumption
 }

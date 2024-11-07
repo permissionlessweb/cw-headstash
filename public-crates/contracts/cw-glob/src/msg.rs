@@ -20,13 +20,16 @@ pub enum ExecuteMsg {
         globs: Vec<Glob>,
     },
     TakeGlob {
-        /// ica-account id for the cw-ica-owner
-        id: u64,
         /// Address to include in the CosmosMsg with the wasm blob.
         /// For cw-headstash, this will be the ica account on the host chain.
         sender: String,
         /// The wasm blob key to upload.
         key: String,
+        /// Optional memo to pass in ica-account
+        memo: Option<String>,
+     /// Optional timeout in seconds to include with the ibc packet.
+        /// If not specified, the [default timeout](crate::ibc::types::packet::DEFAULT_TIMEOUT_SECONDS) is used.
+        timeout: Option<u64>
     },
 }
 

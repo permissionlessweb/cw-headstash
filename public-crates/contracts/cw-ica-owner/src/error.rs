@@ -18,7 +18,7 @@ pub enum ContractError {
 
     #[error("SubMsgError")]
     SubMsgError {},
-    
+
     #[error("no coin sent matches the expected coins to be sent")]
     NoCoinSentMatchesHeadstashParams {},
 
@@ -39,6 +39,9 @@ pub enum ContractError {
 
     #[error("snip code-id not set")]
     NoSnipCodeId {},
+
+    #[error("snip code hash not set")]
+    NoSnip120uCodeHash {},
 
     #[error("snip token not set")]
     NoSnipContractAddr {},
@@ -64,9 +67,17 @@ pub enum ContractError {
     #[error("unauthorized")]
     Unauthorized {},
 
-    #[error("InvalidAttribute")]
-    InvalidAttribute {},
+    #[error("missing attribute : {0}")]
+    MissingAttribute(String),
 
     #[error("InvalidEvent")]
     InvalidEvent {},
+    #[error("BadStoreHeadstashCodeResponse")]
+    BadStoreHeadstashCodeResponse {},
+    
+    #[error("BadStoreSnip120uCodeResponse")]
+    BadStoreSnip120uCodeResponse {},
+
+    #[error("BadContractid")]
+    BadContractid {},
 }

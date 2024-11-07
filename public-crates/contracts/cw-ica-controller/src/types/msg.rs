@@ -18,6 +18,8 @@ pub struct InstantiateMsg {
     /// If not specified, then no callbacks are sent.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub send_callbacks_to: Option<String>,
+    ///
+    pub cw_glob: String,
 }
 
 /// The messages to execute the ICA controller contract.
@@ -55,6 +57,19 @@ pub enum ExecuteMsg {
         #[serde(default)]
         #[serde_as(deserialize_as = "serde_with::DefaultOnNull")]
         queries: Vec<cosmwasm_std::QueryRequest<cosmwasm_std::Empty>>,
+        /// Optional memo to include in the ibc packet.
+        #[serde(skip_serializing_if = "Option::is_none")]
+        packet_memo: Option<String>,
+        /// Optional timeout in seconds to include with the ibc packet.
+        /// If not specified, the [default timeout](crate::ibc::types::packet::DEFAULT_TIMEOUT_SECONDS) is used.
+        #[serde(skip_serializing_if = "Option::is_none")]
+        timeout_seconds: Option<u64>,
+    },
+    /// Custom message that will grab wasm blob from cw-glob, upload via ibc.
+    SendUploadMsg {
+        /// The stargate messages to convert and send to the ICA host.
+        #[serde_as(deserialize_as = "serde_with::DefaultOnNull")]
+        wasm: String,
         /// Optional memo to include in the ibc packet.
         #[serde(skip_serializing_if = "Option::is_none")]
         packet_memo: Option<String>,
@@ -125,6 +140,55 @@ pub mod options {
             self.counterparty_port_id
                 .clone()
                 .unwrap_or_else(|| crate::ibc::types::keys::HOST_PORT_ID.to_string())
+        }
+    }
+}
+
+/// HeadstashCallback
+#[cw_serde]
+pub enum HeadstashCallback {
+    /// UploadHeadstash,
+    UploadHeadstash,
+    /// InstantiateHeadstash,
+    InstantiateHeadstash,
+    /// InstantiateSnip120us,
+    InstantiateSnip120us,
+    /// SetHeadstashAsSnipMinter,
+    SetHeadstashAsSnipMinter,
+    /// AddHeadstashers,
+    AddHeadstashers,
+    /// AuthorizeFeeGrants,
+    AuthorizeFeeGrants,
+    /// FundHeadstash,
+    FundHeadstash,
+}
+
+impl From<HeadstashCallback> for String {
+    fn from(callback: HeadstashCallback) -> Self {
+        match callback {
+            HeadstashCallback::UploadHeadstash => "upload_headstash".to_string(),
+            HeadstashCallback::InstantiateHeadstash => "instantiate_headstash".to_string(),
+            HeadstashCallback::InstantiateSnip120us => "instantiate_snip120us".to_string(),
+            HeadstashCallback::SetHeadstashAsSnipMinter => {
+                "set_headstash_as_snip_minter".to_string()
+            }
+            HeadstashCallback::AddHeadstashers => "add_headstashers".to_string(),
+            HeadstashCallback::AuthorizeFeeGrants => "authorize_fee_grants".to_string(),
+            HeadstashCallback::FundHeadstash => "fund_headstash".to_string(),
+        }
+    }
+}
+
+impl From<String> for HeadstashCallback {
+    fn from(s: String) -> Self {
+        match s.as_str() {
+            "upload_headstash" => HeadstashCallback::UploadHeadstash,
+            "instantiate_headstash" => HeadstashCallback::InstantiateHeadstash,
+            "instantiate_snip120us" => HeadstashCallback::InstantiateSnip120us,
+            "set_headstash_as_snip_minter" => HeadstashCallback::SetHeadstashAsSnipMinter,
+            "add_headstashers" => HeadstashCallback::AddHeadstashers,
+            "authorize_fee_grants" => HeadstashCallback::AuthorizeFeeGrants,
+            _ => panic!("Invalid HeadstashCallback value"),
         }
     }
 }
