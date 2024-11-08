@@ -224,8 +224,6 @@ mod execute {
         let contract_state = state::STATE.load(deps.storage)?;
         let ica_info = contract_state.get_ica_info()?;
 
-       
-
         // grab the msg to upload wasm via ica-controller from cw-glob
         let upload_msg = super::helpers::cw_glob_execute(
             CW_GLOB.load(deps.storage)?.to_string(),
@@ -521,30 +519,6 @@ mod tests {
             counterparty_port_id: None,
             channel_ordering: None,
         };
-
-        // let mock_headstash_params = state::headstash::HeadstashParams {
-        //     headstash_code_id: Some(2),
-        //     token_params: vec![
-        //         HeadstashTokenParams {
-        //             native: "native1".into(),
-        //             ibc: "ibc/native1".into(),
-        //             symbol: "scrtNATIVE1".into(),
-        //             name: "name-of-native1".into(),
-        //             snip_addr: None,
-        //         },
-        //         HeadstashTokenParams {
-        //             native: "native2".into(),
-        //             ibc: "ibc/native2".into(),
-        //             symbol: "scrtNATIVE2".into(),
-        //             name: "name-of-native2".into(),
-        //             snip_addr: None,
-        //         },
-        //     ],
-        //     headstash: None,
-        //     snip120u_code_id: 1u64,
-        //     snip120u_code_hash: "234567jkhgfdsa".into(),
-        //     feegranter: None,
-        // };
 
         let msg = InstantiateMsg {
             owner: None,

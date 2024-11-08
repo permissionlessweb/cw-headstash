@@ -13,11 +13,22 @@ pub struct Glob {
     /// The wasm
     pub blob: Binary,
 }
+#[cw_serde]
+pub struct GlobHash {
+    /// The key used to store the blob
+    pub key: String,
+    /// The hash of the wasm blob
+    pub hash: String,
+}
 
 #[cw_serde]
 pub enum ExecuteMsg {
     AddGlob {
         globs: Vec<Glob>,
+    },
+    HashGlob {
+        /// glob to generate hash of.
+        keys: Vec<String>,
     },
     TakeGlob {
         /// Address to include in the CosmosMsg with the wasm blob.
@@ -27,12 +38,17 @@ pub enum ExecuteMsg {
         key: String,
         /// Optional memo to pass in ica-account
         memo: Option<String>,
-     /// Optional timeout in seconds to include with the ibc packet.
+        /// Optional timeout in seconds to include with the ibc packet.
         /// If not specified, the [default timeout](crate::ibc::types::packet::DEFAULT_TIMEOUT_SECONDS) is used.
-        timeout: Option<u64>
+        timeout: Option<u64>,
     },
 }
 
 #[cw_serde]
 #[derive(QueryResponses)]
-pub enum QueryMsg {}
+pub enum QueryMsg {
+    /// Retrieves the sha256sum hash of stored globs
+    #[returns(GlobHash)]
+    GlobHash { keys: Vec<String> },
+}
+

@@ -41,7 +41,7 @@ cosmwasm-storage = { package = "secret-cosmwasm-storage", version = "1.1.11" }
 cosmos-sdk-proto = { version = "0.20.0", default-features = false, features = ["cosmwasm"] }
 cw-ica-controller-derive = "0.4.2"
 ibc-proto = { version = "0.47", default-features = false, features = ["std", "serde"] }
-hex = "0.4"
+hex = "^0.4"
 rand_core = { version = "0.6.4", default-features = false }
 schemars = { version = "0.8.11" }
 serde = { version = "1.0" }
