@@ -52,7 +52,9 @@ pub enum ContractError {
     #[error("Invalid batch value.")]
     InvalidBatchAmount {},
 
-    #[error("the total amount specificed in you granular messages does not equal the total amount set")]
+    #[error(
+        "the total amount specificed in you granular messages does not equal the total amount set"
+    )]
     BloomTotalError {},
 
     #[error("Blooming for this token has already begun! There is no current support to update or add additional bloom msgs for the same source token.If you would like this feature, lets make it happen :)")]
@@ -80,8 +82,8 @@ pub enum ContractError {
 
     // #[error("semver parse error: {0}")]
     // SemverError(#[from] semver::Error),
-    #[error("{0}")]
-    OwnershipError(#[from] cw_ownable::OwnershipError),
+    #[error("Not Owner")]
+    OwnershipError(),
 
     // #[error("{0}")]
     // BufanyError(#[from] anybuf::BufanyError),

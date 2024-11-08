@@ -6,6 +6,7 @@ target*
 contract/airdrop/target/*
 Cargo.lock
 contract.wasm*
+public-crates/contracts/cw-glob/src/globs/*
 
 node_modules
 

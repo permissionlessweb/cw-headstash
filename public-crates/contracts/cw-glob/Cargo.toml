@@ -24,6 +24,10 @@ overflow-checks = true
 # use library feature to disable all instantiate/execute/query exports
 library = []
 
+[package.metadata]
+wasm-blobs = ["globs/cw_headstash.wasm.gz", "globs/snip120u_impl.wasm.gz"]
+
+
 [package.metadata.scripts]
 optimize = """docker run --rm -v "$(pwd)":/code \
   --mount type=volume,source="$(basename "$(pwd)")_cache",target=/target \

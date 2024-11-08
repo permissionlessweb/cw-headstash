@@ -44,8 +44,8 @@ pub enum ExecuteMsg {
     },
 }
 
-#[cw_serde]
 #[derive(QueryResponses)]
+#[cw_serde]
 pub enum QueryMsg {
     /// Retrieves the sha256sum hash of stored globs
     #[returns(GlobHash)]

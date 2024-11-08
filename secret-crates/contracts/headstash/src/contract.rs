@@ -174,9 +174,7 @@ pub mod headstash {
         }
 
         if info.sender != config.owner {
-            return Err(ContractError::OwnershipError(
-                cw_ownable::OwnershipError::NotOwner,
-            ));
+            return Err(ContractError::OwnershipError());
         }
         // make sure airdrop has not ended
         queries::available(&config, &env)?;

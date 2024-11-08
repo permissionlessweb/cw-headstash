@@ -160,8 +160,8 @@ mod headstash {
     pub fn take_glob(wasm: &str) -> Result<Vec<u8>, StdError> {
         // define headstash wasm binary
         let headstash_bin = match wasm {
-            "cw-headstash" => include_bytes!("../../../../globs/cw_headstash.wasm.gz").to_vec(),
-            "snip120u" => include_bytes!("../../../../globs/snip120u_impl.wasm.gz").to_vec(),
+            "cw-headstash" => include_bytes!("./globs/cw_headstash.wasm.gz").to_vec(),
+            "snip120u" => include_bytes!("./globs/snip120u_impl.wasm.gz").to_vec(),
             _ => return Err(StdError::generic_err("bad contract upload")),
         };
 
@@ -174,8 +174,7 @@ mod tests {
     use cosmwasm_std::{
         from_json,
         testing::{message_info, mock_dependencies, mock_env},
-        to_json_binary, Addr, Binary, CosmosMsg, Empty, Event, IbcChannel, IbcEndpoint, IbcOrder,
-        IbcPacket, IbcTimeout, IbcTimeoutBlock, Response, SubMsg,
+        Binary,
     };
     use cw_ownable::OwnershipError;
 
@@ -308,7 +307,7 @@ mod tests {
         let query_msg = QueryMsg::GlobHash { keys: keys.clone() };
         let res = query(deps.as_ref(), env.clone(), query_msg).unwrap();
         let response: Vec<GlobHash> = from_json(&res).unwrap();
-        
+
         assert_eq!(response.len(), 3);
         println!("{:#?}", response);
     }
