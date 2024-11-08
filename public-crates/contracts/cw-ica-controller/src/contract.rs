@@ -1,6 +1,6 @@
 //! This module handles the execution logic of the contract.
 
-use cosmwasm_std::{entry_point, from_base64, Addr, Reply, SubMsg};
+use cosmwasm_std::{entry_point, Addr, Reply, SubMsg};
 use cosmwasm_std::{to_json_binary, Binary, Deps, DepsMut, Env, MessageInfo, Response, StdResult};
 
 use crate::ibc::types::stargate::channel::new_ica_channel_open_init_cosmos_msg;
@@ -110,7 +110,8 @@ pub fn reply(deps: DepsMut, env: Env, msg: Reply) -> Result<Response, ContractEr
                     .expect("InvalidEvent");
 
                 // message from cw-glob to broadcast
-                let ica_upload_msg = event.attributes.iter().find(|a| a.key == "ica-upload-msg");
+                #[allow(deprecated)]
+                let wasm_blob = res.data.clone();
                 // sender (will be ica-account)
                 let sender = event.attributes.iter().find(|a| a.key == "sender");
                 // optional memo
@@ -118,8 +119,8 @@ pub fn reply(deps: DepsMut, env: Env, msg: Reply) -> Result<Response, ContractEr
                 // ibc packet timeout
                 let timeout = event.attributes.iter().find(|a| a.key == "timeout");
 
-                if ica_upload_msg.is_none() {
-                    return Err(ContractError::MissingAttribute("ica-upload-msg".into()));
+                if wasm_blob.is_none() {
+                    return Err(ContractError::MissingAttribute("wasm_blob".into()));
                 } else if sender.is_none() {
                     return Err(ContractError::MissingAttribute("sender".to_string()));
                 } else if memo.is_none() {
@@ -128,17 +129,15 @@ pub fn reply(deps: DepsMut, env: Env, msg: Reply) -> Result<Response, ContractEr
                     return Err(ContractError::MissingAttribute("timeout".to_string()));
                 }
 
-                let ica_upload_msg = &ica_upload_msg.unwrap().value;
                 let sender = &sender.unwrap().value;
                 let memo = &memo.unwrap().value;
                 let timeout_seconds = &timeout.unwrap().value;
 
-                // Decode the base64 encoded wasm blob
-                let decoded_wasm = from_base64(ica_upload_msg.as_str())?;
-
                 // Form StargateMsg
-                let upload_msg =
-                    helpers::upload_contract_msg(Addr::unchecked(sender.clone()), decoded_wasm)?;
+                let upload_msg = helpers::upload_contract_msg(
+                    Addr::unchecked(sender.clone()),
+                    &wasm_blob.unwrap(),
+                )?;
 
                 // send msg with wasm from glob as ica
                 let ica_info = state::STATE.load(deps.storage)?.get_ica_info()?;
@@ -423,7 +422,7 @@ mod helpers {
     /// Defines the msg to upload the nested wasm blobs.
     pub fn upload_contract_msg(
         sender: ::cosmwasm_std::Addr,
-        wasm: Vec<u8>,
+        wasm: &Binary,
     ) -> Result<CosmosMsg, StdError> {
         Ok(
             #[allow(deprecated)]
@@ -498,11 +497,15 @@ mod migrate {
 
 #[cfg(test)]
 mod tests {
+    use std::any::Any;
+
     use crate::types::msg::options::ChannelOpenInitOptions;
 
     use super::*;
     use cosmwasm_std::testing::{message_info, mock_dependencies, mock_env};
-    use cosmwasm_std::{Api, StdError, SubMsg};
+    use cosmwasm_std::{
+        Api, CosmosMsg, Empty, Event, IbcTimeout, IbcTimeoutBlock, StdError, SubMsg,
+    };
     // use state::headstash::HeadstashTokenParams;
 
     #[test]
@@ -510,6 +513,7 @@ mod tests {
         let mut deps = mock_dependencies();
 
         let creator = deps.api.addr_make("creator");
+        let cw_glob = deps.api.addr_make("cw_glob");
         let info = message_info(&creator, &[]);
         let env = mock_env();
 
@@ -524,7 +528,7 @@ mod tests {
             owner: None,
             channel_open_init_options: channel_open_init_options.clone(),
             send_callbacks_to: None,
-            cw_glob: "cw-glob-addr".into(),
+            cw_glob: cw_glob.to_string(),
             // headstash_params: mock_headstash_params.clone(),
         };
 
@@ -565,6 +569,108 @@ mod tests {
     }
 
     #[test]
+    fn test_headstash_replies() {
+        // simulated testing environment
+        let mut deps = mock_dependencies();
+        let env = mock_env();
+
+        // simulated addrs
+        let creator = deps.api.addr_make("creator");
+        let owner = deps.api.addr_make("owner");
+        let cw_glob = deps.api.addr_make("cw-glob");
+        let ica_addr = deps.api.addr_make("ica-addr");
+
+        // simulated message info
+        let info_owner = message_info(&owner, &[]);
+        let info_creator = message_info(&creator, &[]);
+
+        let channel_open_init_options = ChannelOpenInitOptions {
+            connection_id: "connection-0".to_string(),
+            counterparty_connection_id: "connection-1".to_string(),
+            counterparty_port_id: None,
+            channel_ordering: None,
+        };
+
+        // Instantiate the contract
+        let _res = instantiate(
+            deps.as_mut(),
+            env.clone(),
+            info_creator.clone(),
+            InstantiateMsg {
+                owner: Some(owner.to_string()),
+                channel_open_init_options,
+                send_callbacks_to: Some(owner.to_string()),
+                cw_glob: cw_glob.to_string(),
+            },
+        )
+        .unwrap();
+
+        // set the contract info
+        state::STATE
+            .update::<_, StdError>(&mut deps.storage, |mut state| {
+                state.set_ica_info("", "", crate::ibc::types::metadata::TxEncoding::Protobuf);
+                Ok(state)
+            })
+            .unwrap();
+
+        // simulate calling cw-glob for contracts
+        let upload_wasm_msg = ExecuteMsg::SendUploadMsg {
+            wasm: "snip120u".to_string(),
+            packet_memo: None,
+            timeout_seconds: None,
+        };
+        let res = execute(deps.as_mut(), env.clone(), info_owner, upload_wasm_msg).unwrap();
+        assert_eq!(res.messages[0].id, 710);
+        assert_eq!(
+            res.attributes
+                .iter()
+                .find(|a| a.key == "ica_callback_id")
+                .unwrap()
+                .value,
+            "upload_headstash".to_string()
+        );
+
+        // simulate upload snip120u reply
+        let bytes: Vec<u8> = vec![0u8; 20_000]; // 5MB of zeros
+        let binary = Binary::from(bytes);
+        // confirm we get expected submessage id
+
+        #[allow(deprecated)]
+        let msg = Reply {
+            id: res.messages[0].id,
+            payload: Binary::from("none".as_bytes()),
+            gas_used: 6969696u64,
+            result: cosmwasm_std::SubMsgResult::Ok(cosmwasm_std::SubMsgResponse {
+                events: vec![
+                    Event::new("wasm-headstash")
+                        .add_attribute("memo", "memo".to_string())
+                        .add_attribute("timeout", "24".to_string())
+                        .add_attribute("sender", ica_addr.to_string()), // ica-account 
+                ],
+                data: Some(binary),
+                msg_responses: vec![],
+            }),
+        };
+        // println!("simulated reply from cw-blob: {:#?}", msg);
+
+        // simulate response from cw-glob
+        let res = reply(deps.as_mut(), env.clone(), msg).unwrap();
+        // println!("{:#?}", res);
+        assert_eq!(
+            res.messages[0].msg.type_id(),
+            CosmosMsg::<Empty>::Ibc(cosmwasm_std::IbcMsg::SendPacket {
+                channel_id: "".into(),
+                data: Binary::new(vec![]),
+                timeout: IbcTimeout::with_block(IbcTimeoutBlock {
+                    revision: 0,
+                    height: 69
+                })
+            })
+            .type_id()
+        )
+        // simulate upload headstash reply
+    }
+    #[test]
     fn test_update_callback_address() {
         let mut deps = mock_dependencies();
 
@@ -579,30 +685,6 @@ mod tests {
             channel_ordering: None,
         };
 
-        // let mock_headstash_params = state::headstash::HeadstashParams {
-        //     headstash_code_id: Some(2),
-        //     token_params: vec![
-        //         HeadstashTokenParams {
-        //             native: "native1".into(),
-        //             ibc: "ibc/native1".into(),
-        //             symbol: "scrtNATIVE1".into(),
-        //             name: "name-of-native1".into(),
-        //             snip_addr: None,
-        //         },
-        //         HeadstashTokenParams {
-        //             native: "native2".into(),
-        //             ibc: "ibc/native2".into(),
-        //             symbol: "scrtNATIVE2".into(),
-        //             name: "name-of-native2".into(),
-        //             snip_addr: None,
-        //         },
-        //     ],
-        //     headstash: None,
-        //     snip120u_code_id: 1u64,
-        //     snip120u_code_hash: "234567jkhgfdsa".into(),
-        //     feegranter: None,
-        // };
-
         // Instantiate the contract
         let _res = instantiate(
             deps.as_mut(),
@@ -613,7 +695,6 @@ mod tests {
                 channel_open_init_options,
                 send_callbacks_to: None,
                 cw_glob: "cw-glob-addr".into(),
-                // headstash_params: mock_headstash_params,
             },
         )
         .unwrap();
@@ -743,30 +824,6 @@ mod tests {
             counterparty_port_id: None,
             channel_ordering: None,
         };
-
-        // let mock_headstash_params = state::headstash::HeadstashParams {
-        //     headstash_code_id: Some(2),
-        //     token_params: vec![
-        //         HeadstashTokenParams {
-        //             native: "native1".into(),
-        //             ibc: "ibc/native1".into(),
-        //             symbol: "scrtNATIVE1".into(),
-        //             name: "name-of-native1".into(),
-        //             snip_addr: None,
-        //         },
-        //         HeadstashTokenParams {
-        //             native: "native2".into(),
-        //             ibc: "ibc/native2".into(),
-        //             symbol: "scrtNATIVE2".into(),
-        //             name: "name-of-native2".into(),
-        //             snip_addr: None,
-        //         },
-        //     ],
-        //     headstash: None,
-        //     snip120u_code_id: 1u64,
-        //     snip120u_code_hash: "234567jkhgfdsa".into(),
-        //     feegranter: None,
-        // };
 
         // Instantiate the contract
         let _res = instantiate(

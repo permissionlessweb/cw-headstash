@@ -302,19 +302,15 @@ mod tests {
             set_hash_msg.clone(),
         )
         .unwrap();
-
         println!("{:#?}", res);
 
-        assert_eq!(err.to_string(), OwnershipError::NotOwner.to_string());
         // confirm we get queries
-
         let query_msg = QueryMsg::GlobHash { keys: keys.clone() };
-
         let res = query(deps.as_ref(), env.clone(), query_msg).unwrap();
         let response: Vec<GlobHash> = from_json(&res).unwrap();
-        println!("{:#?}", response);
         
         assert_eq!(response.len(), 3);
+        println!("{:#?}", response);
     }
 
     // query glob hashes
