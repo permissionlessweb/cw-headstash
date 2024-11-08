@@ -1,5 +1,7 @@
 //! This module defines [`ContractError`].
 
+use std::num::ParseIntError;
+
 use thiserror::Error;
 
 /// `ContractError` is the error type returned by contract's functions.
@@ -46,7 +48,7 @@ pub enum ContractError {
 
     #[error("invalid channel ordering")]
     InvalidChannelOrdering,
-    
+
     #[error("invalid host port")]
     InvalidHostPort,
 
@@ -103,4 +105,16 @@ pub enum ContractError {
 
     #[error("unknown reply id: {0}")]
     UnknownReplyId(u64),
+
+    #[error("{0}")]
+    ParseIntError(#[from] ParseIntError),
+
+    #[error("missing attribute : {0}")]
+    MissingAttribute(String),
+
+    #[error("InvalidEvent")]
+    InvalidEvent {},
+
+    #[error("SubMsgError")]
+    SubMsgError {},
 }

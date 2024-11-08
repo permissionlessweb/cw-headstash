@@ -277,7 +277,7 @@ pub mod bloom {
         /// total amount to be sent via bloom protocol. Must never be greater than allowance set for headstash contract.
         pub total: Uint128,
         /// the snip120 to redeem and use in bloom.
-        pub snip120_addr: String,
+        pub snip120u_addr: String,
         /// additional delay before including blooms into msgs (in blocks)
         pub cadance: u64,
         /// amount of tx to process per batch
@@ -287,7 +287,7 @@ pub mod bloom {
         /// 10 == maximize entropy, least possible chance of being included in finality process
         pub entropy_key: u64,
         /// recipient and amount to send.
-        pub bloom: Vec<BloomRecipient>,
+        pub blooms: Vec<BloomRecipient>,
     }
 
     #[derive(Serialize, Debug, Deserialize, Clone, Eq, PartialEq, JsonSchema, Default)]

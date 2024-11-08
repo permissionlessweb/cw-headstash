@@ -3,9 +3,9 @@
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
-use crate::batch::HasDecoy;
-use crate::transaction_history::{ExtendedTx, Tx};
-use crate::{batch, headstash};
+use crate::{batch, transaction_history::Tx};
+#[cfg(feature = "gas_evaporation")]
+use cosmwasm_std::Uint64;
 use cosmwasm_std::{Addr, Api, Binary, StdError, StdResult, Uint128};
 use secret_toolkit::permit::Permit;
 
@@ -55,7 +55,7 @@ pub struct InitConfig {
     /// Indicates whether burn functionality should be enabled
     /// default: False
     enable_burn: Option<bool>,
-    /// Indicated whether an admin can modify supported denoms
+    /// Indicates whether an admin can modify supported denoms
     /// default: False
     can_modify_denoms: Option<bool>,
 }
@@ -93,21 +93,13 @@ pub enum ExecuteMsg {
     Redeem {
         amount: Uint128,
         denom: Option<String>,
-        decoys: Option<Vec<Addr>>,
-        entropy: Option<Binary>,
-        padding: Option<String>,
-    },
-    RedeemFrom {
-        owner: String,
-        amount: Uint128,
-        denom: Option<String>,
-        decoys: Option<Vec<Addr>>,
-        entropy: Option<Binary>,
+        #[cfg(feature = "gas_evaporation")]
+        gas_target: Option<Uint64>,
         padding: Option<String>,
     },
     Deposit {
-        decoys: Option<Vec<Addr>>,
-        entropy: Option<Binary>,
+        #[cfg(feature = "gas_evaporation")]
+        gas_target: Option<Uint64>,
         padding: Option<String>,
     },
 
@@ -116,8 +108,8 @@ pub enum ExecuteMsg {
         recipient: String,
         amount: Uint128,
         memo: Option<String>,
-        decoys: Option<Vec<Addr>>,
-        entropy: Option<Binary>,
+        #[cfg(feature = "gas_evaporation")]
+        gas_target: Option<Uint64>,
         padding: Option<String>,
     },
     Send {
@@ -126,37 +118,45 @@ pub enum ExecuteMsg {
         amount: Uint128,
         msg: Option<Binary>,
         memo: Option<String>,
-        decoys: Option<Vec<Addr>>,
-        entropy: Option<Binary>,
+        #[cfg(feature = "gas_evaporation")]
+        gas_target: Option<Uint64>,
         padding: Option<String>,
     },
     BatchTransfer {
         actions: Vec<batch::TransferAction>,
-        entropy: Option<Binary>,
+        #[cfg(feature = "gas_evaporation")]
+        gas_target: Option<Uint64>,
         padding: Option<String>,
     },
     BatchSend {
         actions: Vec<batch::SendAction>,
-        entropy: Option<Binary>,
+        #[cfg(feature = "gas_evaporation")]
+        gas_target: Option<Uint64>,
         padding: Option<String>,
     },
     Burn {
         amount: Uint128,
         memo: Option<String>,
-        decoys: Option<Vec<Addr>>,
-        entropy: Option<Binary>,
+        #[cfg(feature = "gas_evaporation")]
+        gas_target: Option<Uint64>,
         padding: Option<String>,
     },
     RegisterReceive {
         code_hash: String,
+        #[cfg(feature = "gas_evaporation")]
+        gas_target: Option<Uint64>,
         padding: Option<String>,
     },
     CreateViewingKey {
-        entropy: String,
+        entropy: Option<String>,
+        #[cfg(feature = "gas_evaporation")]
+        gas_target: Option<Uint64>,
         padding: Option<String>,
     },
     SetViewingKey {
         key: String,
+        #[cfg(feature = "gas_evaporation")]
+        gas_target: Option<Uint64>,
         padding: Option<String>,
     },
 
@@ -165,12 +165,16 @@ pub enum ExecuteMsg {
         spender: String,
         amount: Uint128,
         expiration: Option<u64>,
+        #[cfg(feature = "gas_evaporation")]
+        gas_target: Option<Uint64>,
         padding: Option<String>,
     },
     DecreaseAllowance {
         spender: String,
         amount: Uint128,
         expiration: Option<u64>,
+        #[cfg(feature = "gas_evaporation")]
+        gas_target: Option<Uint64>,
         padding: Option<String>,
     },
     TransferFrom {
@@ -178,8 +182,8 @@ pub enum ExecuteMsg {
         recipient: String,
         amount: Uint128,
         memo: Option<String>,
-        decoys: Option<Vec<Addr>>,
-        entropy: Option<Binary>,
+        #[cfg(feature = "gas_evaporation")]
+        gas_target: Option<Uint64>,
         padding: Option<String>,
     },
     SendFrom {
@@ -189,31 +193,34 @@ pub enum ExecuteMsg {
         amount: Uint128,
         msg: Option<Binary>,
         memo: Option<String>,
-        decoys: Option<Vec<Addr>>,
-        entropy: Option<Binary>,
+        #[cfg(feature = "gas_evaporation")]
+        gas_target: Option<Uint64>,
         padding: Option<String>,
     },
     BatchTransferFrom {
         actions: Vec<batch::TransferFromAction>,
-        entropy: Option<Binary>,
+        #[cfg(feature = "gas_evaporation")]
+        gas_target: Option<Uint64>,
         padding: Option<String>,
     },
     BatchSendFrom {
         actions: Vec<batch::SendFromAction>,
-        entropy: Option<Binary>,
+        #[cfg(feature = "gas_evaporation")]
+        gas_target: Option<Uint64>,
         padding: Option<String>,
     },
     BurnFrom {
         owner: String,
         amount: Uint128,
         memo: Option<String>,
-        decoys: Option<Vec<Addr>>,
-        entropy: Option<Binary>,
+        #[cfg(feature = "gas_evaporation")]
+        gas_target: Option<Uint64>,
         padding: Option<String>,
     },
     BatchBurnFrom {
         actions: Vec<batch::BurnFromAction>,
-        entropy: Option<Binary>,
+        #[cfg(feature = "gas_evaporation")]
+        gas_target: Option<Uint64>,
         padding: Option<String>,
     },
 
@@ -222,120 +229,69 @@ pub enum ExecuteMsg {
         recipient: String,
         amount: Uint128,
         memo: Option<String>,
-        decoys: Option<Vec<Addr>>,
-        allowances: Option<headstash::AllowanceAction>,
-        entropy: Option<Binary>,
+        allowances: Vec<AllowanceAction>,
+        #[cfg(feature = "gas_evaporation")]
+        gas_target: Option<Uint64>,
         padding: Option<String>,
     },
     BatchMint {
         actions: Vec<batch::MintAction>,
-        entropy: Option<Binary>,
+        #[cfg(feature = "gas_evaporation")]
+        gas_target: Option<Uint64>,
         padding: Option<String>,
     },
     AddMinters {
         minters: Vec<String>,
+        #[cfg(feature = "gas_evaporation")]
+        gas_target: Option<Uint64>,
         padding: Option<String>,
     },
     RemoveMinters {
         minters: Vec<String>,
+        #[cfg(feature = "gas_evaporation")]
+        gas_target: Option<Uint64>,
         padding: Option<String>,
     },
     SetMinters {
         minters: Vec<String>,
+        #[cfg(feature = "gas_evaporation")]
+        gas_target: Option<Uint64>,
         padding: Option<String>,
     },
 
     // Admin
     ChangeAdmin {
         address: String,
+        #[cfg(feature = "gas_evaporation")]
+        gas_target: Option<Uint64>,
         padding: Option<String>,
     },
     SetContractStatus {
         level: ContractStatusLevel,
+        #[cfg(feature = "gas_evaporation")]
+        gas_target: Option<Uint64>,
         padding: Option<String>,
     },
     /// Add deposit/redeem support for these coin denoms
-    AddSupportedDenoms { denoms: Vec<String> },
+    AddSupportedDenoms {
+        denoms: Vec<String>,
+        #[cfg(feature = "gas_evaporation")]
+        gas_target: Option<Uint64>,
+    },
     /// Remove deposit/redeem support for these coin denoms
-    RemoveSupportedDenoms { denoms: Vec<String> },
+    RemoveSupportedDenoms {
+        denoms: Vec<String>,
+        #[cfg(feature = "gas_evaporation")]
+        gas_target: Option<Uint64>,
+    },
 
     // Permit
     RevokePermit {
         permit_name: String,
+        #[cfg(feature = "gas_evaporation")]
+        gas_target: Option<Uint64>,
         padding: Option<String>,
     },
-}
-
-pub trait Decoyable {
-    fn get_minimal_decoys_size(&self) -> usize;
-    fn get_entropy(self) -> Option<Binary>;
-}
-
-impl Decoyable for ExecuteMsg {
-    fn get_minimal_decoys_size(&self) -> usize {
-        match self {
-            ExecuteMsg::Deposit { decoys, .. }
-            | ExecuteMsg::Redeem { decoys, .. }
-            | ExecuteMsg::Transfer { decoys, .. }
-            | ExecuteMsg::Send { decoys, .. }
-            | ExecuteMsg::Burn { decoys, .. }
-            | ExecuteMsg::Mint { decoys, .. }
-            | ExecuteMsg::TransferFrom { decoys, .. }
-            | ExecuteMsg::SendFrom { decoys, .. }
-            | ExecuteMsg::BurnFrom { decoys, .. } => {
-                if let Some(user_decoys) = decoys {
-                    return user_decoys.len();
-                }
-
-                0
-            }
-            ExecuteMsg::BatchSendFrom { actions, .. } => get_min_decoys_count(actions),
-            ExecuteMsg::BatchTransferFrom { actions, .. } => get_min_decoys_count(actions),
-            ExecuteMsg::BatchTransfer { actions, .. } => get_min_decoys_count(actions),
-            ExecuteMsg::BatchSend { actions, .. } => get_min_decoys_count(actions),
-            ExecuteMsg::BatchBurnFrom { actions, .. } => get_min_decoys_count(actions),
-            ExecuteMsg::BatchMint { actions, .. } => get_min_decoys_count(actions),
-            _ => 0,
-        }
-    }
-
-    fn get_entropy(self) -> Option<Binary> {
-        match self {
-            ExecuteMsg::Deposit { entropy, .. }
-            | ExecuteMsg::Redeem { entropy, .. }
-            | ExecuteMsg::Transfer { entropy, .. }
-            | ExecuteMsg::Send { entropy, .. }
-            | ExecuteMsg::Burn { entropy, .. }
-            | ExecuteMsg::Mint { entropy, .. }
-            | ExecuteMsg::TransferFrom { entropy, .. }
-            | ExecuteMsg::SendFrom { entropy, .. }
-            | ExecuteMsg::BurnFrom { entropy, .. }
-            | ExecuteMsg::BatchTransferFrom { entropy, .. }
-            | ExecuteMsg::BatchSendFrom { entropy, .. }
-            | ExecuteMsg::BatchTransfer { entropy, .. }
-            | ExecuteMsg::BatchSend { entropy, .. }
-            | ExecuteMsg::BatchBurnFrom { entropy, .. }
-            | ExecuteMsg::BatchMint { entropy, .. } => entropy,
-            _ => None,
-        }
-    }
-}
-
-fn get_min_decoys_count<T: HasDecoy>(actions: &[T]) -> usize {
-    let mut min_decoys_count = usize::MAX;
-    for action in actions {
-        if let Some(user_decoys) = &action.decoys() {
-            if user_decoys.len() < min_decoys_count {
-                min_decoys_count = user_decoys.len();
-            }
-        }
-    }
-
-    if min_decoys_count == usize::MAX {
-        0
-    } else {
-        min_decoys_count
-    }
 }
 
 #[derive(Serialize, Deserialize, JsonSchema, Debug)]
@@ -348,9 +304,7 @@ pub enum ExecuteAnswer {
     Redeem {
         status: ResponseStatus,
     },
-    RedeemFrom {
-        status: ResponseStatus,
-    },
+
     // Base
     Transfer {
         status: ResponseStatus,
@@ -444,6 +398,58 @@ pub enum ExecuteAnswer {
     },
 }
 
+#[cfg(feature = "gas_evaporation")]
+pub trait Evaporator {
+    fn evaporate_to_target(&self, api: &dyn Api) -> StdResult<u64>;
+}
+
+#[cfg(feature = "gas_evaporation")]
+impl Evaporator for ExecuteMsg {
+    fn evaporate_to_target(&self, api: &dyn Api) -> StdResult<u64> {
+        match self {
+            ExecuteMsg::Redeem { gas_target, .. }
+            | ExecuteMsg::Deposit { gas_target, .. }
+            | ExecuteMsg::Transfer { gas_target, .. }
+            | ExecuteMsg::Send { gas_target, .. }
+            | ExecuteMsg::BatchTransfer { gas_target, .. }
+            | ExecuteMsg::BatchSend { gas_target, .. }
+            | ExecuteMsg::Burn { gas_target, .. }
+            | ExecuteMsg::RegisterReceive { gas_target, .. }
+            | ExecuteMsg::CreateViewingKey { gas_target, .. }
+            | ExecuteMsg::SetViewingKey { gas_target, .. }
+            | ExecuteMsg::IncreaseAllowance { gas_target, .. }
+            | ExecuteMsg::DecreaseAllowance { gas_target, .. }
+            | ExecuteMsg::TransferFrom { gas_target, .. }
+            | ExecuteMsg::SendFrom { gas_target, .. }
+            | ExecuteMsg::BatchTransferFrom { gas_target, .. }
+            | ExecuteMsg::BatchSendFrom { gas_target, .. }
+            | ExecuteMsg::BurnFrom { gas_target, .. }
+            | ExecuteMsg::BatchBurnFrom { gas_target, .. }
+            | ExecuteMsg::Mint { gas_target, .. }
+            | ExecuteMsg::BatchMint { gas_target, .. }
+            | ExecuteMsg::AddMinters { gas_target, .. }
+            | ExecuteMsg::RemoveMinters { gas_target, .. }
+            | ExecuteMsg::SetMinters { gas_target, .. }
+            | ExecuteMsg::ChangeAdmin { gas_target, .. }
+            | ExecuteMsg::SetContractStatus { gas_target, .. }
+            | ExecuteMsg::AddSupportedDenoms { gas_target, .. }
+            | ExecuteMsg::RemoveSupportedDenoms { gas_target, .. }
+            | ExecuteMsg::RevokePermit { gas_target, .. } => match gas_target {
+                Some(gas_target) => {
+                    let gas_used = api.check_gas()?;
+                    if gas_used < gas_target.u64() {
+                        let evaporate_amount = gas_target.u64() - gas_used;
+                        // api.gas_evaporate(evaporate_amount as u32)?;
+                        return Ok(evaporate_amount);
+                    }
+                    Ok(0)
+                }
+                None => Ok(0),
+            },
+        }
+    }
+}
+
 #[derive(Serialize, Deserialize, Clone, Debug, JsonSchema)]
 #[cfg_attr(test, derive(Eq, PartialEq))]
 #[serde(rename_all = "snake_case")]
@@ -478,20 +484,21 @@ pub enum QueryMsg {
         key: String,
         page: Option<u32>,
         page_size: u32,
-        should_filter_decoys: bool,
     },
     TransactionHistory {
         address: String,
         key: String,
         page: Option<u32>,
         page_size: u32,
-        should_filter_decoys: bool,
     },
     Minters {},
     WithPermit {
         permit: Permit,
         query: QueryWithPermit,
     },
+
+    #[cfg(feature = "gas_tracking")]
+    Dwb {},
 }
 
 impl QueryMsg {
@@ -555,12 +562,10 @@ pub enum QueryWithPermit {
     TransferHistory {
         page: Option<u32>,
         page_size: u32,
-        should_filter_decoys: bool,
     },
     TransactionHistory {
         page: Option<u32>,
         page_size: u32,
-        should_filter_decoys: bool,
     },
 }
 
@@ -607,12 +612,8 @@ pub enum QueryAnswer {
     Balance {
         amount: Uint128,
     },
-    TransferHistory {
-        txs: Vec<Tx>,
-        total: Option<u64>,
-    },
     TransactionHistory {
-        txs: Vec<ExtendedTx>,
+        txs: Vec<Tx>,
         total: Option<u64>,
     },
     ViewingKeyError {
@@ -621,6 +622,20 @@ pub enum QueryAnswer {
     Minters {
         minters: Vec<Addr>,
     },
+
+    #[cfg(feature = "gas_tracking")]
+    Dwb {
+        dwb: String,
+    },
+}
+
+#[derive(Serialize, Deserialize, JsonSchema, Clone, Debug)]
+#[serde(rename_all = "snake_case")]
+pub struct AllowanceAction {
+    pub spender: String,
+    pub amount: Uint128,
+    pub expiration: Option<u64>,
+    pub memo: Option<String>,
 }
 
 #[derive(Serialize, Deserialize, JsonSchema, Clone, Debug)]

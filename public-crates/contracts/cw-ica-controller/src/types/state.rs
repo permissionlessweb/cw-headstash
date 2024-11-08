@@ -6,6 +6,9 @@ use cw_storage_plus::Item;
 
 use super::{msg::options::ChannelOpenInitOptions, ContractError};
 
+/// upload wasm submessage eply id 
+pub const UPLOAD_REPLY_ID: u64 = 710;
+
 #[allow(clippy::module_name_repetitions)]
 pub use channel::{ChannelState, ChannelStatus};
 #[allow(clippy::module_name_repetitions)]
@@ -34,6 +37,9 @@ pub const ALLOW_CHANNEL_CLOSE_INIT: Item<bool> = Item::new("allow_channel_close_
 /// This is used to ensure that the correct sequence is recorded for the response.
 #[cfg(feature = "query")]
 pub const QUERY: Item<Vec<(String, bool)>> = Item::new("pending_query");
+
+/// Contract address of cw-glob
+pub const CW_GLOB: Item<Addr> = Item::new("glob");
 
 /// `PENDING_QUERIES` is the map of pending queries.
 /// It maps `channel_id`, and sequence to the query path.
@@ -64,9 +70,7 @@ mod contract {
     impl State {
         /// Creates a new [`State`]
         #[must_use]
-        pub const fn new(
-            callback_address: Option<Addr>,
-        ) -> Self {
+        pub const fn new(callback_address: Option<Addr>) -> Self {
             Self {
                 ica_info: None,
                 // We always allow the first `MsgChannelOpenInit` message.

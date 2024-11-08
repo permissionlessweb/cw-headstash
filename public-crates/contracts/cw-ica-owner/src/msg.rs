@@ -3,13 +3,17 @@ use cw_ica_controller::{
     helpers::ica_callback_execute, types::msg::options::ChannelOpenInitOptions,
 };
 
-use crate::state::headstash::{Headstash, HeadstashParams, HeadstashTokenParams};
+use crate::state::headstash::{Headstash, HeadstashParams};
 
 #[cw_serde]
 pub struct InstantiateMsg {
+    /// Owner of this contract, and any ICA account created by this contract.
     pub owner: Option<String>,
+    /// Eligible address able to authorize feegrants on behalf of the ICA.
     pub feegranter: Option<String>,
+    /// Code-id off the cw-ica-controller contract
     pub ica_controller_code_id: u64,
+    /// Parameters for the cw-headstash contract
     pub headstash_params: HeadstashParams,
 }
 
@@ -20,7 +24,10 @@ pub enum ExecuteMsg {
     CreateIcaContract {
         salt: Option<String>,
         channel_open_init_options: ChannelOpenInitOptions,
-        headstash_params: HeadstashParams,
+        /// If none is set, loads headstash params from contract state.
+        headstash_params: Option<HeadstashParams>,
+        /// Contract addr of cw-glob
+        cw_glob: String,
     },
     /// 1. Upload the following contracts:
     /// a. Headstash
@@ -32,38 +39,42 @@ pub enum ExecuteMsg {
         /// The wasm blob name to upload
         wasm: String,
     },
-    // /// 2. Instantiates the secret headstash contract on Secret Network.
-    // InitHeadstash {
-    //     /// The ICA ID.
-    //     ica_id: u64,
-    //     /// Timestamp seconds of when headstash can begin
-    //     start_date: u64,
-    // },
-    // /// 3. Instantiate a snip120u contract for every token defined in tokens.
-    // InitSnip120u {
-    //     /// The ICA ID.
-    //     ica_id: u64,
-    //     /// Tokens to have their snip120u contract created
-    //     tokens: Vec<HeadstashTokenParams>,
-    // },
+    /// 2. Instantiate a snip120u contract for every token defined in tokens.
+    InitSnip120u {
+        /// The ICA ID.
+        ica_id: u64,
+    },
+    // /// 3. Instantiates the secret headstash contract on Secret Network.
+    InitHeadstash {
+        /// The ICA ID.
+        ica_id: u64,
+        // /// Timestamp seconds of when headstash can begin
+        // start_date: u64,
+    },
     // /// 4. Authorized the headstash contract as a minter for both snip120u contracts.
-    // AuthorizeMinter { ica_id: u64 },
-    // /// 5. Create Secret Headstash Circuitboard
-    // InitHeadstashCircuitboard { ica_id: u64 },
-    // /// 6. Transfer each token included in msg over via ics20.
-    // IBCTransferTokens { ica_id: u64, channel_id: String },
+    AuthorizeMinter {
+        ica_id: u64,
+    },
+    // /// . Transfer each token included in msg over via ics20.
+    IBCTransferTokens {
+        ica_id: u64,
+        channel_id: String,
+    },
     // /// 8. Add Eligible Addresses To Headstash
-    // AddHeadstashClaimers { ica_id: u64, to_add: Vec<Headstash> },
+    AddHeadstashClaimers {
+        ica_id: u64,
+        to_add: Vec<Headstash>,
+    },
     // /// 9. Authorize secret network wallet with feegrant
-    // AuthorizeFeegrant {
-    //     ica_id: u64,
-    //     to_grant: Vec<String>,
-    //     owner: Option<String>,
-    // },
+    AuthorizeFeegrant {
+        ica_id: u64,
+        to_grant: Vec<String>,
+        owner: Option<String>,
+    },
 }
 #[cw_serde]
 pub enum SudoMsg {
-    HandleIbcBloom {}
+    HandleIbcBloom {},
 }
 
 #[cw_ownable::cw_ownable_query]
@@ -84,6 +95,7 @@ pub enum QueryMsg {
 #[cw_serde]
 pub enum HeadstashCallback {
     UploadHeadstash,
+    UploadSnip120u,
     InstantiateHeadstash,
     InstantiateSnip120us,
     SetHeadstashAsSnipMinter,
@@ -96,6 +108,7 @@ impl From<HeadstashCallback> for String {
     fn from(callback: HeadstashCallback) -> Self {
         match callback {
             HeadstashCallback::UploadHeadstash => "upload_headstash".to_string(),
+            HeadstashCallback::UploadSnip120u => "upload_snip120u".to_string(),
             HeadstashCallback::InstantiateHeadstash => "instantiate_headstash".to_string(),
             HeadstashCallback::InstantiateSnip120us => "instantiate_snip120us".to_string(),
             HeadstashCallback::SetHeadstashAsSnipMinter => {
@@ -112,6 +125,7 @@ impl From<String> for HeadstashCallback {
     fn from(s: String) -> Self {
         match s.as_str() {
             "upload_headstash" => HeadstashCallback::UploadHeadstash,
+            "upload_snip120u" => HeadstashCallback::UploadSnip120u,
             "instantiate_headstash" => HeadstashCallback::InstantiateHeadstash,
             "instantiate_snip120us" => HeadstashCallback::InstantiateSnip120us,
             "set_headstash_as_snip_minter" => HeadstashCallback::SetHeadstashAsSnipMinter,
