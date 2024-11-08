@@ -9,11 +9,10 @@ pub use ica::{IcaContractState, IcaState};
 /// upload wasm submessage eply id
 pub const UPLOAD_REPLY_ID: u64 = 710;
 
-
 /// The Map used to determine how to handle ica-callbacks.
 /// key: snip120u = first action to take. if false, all other prefixes should fail
 /// key: cw-headstash = second action to take. if false, cannot init snips.
-/// key: snip120u-init-(len()) = third action to take. if false, cannot init headstash. 
+/// key: snip120u-init-(len()) = third action to take. if false, cannot init headstash.
 ///      key defined with enumerated object position for each snip.
 /// key: cw-headstash-init = fourth action to take.
 pub const DEPLOYMENT_SEQUENCE: Map<String, bool> = Map::new("uploaded");
@@ -28,8 +27,6 @@ pub const HEADSTASH_STATES: Map<u64, HeadstashParams> = Map::new("hsp");
 pub const ICA_COUNT: Item<u64> = Item::new("ica");
 /// The item used to map contract addresses to ICA IDs.
 pub const CONTRACT_ADDR_TO_ICA_ID: Map<Addr, u64> = Map::new("catia");
-/// The item used to store the stat of the snip120u contracts created
-pub const SNIP120U_CONTRACTS: Item<Vec<Addr>> = Item::new("snip");
 
 pub const CLOCK_INTERVAL: Item<u64> = Item::new("tictoc");
 
@@ -211,8 +208,8 @@ pub mod headstash {
         pub headstash_code_id: Option<u64>,
         /// The code hash of the snip120u contract, on Secret Network.
         // pub headstash_code_hash: Option<String>,
-        /// The code hash of the snip120u contract, on Secret Network.
-        pub snip120u_code_hash: Option<String>,
+        /// The code hash of the snip120u contract, on Secret Network. Not optional for pre-deployment verification
+        pub snip120u_code_hash: String,
         /// Params defined by deployer for tokens included.
         pub token_params: Vec<HeadstashTokenParams>,
         /// Headstash contract address this contract is admin of.
@@ -233,7 +230,7 @@ pub mod headstash {
             cw_glob: String,
             snip120u_code_id: Option<u64>,
             headstash_code_id: Option<u64>,
-            snip120u_code_hash: Option<String>,
+            snip120u_code_hash: String,
             token_params: Vec<HeadstashTokenParams>,
             headstash_addr: Option<String>,
             fee_granter: Option<String>,
