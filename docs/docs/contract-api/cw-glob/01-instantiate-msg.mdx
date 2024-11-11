@@ -9,13 +9,6 @@ slug: /contract-api/cw-glob/instantiate-msg
 
 The `InstantiateMsg` is the message that is used to instantiate the `cw-glob` contract.
 
-```rust reference
-https://github.com/srdtrk/cw-ica-controller/blob/v0.4.0/src/types/msg.rs#L8-L21
-```
-
-## Fields
-
-### `owners`
-
-This contract has a list of owners who is allowed to call the `ExecuteMsg` methods.
-If left empty, the owner is set to the sender of the `InstantiateMsg`.
+InstantiateMsg  | Description | Type |
+--- | --- | --- | 
+`owners` | The optional list of owners who is allowed to call the `ExecuteMsg` methods.If left empty, the owner is set to the sender of the `InstantiateMsg`.  | Array of String

@@ -1,0 +1,33 @@
+---
+title: Headstash Workflow
+sidebar_label: Headstash Workflow
+sidebar_position: 4
+slug: /how-it-works/headstash-workflow
+---
+
+
+
+
+## Headstash LifeCycle
+
+### A. Connect Eligible Wallet
+
+Any Ethereum or Solana address is able to be considered eligible for headstashes. Claimers will choose between the two wallet types to connect, and will automatically generate a prompt specific to if they are eligible.
+
+### B. Generate Throwaway Wallet
+
+If an account is eligible, the next prompts ask the account owner to confirm the throwaway wallet to use to claim their headstash, before verifying their ownership.
+
+### C. Verify Ownership
+
+Once the throwaway wallet is generated and confirmed, a prompt to generate a signature using either Metamask or Phantom wallet occurs.
+
+### D. Register For FeeGrant
+
+Feegrants can be requested only be eligible claimers, and requires providing the signature to an external API, to verify a wallet can request a feegrant. To minimize the chance of leaking the signature to the public, we include ecies encryption via the ecies-wasm package.
+
+### E. Claim Headstash
+
+Now, thats left to do is claim a headstash by broadcasting the msg to claim, with the throwaway wallet, while having this tx covered if the feegrant was needed/registered.
+
+### F. Privately IBC Transfer tokens back to Terp Network

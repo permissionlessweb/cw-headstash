@@ -7,39 +7,34 @@ slug: /contract-api/cw-headstash/instantiate-msg
 
 # `InstantiateMsg`
 
-The `InstantiateMsg` is the message that is used to instantiate the `cw-glob` contract.
-
-```rust reference
-https://github.com/srdtrk/cw-ica-controller/blob/v0.4.0/src/types/msg.rs#L8-L21
-```
-
+The `InstantiateMsg` is the message that is used to instantiate the `cw-headstash` contract.
 ## Fields
 
 InstantiateMsg  | Description | Type |
 --- | --- | --- | 
-`owner` | Owner of the contract | String |
-`claim_msg_plaintext` | The value that is used signed to generate the offline signature. | String |
-`start_date` | optional date that once reached, will start headstash distribution event. | Option<u64> |
-`end_date` | optional date that once reached, will end headstash distribution event. | Option<u64> |
-`snip120u_code_hash` | code hash of custom snip20 contract for headstashes. | String |
-`snips` | A list of custom snip20-headstash contracts. | Vec<Snip120u> |
-`multiplier` | Option to enable contract to add multiplier on allocations when claiming. currently 1.33x. | boolean |
-`viewing_key` | viewing key permit. | String |
-`bloom_config` | viewing key permit. | Option<BloomConfig> |
+| `owner` | Owner of the contract | `String` |
+`claim_msg_plaintext` | The value that is used signed to generate the offline signature. | `String` |
+`start_date` | optional date that once reached, will start headstash distribution event. | Optional `u64` |
+`end_date` | optional date that once reached, will end headstash distribution event. | Optional `u64` |
+`snip120u_code_hash` | code hash of custom snip20 contract for headstashes. | `String` |
+`snips` | A list of custom snip20-headstash contracts. | Array of `Snip120u`|
+`multiplier` | Option to enable contract to add multiplier on allocations when claiming. currently 1.33x. | `boolean` |
+`viewing_key` | viewing key permit. | `String` |
+`bloom_config` | viewing key permit. | Optional `BloomConfig`  |
 
 
 ### `Snip120u`
 
-BloomConfig  | Description | Type |
+Snip120u  | Description | Type |
 --- | --- | --- | 
-`native_token` | native x/bank token denomination for this snip120u | String |
-`addr` | smart contract addr of snip120u | Addr |
-`total_amount` | total amount of this to be distributed during this headstash | Uint128 |
+`native_token` | native x/bank token denomination for this snip120u | `String` |
+`addr` | smart contract addr of snip120u | `Addr` |
+`total_amount` | total amount of this to be distributed during this headstash | `Uint128` |
 
 ### `BloomConfig`
 
 BloomConfig  | Description | Type |
 --- | --- | --- | 
-`native_token` | native x/bank token denomination for this snip120u | String |
-`min_cadance` | minimum cadance that can be set before messages are eligible for mempool. if 0, default_cadance is set. | u64 |
-`max_granularity` | maximum number of transactions a bloom msg will process | u64 |
+`native_token` | native x/bank token denomination for this snip120u | `String` |
+`min_cadance` | minimum cadance that can be set before messages are eligible for mempool. if 0, default_cadance is set. | `u64` |
+`max_granularity` | maximum number of transactions a bloom msg will process | `u64` |

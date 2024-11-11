@@ -12,8 +12,9 @@ understand the state of the contract.
 
 ## `GlobHash`
 
-```rust reference
-https://github.com/srdtrk/cw-ica-controller/blob/v0.4.0/src/types/msg.rs#L103-L105
-```
+Retrieves the sha256sum hash of the stored globs.
 
-This message is used to query the sha256sum of a stored wasm blob.
+HashGlob  | Description | Type |
+--- | --- | --- | 
+`keys` | array of storage keys associated to blob stored internally  | Array of String
+

@@ -1,22 +1,22 @@
-import { themes as prismThemes } from 'prism-react-renderer';
-import type { Config } from '@docusaurus/types';
+import {themes as prismThemes} from 'prism-react-renderer';
+import type {Config} from '@docusaurus/types';
 import type * as Preset from '@docusaurus/preset-classic';
 
 const config: Config = {
-  title: 'CosmWasm Interchain Accounts Controller',
-  tagline: 'A pure CosmWasm implementation of ICS-27.',
+  title: 'The Headstash Contracts',
+  tagline: 'A transparency minimizing, multi-chain airdrop protocol.',
   favicon: 'img/logo.svg',
 
   // Set the production url of your site here
-  url: 'https://srdtrk.github.io',
+  url: 'https://permissionlessweb.github.io',
   // Set the /<baseUrl>/ pathname under which your site is served
   // For GitHub pages deployment, it is often '/<projectName>/'
-  baseUrl: '/cw-ica-controller/',
+  baseUrl: '/cw-headstash/',
 
   // GitHub pages deployment config.
   // If you aren't using GitHub pages, you don't need these.
-  organizationName: 'srdtrk', // Usually your GitHub org/user name.
-  projectName: 'cw-ica-controller', // Usually your repo name.
+  organizationName: 'permissionlessweb', // Usually your GitHub org/user name.
+  projectName: 'cw-headstash', // Usually your repo name.
 
   onBrokenLinks: 'throw',
   onBrokenMarkdownLinks: 'warn',
@@ -38,32 +38,20 @@ const config: Config = {
           // Please change this to your repo.
           // Remove this to remove the "edit this page" links.
           editUrl:
-            'https://github.com/permissionlessweb/cw-headstash/tree/main/docs',
+            'https://github.com/permissionlessweb/cw-headstash/tree/feat/docusaurus-docs/docs',
           // Routed the docs to the root path
           routeBasePath: "/",
           sidebarCollapsed: false,
           // Select the latest version
-          lastVersion: "v0.0.1",
+          lastVersion: "current",
           versions: {
             current: {
               label: 'main',
               path: 'main',
               banner: 'unreleased',
-            }
-            // "v0.20.x": {
-            //   label: 'v0.20.x',
-            //   path: 'v0.20',
-            // },
-            // "v0.6.x": {
-            //   label: 'v0.6.x',
-            //   path: 'v0.6',
-            // },
-            // "v0.5.x": {
-            //   label: 'v0.5.x',
-            //   path: 'v0.5',
-            // },
+            },
             // "v0.4.x": {
-            //   label: 'v0.4.x',
+            //   label: 'v0.4',
             //   path: 'v0.4',
             // },
           },
@@ -94,9 +82,9 @@ const config: Config = {
 
   themeConfig: {
     // Replace with your project's social card
-    image: 'https://opengraph.githubassets.com/946cd03a2431502cb8cdbb579ca48c56e2c4060ca5ff0b25e13739f3fc08b512/srdtrk/cw-ica-controller',
+    image: 'https://opengraph.githubassets.com/946cd03a2431502cb8cdbb579ca48c56e2c4060ca5ff0b25e13739f3fc08b512/permissionlessweb/cw-headstash',
     navbar: {
-      title: 'cw-headstash',
+      title: 'The Headstash Contracts',
       logo: {
         alt: 'Logo',
         src: 'img/logo.svg',
@@ -150,7 +138,7 @@ const config: Config = {
           items: [
             {
               label: 'GitHub',
-              href: 'https://github.com/terpnetwork',
+              href: 'https://github.com/permissionlessweb/cw-headstash',
             },
           ],
         },
@@ -166,10 +154,10 @@ const config: Config = {
     },
     // github codeblock theme configuration
     codeblock: {
-      showGithubLink: true,
-      githubLinkLabel: 'View on GitHub',
-      showRunmeLink: false,
-      runmeLinkLabel: 'Checkout via Runme'
+        showGithubLink: true,
+        githubLinkLabel: 'View on GitHub',
+        showRunmeLink: false,
+        runmeLinkLabel: 'Checkout via Runme'
     },
   } satisfies Preset.ThemeConfig,
   plugins: [

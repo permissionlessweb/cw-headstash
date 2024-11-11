@@ -21,7 +21,7 @@ The CosmWasm ICA Controller is a CosmWasm contract that implements the ICS-27 in
 pure Rust. It is designed to be used by other CosmWasm contracts to create and manage interchain accounts on
 the chain where the contract is deployed.
 
-The Headstash Contract is also a Cosmwasm contract, that faciliates the registration & authentication of various cryptographic
+The Headstash Contract is also a Cosmwasm contract, that faciliates the registration and authentication of various cryptographic
 signatures, for the purpose of  newly minted (or existing) tokens. 
 
 ## High Level Overview
@@ -51,7 +51,38 @@ makes a callback to the callback contract if one was provided during instantiati
 
 The following diagram shows how `cw-headstash` is deployed at a high level.
 
-![High Level Overview](/img/cw-headstash.svg)
+![High Level Overview](/img/cw-headstash.jpg)
 
-The `cw-ica-owner` & `cw-glob` contracts are also deployed on a chain that supports IBC CosmWasm. These contracts allow this 
-chain to deploy the `cw-headstash` and `snip120u` via the ICS-27 handshake.
+The `cw-ica-owner` and `cw-glob` contracts are also deployed on a chain that supports IBC CosmWasm. These contracts allow this 
+chain to deploy the `cw-headstash` and `snip120u` via the ICS-27 handshake. There are 3 main components of the headstash application stack:
+
+- **Smart Contracts**: Two main contracts are used for headstashes: a custom snip20 implementation, and the airdrop distribution contract.
+- **Web Application**: A website that allows users to claim and manage headstashes.
+- **FeeGrant API**: An API that allows users to register & bypass fees.
+
+## Privacy And Verification
+
+Each headstash instance starts with a public distribution list. Ethereum or Solana wallets can have a list of snip20 tokens they are eligible for. In order for these eligible wallet to claim their allocation, an offline signature generated from these eligible wallets is required to be provided when claiming the tokens. This signature is expected to **have been generated with the content that was signed to include the public wallet address that is claiming the headstash** .
+
+This requirement is how the smart contract is able to verify the ownership of an account when claiming, as the signature will get deconstructed, and assert that the address that is claiming matches the address that was signed to generate the offline signature. This method has been chosen to allow eligible headstashers to decide which wallet to use to claim.
+
+### Secret Networks CosmwasmVM TEE
+
+The entire security design of the headstash contract relies on the integrity of Secret Networks secure enclave model for cosmwasm contract read & writes. The public signatures hashes containing the wallet that is to remain private is sent to the contract for verification. In the standard CosmwasmVM, retaining privacy of this would not be possible.
+
+### Ephemeral Wallet Use
+
+A major feature of the Web-App is the generation of ephemeral wallets for use of claimng an allocation.
+
+ <!-- - describe how these help mitigate associating eligible wallets with claiming wallets  -->
+ <!-- - describe how these are generated and stored locally  -->
+
+
+### Encrypted FeeGrant API
+
+Generated ephemeral wallets will not be able to cover gas cost when initially created. The FeeGrant API will be able to authorize itself to cover gas cost for ephemeral wallets.
+<!-- - describe why we want to encrypt/decrypt signature being passed to API -->
+
+## Headstash Dashboard
+
+Headstash Dashboard is an entry point for new users into the Cosmos Ecosystem. Features include a Dashboard UI to claim a headstash distribution they are eligible for, IBC Transfer to and from Secret, a Wrap/Unwrap interface, a list of all active Secret dApps, a link collection to useful secret tools and more.

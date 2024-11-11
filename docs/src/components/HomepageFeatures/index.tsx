@@ -26,22 +26,20 @@ const FeatureList: FeatureItem[] = [
     ),
   },
   {
-    title: 'Universal CosmWasm Support',
+    title: 'Fully On-Chain Deployment Workflow',
     Svg: UniversalSupportSvg,
     description: (
       <>
-        CosmWasm ICA Controller can be deployed on all IBC enabled CosmWasm chains. There is no need
-        for custom chain bindings or even the interchain accounts module.
+       The entire framework is able to be deployed via the unique IBC path the ICA makes use of. This allows for protocol level consensus for deployment and configuration of the headstash contracts.
       </>
     ),
   },
   {
-    title: 'Focus on What Matters',
+    title: 'Retain Privacy While Redeeming',
     Svg: FocusSvg,
     description: (
       <>
-        CosmWasm ICA Controller lets you focus on your application, and we&apos;ll do the IBC chores
-        in the background. Go ahead and build your cross-chain application.
+      An optional feature we call Bloom, allows headstash claimee's to reddeem and transfer their new allocations, in such a way that retains the privacy design of Secret Networks Private Compute Enclave.
       </>
     ),
   },
