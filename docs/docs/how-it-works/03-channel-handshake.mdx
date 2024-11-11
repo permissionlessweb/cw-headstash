@@ -36,8 +36,8 @@ In the case of `cw-ica-controller`, only the contract itself can send a channel 
 `MsgChannelOpenInit` is not passed to the contract (or any other IBC module), we enforce this by having a [state
 variable](https://github.com/srdtrk/cw-ica-controller/blob/v0.4.2/src/types/state.rs#L41) that keeps track of whether
 or not to accept channel open init messages. This variable is only set to true by the contract itself right before
-it is about to send a channel open init message in [`InstantiateMsg`](../contract-api/01-instantiate-msg.mdx) or
-[`ExecuteMsg::CreateChannel`](../contract-api/02-execute-msg.mdx#createchannel).
+it is about to send a channel open init message in [`InstantiateMsg`](../contract-api/cw-ica-controller/01-instantiate-msg.mdx) or
+[`ExecuteMsg::CreateChannel`](../contract-api/cw-ica-controller/02-execute-msg.mdx#createchannel).
 
 ```rust reference
 https://github.com/srdtrk/cw-ica-controller/blob/v0.4.2/src/contract.rs#L130-L133
@@ -60,7 +60,7 @@ https://github.com/srdtrk/cw-ica-controller/blob/v0.4.2/src/ibc/types/metadata.r
 ```
 
 Since it is the contract itself that submits the `MsgChannelOpenInit`, the contract constructs the version string
-based on the `channel_open_init_options` that are passed to it in [`InstantiateMsg`](../contract-api/01-instantiate-msg.mdx) or [`ExecuteMsg::CreateChannel`](../contract-api/02-execute-msg.mdx#createchannel).
+based on the `channel_open_init_options` that are passed to it in [`InstantiateMsg`](../contract-api/cw-ica-controller/01-instantiate-msg.mdx) or [`ExecuteMsg::CreateChannel`](../contract-api/cw-ica-controller/02-execute-msg.mdx#createchannel).
 
 ```rust reference
 https://github.com/srdtrk/cw-ica-controller/blob/main/src/ibc/types/stargate.rs#L25-L57
