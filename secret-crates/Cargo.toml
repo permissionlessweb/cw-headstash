@@ -1,8 +1,6 @@
 [workspace]
 resolver = "2"
 members = [
-
-  # Secret Headstash Contract
   "contracts/headstash",
   "contracts/snip120u",
   # "scripts",

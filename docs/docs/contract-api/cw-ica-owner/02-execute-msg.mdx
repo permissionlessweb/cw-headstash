@@ -1,0 +1,82 @@
+---
+title: ExecuteMsg
+sidebar_label: ExecuteMsg
+sidebar_position: 2
+slug: /contract-api/cw-ica-owner/execute-msg
+---
+
+# `ExecuteMsg`
+
+The `ExecuteMsg` is the message that is used to interact with the `cw-ica-controller` contract.
+**All execute messages are only callable by the owner of the contract.**
+
+## `CreateIcaContract`
+
+CreateIcaContract  | Description | Type |
+--- | --- | --- | 
+`salt` | random value used to instantiate a predictable address for the ica-controller | Optional `String` |
+`channel_open_init_options` | Eligible address able to authorize feegrants on behalf of the ICA. | `ChannelOpenInitOptions` |
+`headstash_params` | Parameters for the cw-headstash contract | [`HeadstashParams`](../cw-ica-owner/instantiate-msg#headstashparams)|
+
+### `ChannelOpenInitOptions`
+ChannelOpenInitOptions  | Description | Type |
+--- | --- | --- | 
+`connection_id` |  The connection id on this chain. | `String` |
+`counterparty_connection_id` |  The counterparty connection id on the counterparty chain. | `String` |
+`counterparty_port_id` | The counterparty port id. If not specified, [`crate::ibc::types::keys::HOST_PORT_ID`] is used.| Optional `String` |
+`channel_ordering` |  The order of the channel. If not specified, [`IbcOrder::Ordered`] is used.| Optional `IbcOrder` |
+`channel_open_init_options` | Eligible address able to authorize feegrants on behalf of the ICA. | `ChannelOpenInitOptions` |
+`headstash_params` | Parameters for the cw-headstash contract | [`HeadstashParams`](../cw-ica-owner/instantiate-msg#headstashparams)|
+
+## `SetCwGlob`
+
+SetCwGlob  | Description | Type |
+--- | --- | --- | 
+`cw_glob` | the contract address of cw-glob | `String` |
+
+
+
+## `UploadContractOnSecret`
+
+UploadContractOnSecret  | Description | Type |
+--- | --- | --- | 
+`cw_glob` |  Optional contract address of the cw-blob.  | Optional `String` |
+`ica_id` | The ICA ID. | `u64` |
+`wasm` | the storage key used to reference the wasm blob | `u64` |
+
+
+## `InitSnip120u`
+
+InitSnip120u  | Description | Type |
+--- | --- | --- | 
+`ica_id` | The ICA ID. | `u64` |
+
+## `InitHeadstash`
+InitHeadstash | Description | Type |
+--- | --- | --- | 
+`ica_id` | The ICA ID. | `u64` |
+
+
+## `AuthorizeMinter`
+AuthorizeMinter | Description | Type |
+--- | --- | --- | 
+`ica_id` |  The ICA ID. | `u64` |
+
+## `IBCTransferTokens`
+IBCTransferTokens | Description | Type |
+--- | --- | --- | 
+`ica_id` | The ICA ID. | `u64` |
+`channel_id` | the channel id used to IBC Transfer the tokens from   | `String` |
+
+## `AddHeadstashClaimers`
+AddHeadstashClaimers | Description | Type |
+--- | --- | --- | 
+`ica_id` | The ICA ID.  | `u64` |
+`to_add` | A list of eligible address and the allocations | Array of `Headstash` |
+
+## `AuthorizeFeegrant`
+AuthorizeFeegrant | Description | Type |
+--- | --- | --- | 
+`ica_id` |  The ICA ID. | `u64` |
+`to_grant` |  List of addresses to receive a feegrant from the ICA | Array of `String` |
+`owner` |  | Optional `String`  |

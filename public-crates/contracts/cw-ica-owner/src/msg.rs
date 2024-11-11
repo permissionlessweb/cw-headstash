@@ -26,7 +26,9 @@ pub enum ExecuteMsg {
         channel_open_init_options: ChannelOpenInitOptions,
         /// If none is set, loads headstash params from contract state.
         headstash_params: Option<HeadstashParams>,
-        /// Contract addr of cw-glob
+    },
+    SetCwGlob{
+        /// The storage key set in cw-glob. defaults enabled are either `snip120u` or `cw-headstash`
         cw_glob: String,
     },
     /// 1. Upload the following contracts:
@@ -34,6 +36,8 @@ pub enum ExecuteMsg {
     /// b. Snip120u
     /// c. Headstash Circuitboard
     UploadContractOnSecret {
+        /// Optional contract address of the cw-blob. 
+        cw_glob: Option<String>,
         /// The ICA ID.
         ica_id: u64,
         /// The wasm blob name to upload

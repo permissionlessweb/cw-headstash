@@ -3,7 +3,7 @@
 //! This module defines the messages that this contract receives.
 
 use cosmwasm_schema::{cw_serde, QueryResponses};
-use cosmwasm_std::CosmosMsg;
+use cosmwasm_std::{Addr, CosmosMsg};
 
 /// The message to instantiate the ICA controller contract.
 #[cw_serde]
@@ -18,8 +18,6 @@ pub struct InstantiateMsg {
     /// If not specified, then no callbacks are sent.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub send_callbacks_to: Option<String>,
-    ///
-    pub cw_glob: String,
 }
 
 /// The messages to execute the ICA controller contract.
@@ -65,11 +63,18 @@ pub enum ExecuteMsg {
         #[serde(skip_serializing_if = "Option::is_none")]
         timeout_seconds: Option<u64>,
     },
+    /// Sets the cw-glob contract addr to state
+    SetGlob {
+        /// contract address
+        cw_glob: String,
+    },
     /// Custom message that will grab wasm blob from cw-glob, upload via ibc.
     SendUploadMsg {
-        /// The stargate messages to convert and send to the ICA host.
+        /// The address of the cw-glob.
+        cw_glob: Option<Addr>,
+        /// The key for cw-glob to retrive a wasm blob
         #[serde_as(deserialize_as = "serde_with::DefaultOnNull")]
-        wasm: String,
+        glob_key: String,
         /// Optional memo to include in the ibc packet.
         #[serde(skip_serializing_if = "Option::is_none")]
         packet_memo: Option<String>,

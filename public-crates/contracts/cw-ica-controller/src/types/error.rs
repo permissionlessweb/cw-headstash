@@ -115,6 +115,9 @@ pub enum ContractError {
     #[error("InvalidEvent")]
     InvalidEvent {},
 
-    #[error("SubMsgError")]
-    SubMsgError {},
+    #[error("submessage error : {0}")]
+    SubMsgError(String),
+
+    #[error("GlobAlreadySet")]
+    GlobAlreadySet {},
 }

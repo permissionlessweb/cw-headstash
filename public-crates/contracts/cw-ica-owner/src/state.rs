@@ -197,17 +197,16 @@ pub mod headstash {
         /// Total amount for specific snip
         pub total: Uint128,
     }
+    
     /// Params for Headstash
     #[cw_serde]
     pub struct HeadstashParams {
         /// The contract addr for cw-glob on the native chain.
-        pub cw_glob: String,
+        pub cw_glob: Option<Addr>,
         /// The code ID of the snip120u contract, on Secret Network.
         pub snip120u_code_id: Option<u64>,
         /// Code id of Headstash contract on Secret Network
         pub headstash_code_id: Option<u64>,
-        /// The code hash of the snip120u contract, on Secret Network.
-        // pub headstash_code_hash: Option<String>,
         /// The code hash of the snip120u contract, on Secret Network. Not optional for pre-deployment verification
         pub snip120u_code_hash: String,
         /// Params defined by deployer for tokens included.
@@ -220,14 +219,14 @@ pub mod headstash {
         pub fee_granter: Option<String>,
         /// Enables reward multiplier for cw-headstash
         pub multiplier: bool,
-
+        /// bloom config
         pub bloom_config: Option<BloomConfig>,
     }
 
     impl HeadstashParams {
         /// creates new headstash param instance
         pub fn new(
-            cw_glob: String,
+            cw_glob: Option<Addr>,
             snip120u_code_id: Option<u64>,
             headstash_code_id: Option<u64>,
             snip120u_code_hash: String,

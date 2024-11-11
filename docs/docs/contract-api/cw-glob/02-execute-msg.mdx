@@ -1,0 +1,43 @@
+---
+title: ExecuteMsg
+sidebar_label: ExecuteMsg
+sidebar_position: 2
+slug: /contract-api/cw-glob/execute-msg
+---
+
+# `ExecuteMsg`
+
+The `ExecuteMsg` is the message that is used to interact with the `cw-glob` contract.
+**All execute messages are only callable by the owner of the contract.**
+
+## `AddGlob`
+
+AddGlob  | Description | Type |
+--- | --- | --- | 
+`globs` | array of storage keys and the wasm binary associated with the storage key  | Array of 	`Glob`
+
+### `Glob`
+Glob  | Description | Type |
+--- | --- | --- | 
+`key` | array of storage keys and the wasm binary associated with the storage key  | String
+`blob` | Wasm blob binary  | Binary
+
+
+## `HashGlob`
+This message is used to generate the sha256sum of a wasm blob stored inside the contract state. It is only callable by the owner.
+
+HashGlob  | Description | Type |
+--- | --- | --- | 
+`keys` | array of storage keys associated to blob stored internally  | Array of String
+
+
+## `TakeGlob`
+
+This will retrieve a stored wasm blob. It is only callable by one of the owners.
+
+TakeGlob  | Description | Type |
+--- | --- | --- | 
+`sender` | Address to include in the CosmosMsg with the wasm blob. For cw-headstash, this will be the ica account on the host chain. | String
+`key` | The wasm blob key to upload.  | String
+`memo` | Optional memo to pass in ica-account  | Optional String
+`timeout` | Optional timeout in seconds to include with the ibc packet. | Optional u64

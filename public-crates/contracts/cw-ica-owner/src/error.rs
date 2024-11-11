@@ -15,9 +15,9 @@ pub enum ContractError {
 
     #[error("error : {0}")]
     CwIcaControllerError(#[from] CwIcaControllerError),
-
-    #[error("SubMsgError")]
-    SubMsgError {},
+    
+    #[error("submessage error cw-ica-owner : {0}")]
+    SubMsgError(String),
 
     #[error("no coin sent matches the expected coins to be sent")]
     NoCoinSentMatchesHeadstashParams {},
@@ -92,4 +92,7 @@ pub enum ContractError {
     
     #[error("BadReply")]
     BadReply {},
+    
+    #[error("CwGlobExists")]
+    CwGlobExists {},
 }

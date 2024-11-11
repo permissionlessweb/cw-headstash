@@ -324,10 +324,6 @@ pub mod bloom {
         pub min_cadance: u64,
         /// maximum number of transactions a bloom msg will process  
         pub max_granularity: u64,
-        // if enabled, randomness seed is used to add random value to cadance.
-        // pub random_cadance: bool,
-        // /// if enabled, decoy messages are included in batches to create noise
-        // pub decoys: bool,
     }
 
     #[derive(Serialize, Deserialize, Clone, Debug, Eq, PartialEq, JsonSchema)]
@@ -373,7 +369,6 @@ pub mod snip {
     pub struct Snip120u {
         /// native x/bank token denomination for this snip120u
         pub native_token: String,
-        // pub name: String,
         /// smart contract addr of snip120u
         pub addr: Addr,
         // total amount of this to be distributed during this headstash
