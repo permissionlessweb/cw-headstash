@@ -37,7 +37,6 @@ pub fn instantiate(
     info: MessageInfo,
     msg: InstantiateMsg,
 ) -> Result<Response, ContractError> {
-    // println!("ADMIN: {:#?}", info.sender);
     cw_ownable::initialize_owner(
         deps.storage,
         deps.api,
@@ -108,7 +107,6 @@ pub fn execute(
             salt,
             channel_open_init_options,
             headstash_params,
-            cw_glob,
         } => headstash::create_ica_contract(
             deps,
             env,
@@ -116,11 +114,13 @@ pub fn execute(
             salt,
             channel_open_init_options,
             headstash_params,
-            cw_glob,
         ),
-        ExecuteMsg::UploadContractOnSecret { ica_id, wasm } => {
-            upload::ica_upload_contract_on_secret(deps, info, ica_id, wasm)
-        }
+        ExecuteMsg::SetCwGlob { cw_glob } => upload::set_cw_glob(deps, cw_glob),
+        ExecuteMsg::UploadContractOnSecret {
+            ica_id,
+            wasm,
+            cw_glob,
+        } => upload::ica_upload_contract_on_secret(deps, info, ica_id, wasm, cw_glob),
         ExecuteMsg::ReceiveIcaCallback(callback_msg) => {
             ica::ica_callback_handler(deps, info, callback_msg)
         }
@@ -166,7 +166,7 @@ pub fn reply(_deps: DepsMut, _env: Env, reply: Reply) -> Result<Response, Contra
         cosmwasm_std::SubMsgResult::Ok(_res) => match reply.id {
             _ => return Err(ContractError::BadReply {}),
         },
-        cosmwasm_std::SubMsgResult::Err(_) => return Err(ContractError::SubMsgError {}),
+        cosmwasm_std::SubMsgResult::Err(a) => return Err(ContractError::SubMsgError(a)),
     }
 }
 
@@ -207,17 +207,39 @@ pub mod upload {
         .into())
     }
 
+    pub fn set_cw_glob(deps: DepsMut, cw_glob: String) -> Result<Response, ContractError> {
+        STATE.update(deps.storage, |mut a| {
+            if a.headstash_params.cw_glob.is_none() {
+                a.headstash_params.cw_glob = Some(deps.api.addr_validate(&cw_glob)?)
+            } else {
+                return Err(ContractError::CwGlobExists {});
+            }
+            Ok(a)
+        })?;
+
+        Ok(Response::new())
+    }
     /// uploads specific wasm blobs.
     pub fn ica_upload_contract_on_secret(
         deps: DepsMut,
         info: MessageInfo,
         ica_id: u64,
-        contract: String,
+        key: String,
+        cw_blob: Option<String>,
     ) -> Result<Response, ContractError> {
         let cw_ica_contract =
             helpers::retrieve_ica_owner_account(deps.as_ref(), info.sender.clone(), ica_id)?;
 
-        match contract.as_str() {
+        let blob = match cw_blob.clone() {
+            Some(a) => deps.api.addr_validate(&a)?,
+            None => STATE
+                .load(deps.storage)?
+                .headstash_params
+                .cw_glob
+                .expect("no cw-blob. Either set one, or provide one."),
+        };
+
+        match key.as_str() {
             "snip120u" => {
                 if DEPLOYMENT_SEQUENCE.load(deps.storage, "snip120u".to_string())? {
                     return Err(ContractError::Std(StdError::generic_err(
@@ -243,14 +265,12 @@ pub mod upload {
         let upload_msg = helpers::cw_ica_controller_execute(
             cw_ica_contract.addr().to_string(),
             cw_ica_controller::types::msg::ExecuteMsg::SendUploadMsg {
-                wasm: contract.clone(),
+                glob_key: key.clone(),
                 packet_memo: Some("23".into()),
                 timeout_seconds: None,
+                cw_glob: Some(blob),
             },
         )?;
-
-        // set the wasm blob key in state, in order to properly handle code-id in ica callback
-        // - sequence for continuity
 
         // send as submsg to handle reply
         Ok(Response::default().add_message(upload_msg))
@@ -404,7 +424,6 @@ mod headstash {
         salt: Option<String>,
         channel_open_init_options: ChannelOpenInitOptions,
         headstash_params: Option<HeadstashParams>,
-        cw_glob: String,
     ) -> Result<Response, ContractError> {
         cw_ownable::assert_owner(deps.storage, &info.sender)?;
         let state = STATE.load(deps.storage)?;
@@ -415,8 +434,6 @@ mod headstash {
             owner: Some(env.contract.address.to_string()),
             channel_open_init_options,
             send_callbacks_to: Some(env.contract.address.to_string()),
-            cw_glob,
-            // headstash_params: headstash_params.clone(),
         };
 
         let ica_count = ICA_COUNT.load(deps.storage).unwrap_or(0);
@@ -686,6 +703,8 @@ pub mod ica {
                         Ok(Response::default().add_attribute("sequence", "upload_snip120u"))
                     // 2. if headstash has not been uploaded, this is a headstash upload callback
                     } else if !DEPLOYMENT_SEQUENCE.load(deps.storage, "cw-headstash".into())? {
+                        // TODO: if snip120u code-id is still not set, something must have errored
+                        if ica_state.headstash_params.snip120u_code_id.is_none() {}
                         if let Some(event) = response.events.iter().find(|e| e.ty == "store_code") {
                             let code_id = event.attributes[0].value.clone();
                             // set code-id for headstash to state
@@ -701,6 +720,8 @@ pub mod ica {
                         Ok(Response::default().add_attribute("sequence", "upload_headstash"))
                     // 3. snip120u init
                     } else {
+                        // TODO: if cw-headstash code-id is still not set, something must have errored
+                        if ica_state.headstash_params.headstash_code_id.is_none() {}
                         // check if each snip in token_params has been instantiated.
                         let mut uninstantiated_snips = Vec::new();
                         for (i, _) in ica_state.headstash_params.token_params.iter().enumerate() {
@@ -1069,10 +1090,12 @@ mod tests {
         let msg_upload_snip120u = ExecuteMsg::UploadContractOnSecret {
             ica_id: 0,
             wasm: "snip120u".into(),
+            cw_glob: Some(cw_glob.to_string()),
         };
         let msg_upload_headstash = ExecuteMsg::UploadContractOnSecret {
             ica_id: 0,
             wasm: "cw-headstash".into(),
+            cw_glob: Some(cw_glob.to_string()),
         };
         let msg_authorize_minter = ExecuteMsg::AuthorizeMinter { ica_id: 0 };
         let msg_ibc_transfer = ExecuteMsg::IBCTransferTokens {
@@ -1090,7 +1113,6 @@ mod tests {
         };
 
         let headstash_params = HeadstashParams {
-            cw_glob: cw_glob.to_string(),
             snip120u_code_id: None,
             headstash_code_id: None,
             headstash_addr: None,
@@ -1103,6 +1125,7 @@ mod tests {
                 min_cadance: 0u64,
                 max_granularity: 5,
             }),
+            cw_glob: None,
         };
 
         // init msg
@@ -1134,7 +1157,6 @@ mod tests {
                 channel_ordering: None,
             },
             headstash_params: None,
-            cw_glob: cw_glob.to_string(),
         };
 
         // cannot create if not owner

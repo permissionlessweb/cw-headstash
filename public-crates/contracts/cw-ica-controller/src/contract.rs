@@ -6,7 +6,7 @@ use cosmwasm_std::{to_json_binary, Binary, Deps, DepsMut, Env, MessageInfo, Resp
 use crate::ibc::types::stargate::channel::new_ica_channel_open_init_cosmos_msg;
 use crate::types::keys;
 use crate::types::msg::{ExecuteMsg, InstantiateMsg, MigrateMsg, QueryMsg};
-use crate::types::state::{self, ChannelState, ContractState, CW_GLOB, UPLOAD_REPLY_ID};
+use crate::types::state::{self, ChannelState, ContractState, UPLOAD_REPLY_ID};
 use crate::types::ContractError;
 
 /// Custom Reply id
@@ -47,7 +47,7 @@ pub fn instantiate(
         msg.channel_open_init_options.channel_ordering,
     );
 
-    CW_GLOB.save(deps.storage, &deps.api.addr_validate(&msg.cw_glob)?)?;
+    // CW_GLOB.save(deps.storage, &deps.api.addr_validate(&msg.cw_glob)?)?;
 
     Ok(Response::new().add_message(ica_channel_open_init_msg))
 }
@@ -85,10 +85,20 @@ pub fn execute(
         ),
         ExecuteMsg::UpdateOwnership(action) => execute::update_ownership(deps, env, info, action),
         ExecuteMsg::SendUploadMsg {
-            wasm,
+            cw_glob,
+            glob_key,
             packet_memo,
             timeout_seconds,
-        } => execute::upload_wasm_blob(deps, env, info, wasm, packet_memo, timeout_seconds),
+        } => execute::upload_wasm_blob(
+            deps,
+            env,
+            info,
+            glob_key,
+            cw_glob,
+            packet_memo,
+            timeout_seconds,
+        ),
+        ExecuteMsg::SetGlob { cw_glob } => execute::set_cw_glob(deps, env, info, cw_glob),
     }
 }
 
@@ -163,7 +173,7 @@ pub fn reply(deps: DepsMut, env: Env, msg: Reply) -> Result<Response, ContractEr
             }
             _ => Err(ContractError::UnknownReplyId(msg.id)),
         },
-        cosmwasm_std::SubMsgResult::Err(_) => return Err(ContractError::SubMsgError {}),
+        cosmwasm_std::SubMsgResult::Err(a) => return Err(ContractError::SubMsgError(a.to_string())),
     }
 }
 
@@ -201,7 +211,7 @@ mod execute {
             state::{CW_GLOB, UPLOAD_REPLY_ID},
         },
     };
-    use cosmwasm_std::{CosmosMsg, IbcMsg, SubMsg};
+    use cosmwasm_std::{Addr, CosmosMsg, IbcMsg, SubMsg};
 
     use super::{
         keys, new_ica_channel_open_init_cosmos_msg, state, ContractError, DepsMut, Env,
@@ -210,12 +220,29 @@ mod execute {
 
     use cosmwasm_std::{Empty, QueryRequest};
 
+    pub fn set_cw_glob(
+        deps: DepsMut,
+        _env: Env,
+        info: MessageInfo,
+        cw_glob: String,
+    ) -> Result<Response, ContractError> {
+        cw_ownable::assert_owner(deps.storage, &info.sender)?;
+
+        if CW_GLOB.may_load(deps.storage)?.is_some() {
+            return Err(ContractError::GlobAlreadySet {});
+        } else {
+            CW_GLOB.save(deps.storage, &deps.api.addr_validate(&cw_glob)?)?;
+        }
+        Ok(Response::new())
+    }
+
     /// Retrieves the wasm-blob from cw-glob, replies with ica msg to upload blob.
     pub fn upload_wasm_blob(
         deps: DepsMut,
         _env: Env,
         info: MessageInfo,
         wasm: String,
+        cw_glob: Option<Addr>,
         memo: Option<String>,
         timeout: Option<u64>,
     ) -> Result<Response, ContractError> {
@@ -223,9 +250,14 @@ mod execute {
         let contract_state = state::STATE.load(deps.storage)?;
         let ica_info = contract_state.get_ica_info()?;
 
+        let glob = match cw_glob {
+            Some(a) => a,
+            None => CW_GLOB.load(deps.storage)?,
+        };
+
         // grab the msg to upload wasm via ica-controller from cw-glob
         let upload_msg = super::helpers::cw_glob_execute(
-            CW_GLOB.load(deps.storage)?.to_string(),
+            glob,
             cw_glob::msg::ExecuteMsg::TakeGlob {
                 sender: ica_info.ica_address.clone(),
                 key: wasm,
@@ -409,11 +441,11 @@ mod helpers {
 
     /// Defines the msg to instantiate the headstash contract
     pub fn cw_glob_execute(
-        cw_glob: String,
+        cw_glob: Addr,
         msg: cw_glob::msg::ExecuteMsg,
     ) -> Result<CosmosMsg, ContractError> {
         Ok(CosmosMsg::<Empty>::Wasm(cosmwasm_std::WasmMsg::Execute {
-            contract_addr: cw_glob,
+            contract_addr: cw_glob.to_string(),
             msg: to_json_binary(&msg)?,
             funds: vec![],
         }))
@@ -513,7 +545,7 @@ mod tests {
         let mut deps = mock_dependencies();
 
         let creator = deps.api.addr_make("creator");
-        let cw_glob = deps.api.addr_make("cw_glob");
+        // let cw_glob = deps.api.addr_make("cw_glob");
         let info = message_info(&creator, &[]);
         let env = mock_env();
 
@@ -528,8 +560,6 @@ mod tests {
             owner: None,
             channel_open_init_options: channel_open_init_options.clone(),
             send_callbacks_to: None,
-            cw_glob: cw_glob.to_string(),
-            // headstash_params: mock_headstash_params.clone(),
         };
 
         let res = instantiate(deps.as_mut(), env.clone(), info.clone(), msg).unwrap();
@@ -577,7 +607,7 @@ mod tests {
         // simulated addrs
         let creator = deps.api.addr_make("creator");
         let owner = deps.api.addr_make("owner");
-        let cw_glob = deps.api.addr_make("cw-glob");
+        // let cw_glob = deps.api.addr_make("cw-glob");
         let ica_addr = deps.api.addr_make("ica-addr");
 
         // simulated message info
@@ -600,7 +630,6 @@ mod tests {
                 owner: Some(owner.to_string()),
                 channel_open_init_options,
                 send_callbacks_to: Some(owner.to_string()),
-                cw_glob: cw_glob.to_string(),
             },
         )
         .unwrap();
@@ -615,9 +644,10 @@ mod tests {
 
         // simulate calling cw-glob for contracts
         let upload_wasm_msg = ExecuteMsg::SendUploadMsg {
-            wasm: "snip120u".to_string(),
+            glob_key: "snip120u".to_string(),
             packet_memo: None,
             timeout_seconds: None,
+            cw_glob: None,
         };
         let res = execute(deps.as_mut(), env.clone(), info_owner, upload_wasm_msg).unwrap();
         assert_eq!(res.messages[0].id, 710);
@@ -645,7 +675,7 @@ mod tests {
                     Event::new("wasm-headstash")
                         .add_attribute("memo", "memo".to_string())
                         .add_attribute("timeout", "24".to_string())
-                        .add_attribute("sender", ica_addr.to_string()), // ica-account 
+                        .add_attribute("sender", ica_addr.to_string()), // ica-account
                 ],
                 data: Some(binary),
                 msg_responses: vec![],
@@ -694,7 +724,6 @@ mod tests {
                 owner: None,
                 channel_open_init_options,
                 send_callbacks_to: None,
-                cw_glob: "cw-glob-addr".into(),
             },
         )
         .unwrap();
@@ -777,8 +806,6 @@ mod tests {
                 owner: None,
                 channel_open_init_options,
                 send_callbacks_to: None,
-                cw_glob: "cw-glob-addr".into(),
-                // headstash_params: mock_headstash_params,
             },
         )
         .unwrap();
@@ -834,8 +861,6 @@ mod tests {
                 owner: None,
                 channel_open_init_options,
                 send_callbacks_to: None,
-                cw_glob: "cw-glob-addr".into(),
-                // headstash_params: mock_headstash_params,
             },
         )
         .unwrap();
