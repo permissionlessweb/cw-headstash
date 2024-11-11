@@ -1,0 +1,38 @@
+---
+title: ExecuteMsg
+sidebar_label: ExecuteMsg
+sidebar_position: 2
+slug: /contract-api/cw-glob/execute-msg
+---
+
+# `ExecuteMsg`
+
+The `ExecuteMsg` is the message that is used to interact with the `cw-glob` contract.
+**All execute messages are only callable by the owner of the contract.**
+
+## `AddGlob`
+
+```rust reference
+https://github.com/srdtrk/cw-ica-controller/blob/v0.4.0/src/types/msg.rs#L27-L37
+```
+
+This message is used to add a compiled wasm blob with a unique key to reference the wasm blob. It is only callable by one of the owners.
+
+
+
+## `HashGlob`
+
+```rust reference
+https://github.com/srdtrk/cw-ica-controller/blob/9890793d3a19a9ec068e26627ec99ec48b3b9d92/src/types/msg.rs#L38-L39
+```
+
+This message is used to generate the sha256sum of a wasm blob stored inside the contract state. It is only callable by the owner.
+
+## `TakeGlob`
+
+```rust reference
+https://github.com/srdtrk/cw-ica-controller/blob/v0.4.0/src/types/msg.rs#L38-L52
+```
+
+This will retrieve a stored wasm blob. It is only callable by one of the owners.
+

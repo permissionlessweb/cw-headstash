@@ -1,0 +1,47 @@
+---
+title: InstantiateMsg
+sidebar_label: InstantiateMsg
+sidebar_position: 1
+slug: /contract-api/cw-headstash/instantiate-msg
+---
+
+# `InstantiateMsg`
+
+The `InstantiateMsg` is the message that is used to instantiate the `cw-glob` contract.
+
+```rust reference
+https://github.com/srdtrk/cw-ica-controller/blob/v0.4.0/src/types/msg.rs#L8-L21
+```
+
+## Fields
+
+InstantiateMsg  | Description | Type |
+--- | --- | --- | 
+`owner` | Owner of the contract | Option<String> |
+`feegranter` | Eligible address able to authorize feegrants on behalf of the ICA. | Option<String> |
+`ica_controller_code_id` |Code-id off the cw-ica-controller contract | u64 |
+`headstash_params` | Parameters for the cw-headstash contract | `HeadstashParams` |
+
+### `HeadstashParams`
+
+HeadstashParams  | Description | Type |
+--- | --- | --- | 
+`cw_glob` | native x/bank token denomination for this snip120u | String |
+`headstash_code_id` | total amount of this to be distributed during this headstash | Uint128 |
+`snip120u_code_id` | smart contract addr of snip120u | Addr |
+`snip120u_code_hash` | smart contract addr of snip120u | Addr |
+`token_params` | smart contract addr of snip120u | Vec<HeadstashTokenParams> |
+`fee_granter` | Eligible address able to authorize feegrants on behalf of the ICA. |  Option<String> |
+`multiplier` |  Enables reward multiplier for cw-headstash | boolean |
+`bloom_config` |  Enables reward multiplier for cw-headstash | Option<BloomConfig> |
+
+### `HeadstashTokenParams`
+
+HeadstashTokenParams  | Description | Type |
+--- | --- | --- | 
+`name` | name to use in the snip120u state | String |
+`symbol` | Snip120u symbol to use | u64 |
+`native` | token denomination on its orgin providence chain | String |
+`ibc` | ibc token denomination of this token | String |
+`snip_addr` | smart contract address of the snip120u specific to this token | Option<String> |
+`total` |  Total amount to be distributed for a specific snip | Uint128 |
