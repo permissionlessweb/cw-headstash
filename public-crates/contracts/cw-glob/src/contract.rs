@@ -8,8 +8,8 @@ use cw2::set_contract_version;
 use sha2::{Digest, Sha256};
 
 use crate::error::ContractError;
-use crate::msg::{ExecuteMsg, Glob, GlobHash, InstantiateMsg, QueryMsg};
-use crate::state::{GLOBMAP, HASHMAP};
+use crate::msg::{ExecuteMsg, InstantiateMsg, QueryMsg};
+use crate::state::{Glob, GlobHash, GLOBMAP, HASHMAP, OWNER};
 
 // version info for migration info
 const CONTRACT_NAME: &str = "crates.io:cw-glob";
@@ -23,8 +23,17 @@ pub fn instantiate(
     msg: InstantiateMsg,
 ) -> Result<Response, ContractError> {
     set_contract_version(deps.storage, CONTRACT_NAME, CONTRACT_VERSION)?;
-    cw_ownable::initialize_owner(deps.storage, deps.api, Some(&msg.owner))?;
-    Ok(Response::new())
+    // set owners
+    for addr in msg.owners.clone() {
+        deps.api.addr_validate(&addr)?;
+    }
+    OWNER.save(deps.storage, &msg.owners)?;
+
+    // hash cw-headstsh & snip120u
+    let default_keys = vec!["cw-headstash".to_string(), "snip120u".to_string()];
+    let res = perform_hash_glob(deps.storage, default_keys)?;
+
+    Ok(res)
 }
 
 #[cfg_attr(not(feature = "library"), entry_point)]
@@ -44,7 +53,7 @@ pub fn execute(
         } => take_glob(
             deps.storage,
             info.sender,
-            deps.api.addr_validate(&sender)?,
+            Addr::unchecked(sender),
             key,
             memo,
             timeout,
@@ -106,7 +115,11 @@ fn add_glob(
     owner: Addr,
     globs: Vec<Glob>,
 ) -> Result<Response, ContractError> {
-    cw_ownable::assert_owner(storage, &owner)?;
+    if !OWNER.load(storage)?.contains(&owner.to_string()) {
+        return Err(ContractError::OwnershipError(
+            cw_ownable::OwnershipError::NotOwner,
+        ));
+    }
     let mut attrs = vec![];
     for glob in globs {
         if GLOBMAP.has(storage, glob.key.clone()) {
@@ -136,7 +149,11 @@ fn take_glob(
     memo: Option<String>,
     timeout: Option<u64>,
 ) -> Result<Response, ContractError> {
-    cw_ownable::assert_owner(storage, &owner.clone())?;
+    if !OWNER.load(storage)?.contains(&owner.to_string()) {
+        return Err(ContractError::OwnershipError(
+            cw_ownable::OwnershipError::NotOwner,
+        ));
+    }
     let msg = headstash::take_glob(&wasm)?;
     Ok(Response::new().set_data(msg).add_event(
         Event::new("headstash")
@@ -180,7 +197,8 @@ mod tests {
 
     use crate::{
         contract::query,
-        msg::{ExecuteMsg, Glob, GlobHash, InstantiateMsg, QueryMsg},
+        msg::{ExecuteMsg, InstantiateMsg, QueryMsg},
+        state::{Glob, GlobHash},
         ContractError,
     };
 
@@ -202,7 +220,7 @@ mod tests {
         let info_creator = message_info(&creator, &[]);
 
         let init_msg = InstantiateMsg {
-            owner: owner.to_string(),
+            owners: vec![owner.to_string()],
         };
 
         // instantiate

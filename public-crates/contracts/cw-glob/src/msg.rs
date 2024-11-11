@@ -1,24 +1,10 @@
 use cosmwasm_schema::{cw_serde, QueryResponses};
-use cosmwasm_std::Binary;
+
+use crate::state::{Glob, GlobHash};
 
 #[cw_serde]
 pub struct InstantiateMsg {
-    pub owner: String,
-}
-
-#[cw_serde]
-pub struct Glob {
-    /// The key used to store the blob
-    pub key: String,
-    /// The wasm
-    pub blob: Binary,
-}
-#[cw_serde]
-pub struct GlobHash {
-    /// The key used to store the blob
-    pub key: String,
-    /// The hash of the wasm blob
-    pub hash: String,
+    pub owners: Vec<String>,
 }
 
 #[cw_serde]
@@ -51,4 +37,3 @@ pub enum QueryMsg {
     #[returns(GlobHash)]
     GlobHash { keys: Vec<String> },
 }
-
