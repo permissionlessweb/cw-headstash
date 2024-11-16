@@ -298,9 +298,13 @@ pub mod instantiate {
         let hp = state.headstash_params;
 
         // if headstash or snip120u is not set, we cannot instantiate snips
-        if !DEPLOYMENT_SEQUENCE.load(deps.storage, "snip120u".to_string())? {
+        if !DEPLOYMENT_SEQUENCE.load(deps.storage, "snip120u".to_string())?
+            && hp.snip120u_code_id.is_none()
+        {
             return Err(ContractError::NoSnipCodeId {});
-        } else if !DEPLOYMENT_SEQUENCE.load(deps.storage, "cw-headstash".to_string())? {
+        } else if !DEPLOYMENT_SEQUENCE.load(deps.storage, "cw-headstash".to_string())?
+            && hp.headstash_code_id.is_none()
+        {
             return Err(ContractError::NoHeadstashCodeId {});
         }
 
@@ -309,9 +313,6 @@ pub mod instantiate {
         for token in &hp.token_params {
             if length != 0 {
                 if let Some(t) = hp.token_params.iter().find(|t| t.native == token.native) {
-                    if hp.snip120u_code_id.is_none() {
-                        return Err(ContractError::NoSnipCodeId {});
-                    }
                     let msg = self::ica::form_instantiate_snip120u(
                         cw_ica_contract.addr().to_string(),
                         token.clone(),
@@ -323,14 +324,10 @@ pub mod instantiate {
                     msgs.push(msg);
                 }
             } else {
-                if hp.snip120u_code_id.is_none() {
-                    return Err(ContractError::NoSnipCodeId {});
-                }
-
-                // if contract addr, set headstash param to state.
-                // if none,
+                return Err(ContractError::NoSnip120uParamsSet {});
             }
         }
+
         let msg_lens = msgs.len().to_string();
         let msg = send_msg_as_ica(msgs, cw_ica_contract);
 
@@ -352,10 +349,12 @@ pub mod instantiate {
         let cw_ica_contract =
             retrieve_ica_owner_account(deps.as_ref(), info.sender.clone(), ica_id.clone())?;
 
-        // iterate and enumerate for each snip in snip params, if there already is
-        for (i, _) in hs_params.token_params.iter().enumerate() {
+        // iterate and enumerate for each snip in snip params, if they deployment sequence is not met, and there is addr for each snip, error.
+        for (i, hstp) in hs_params.token_params.iter().enumerate() {
             // println!("token_param: {i}, {:#?}", param);
-            if !DEPLOYMENT_SEQUENCE.load(deps.storage, format!("snip120u-init-{}", i))? {
+            if !DEPLOYMENT_SEQUENCE.load(deps.storage, format!("snip120u-init-{}", i))?
+                && hstp.snip_addr.is_none()
+            {
                 return Err(ContractError::NoSnip120uContract {});
             }
         }
@@ -383,10 +382,15 @@ pub mod instantiate {
                 let init_headstash_msg = instantiate_headstash_msg(
                     code_id,
                     crate::state::headstash::InstantiateMsg {
-                        claim_msg_plaintext: "{wallet}".into(),
-                        end_date: Some(env.block.time.plus_days(365u64).nanos()),
-                        start_date: None,
-                        viewing_key: "eretskeretjablret".into(),
+                        claim_msg_plaintext: hs_params.headstash_init_config.claim_msg_plaintxt,
+                        end_date: Some(
+                            hs_params
+                                .headstash_init_config
+                                .end_date
+                                .unwrap_or(env.block.time.plus_days(365u64).nanos()), // one year
+                        ),
+                        start_date: hs_params.headstash_init_config.end_date,
+                        viewing_key: hs_params.headstash_init_config.viewing_key,
                         owner: Addr::unchecked(ica.ica_addr),
                         snip120u_code_hash: hs_params.snip120u_code_hash,
                         snips: hs_snips,
@@ -433,7 +437,7 @@ mod headstash {
         let instantiate_msg = cw_ica_controller::types::msg::InstantiateMsg {
             owner: Some(env.contract.address.to_string()),
             channel_open_init_options,
-            send_callbacks_to: Some(env.contract.address.to_string()),
+            send_callbacks_to: Some(env.contract.address.to_string()), // always send callbacks to this contract.
         };
 
         let ica_count = ICA_COUNT.load(deps.storage).unwrap_or(0);
@@ -451,7 +455,7 @@ mod headstash {
             salt,
         )?;
 
-        let hs_params = headstash_params.unwrap_or(state.headstash_params);
+        let hs_params = headstash_params.unwrap_or(state.headstash_params); // provide new headstash params, or borrow from params set on init.
         let initial_state = state::IcaContractState::new(contract_addr.clone(), hs_params);
 
         ICA_STATES.save(deps.storage, ica_count, &initial_state)?;
@@ -677,17 +681,19 @@ pub mod ica {
     ) -> Result<Response, ContractError> {
         let ica_id = CONTRACT_ADDR_TO_ICA_ID.load(deps.storage, info.sender.clone())?;
         let mut ica_state = ICA_STATES.load(deps.storage, ica_id)?;
+        let token_params = ica_state.headstash_params.token_params.clone();
 
         match callback_msg {
             IcaControllerCallbackMsg::OnAcknowledgementPacketCallback {
                 ica_acknowledgement,
+                // original_packet,
                 ..
             } => match ica_acknowledgement {
                 Data::Result(res) => {
                     let response: Response<Empty> = from_json(&res)?;
-                    // println!("ica_acknowledgement result: {:#?}", response);
 
-                    // 1. if snip has not been uploaded, this is a snip upload callback
+                    // 1. if snip has not been uploaded, this is a snip upload callback.
+                    // This deployment sequence step will be set to true, if snip code-id provided during ica-owner contract init.
                     if !DEPLOYMENT_SEQUENCE.load(deps.storage, "snip120u".into())? {
                         if let Some(event) = response.events.iter().find(|e| e.ty == "store_code") {
                             let code_id = event.attributes[0].value.clone();
@@ -702,6 +708,7 @@ pub mod ica {
                         }
                         Ok(Response::default().add_attribute("sequence", "upload_snip120u"))
                     // 2. if headstash has not been uploaded, this is a headstash upload callback
+                    // This deployment sequence step will be set to true, if headstash code-id provided during ica-owner contract init.
                     } else if !DEPLOYMENT_SEQUENCE.load(deps.storage, "cw-headstash".into())? {
                         // TODO: if snip120u code-id is still not set, something must have errored
                         if ica_state.headstash_params.snip120u_code_id.is_none() {}
@@ -718,54 +725,74 @@ pub mod ica {
                             return Err(ContractError::BadStoreHeadstashCodeResponse {});
                         }
                         Ok(Response::default().add_attribute("sequence", "upload_headstash"))
-                    // 3. snip120u init
+                    // 3. if both snip120u & headstash code-id exist, this callback is for instantiating snip120u's.
+                    // The deployment sequence step is saved by enumerated index for each snip involved. These will be set to true for each snip
                     } else {
-                        // TODO: if cw-headstash code-id is still not set, something must have errored
                         if ica_state.headstash_params.headstash_code_id.is_none() {}
                         // check if each snip in token_params has been instantiated.
+
                         let mut uninstantiated_snips = Vec::new();
-                        for (i, _) in ica_state.headstash_params.token_params.iter().enumerate() {
+                        for (i, hstp) in token_params.iter().enumerate() {
                             if !DEPLOYMENT_SEQUENCE
                                 .load(deps.storage, format!("snip120u-init-{}", i))?
                             {
-                                // println!("not instantiated: {:#?}", i);
-                                uninstantiated_snips.push(i);
+                                uninstantiated_snips.push((i, hstp));
                             }
                         }
 
                         if !uninstantiated_snips.is_empty() {
-                            for (i, event) in response
-                                .events
-                                .iter()
-                                .filter(|e| e.ty == "_instantiate")
-                                .collect::<Vec<_>>()
-                                .into_iter()
-                                .enumerate()
-                            {
-                                // todo: match the native denom with saved headstash params
-                                if let Some(attr) = event
-                                    .attributes
-                                    .iter()
-                                    .find(|a| a.key == "contract_address")
+                            for index in uninstantiated_snips {
+                                for event in
+                                    response.events.iter().filter(|e| e.ty == "instantiate")
                                 {
-                                    ica_state.headstash_params.token_params[i].snip_addr =
-                                        Some(attr.value.clone());
-                                }
+                                    if let Some(attr) = event
+                                        .attributes
+                                        .iter()
+                                        .find(|a| a.key == "contract_address")
+                                    {
+                                        // println!(
+                                        //     "attr: {:#?},{:#?},{:#?},",
+                                        //     attr,
+                                        //     index.0,
+                                        //     attr.value.clone()
+                                        // );
+                                        let mut current_index = index.0;
+                                        // Recursively try the next index until we find one that does not exist
+                                        while current_index
+                                            < ica_state.headstash_params.token_params.len()
+                                            && ica_state.headstash_params.token_params
+                                                [current_index]
+                                                .snip_addr
+                                                .is_some()
+                                        {
+                                            current_index += 1;
+                                        }
 
-                                ICA_STATES.save(deps.storage, ica_id, &ica_state)?;
-                                DEPLOYMENT_SEQUENCE.save(
-                                    deps.storage,
-                                    format!("snip120u-init-{}", i),
-                                    &true,
-                                )?;
+                                        if current_index
+                                            < ica_state.headstash_params.token_params.len()
+                                        {
+                                            ica_state.headstash_params.token_params
+                                                [current_index]
+                                                .snip_addr = Some(attr.value.clone());
+                                        }
+
+                                        ICA_STATES.save(deps.storage, ica_id, &ica_state)?;
+                                        DEPLOYMENT_SEQUENCE.save(
+                                            deps.storage,
+                                            format!("snip120u-init-{}", index.0),
+                                            &true,
+                                        )?;
+                                    }
+                                }
                             }
-                            Ok(Response::default().add_attribute("sequence", "instantiate_snips"))
+
+                            Ok(Response::new())
                         } else {
                             if !DEPLOYMENT_SEQUENCE
                                 .load(deps.storage, "cw-headstash-init".into())?
                             {
                                 if let Some(event) =
-                                    response.events.iter().find(|e| e.ty == "_instantiate")
+                                    response.events.iter().find(|e| e.ty == "instantiate")
                                 {
                                     ica_state.headstash_params.headstash_addr =
                                         Some(event.attributes[0].value.clone());
@@ -936,12 +963,9 @@ pub mod ica {
 }
 
 pub mod helpers {
-
-    use cosmwasm_std::Empty;
-
-    use crate::state::ICA_STATES;
-
     use super::*;
+    use crate::state::ICA_STATES;
+    use cosmwasm_std::Empty;
 
     /// Retrieves an ica account for the given sender and the account id. only contract owner can call this.
     pub fn retrieve_ica_owner_account(
@@ -1004,6 +1028,19 @@ pub mod helpers {
 mod tests {
     use std::error::Error;
 
+    use crate::{
+        contract::{execute, instantiate},
+        msg::{ExecuteMsg, InstantiateMsg},
+        state::{
+            self,
+            headstash::{
+                BloomConfig, HeadstashInitConfig, HeadstashParams, HeadstashTokenParams, Snip120u,
+            },
+            snip120u, ContractState, IcaContractState, IcaState, CONTRACT_ADDR_TO_ICA_ID,
+            ICA_COUNT, ICA_STATES, UPLOAD_REPLY_ID,
+        },
+        ContractError,
+    };
     use anybuf::Anybuf;
     use cosmwasm_std::{
         testing::{message_info, mock_dependencies, mock_env},
@@ -1019,18 +1056,6 @@ mod tests {
         },
     };
     use cw_ownable::OwnershipError;
-
-    use crate::{
-        contract::{execute, instantiate, CUSTOM_CALLBACK},
-        msg::{ExecuteMsg, HeadstashCallback, InstantiateMsg},
-        state::{
-            self,
-            headstash::{BloomConfig, HeadstashParams, HeadstashTokenParams, Snip120u},
-            snip120u, ContractState, IcaContractState, IcaState, CONTRACT_ADDR_TO_ICA_ID,
-            ICA_COUNT, ICA_STATES, UPLOAD_REPLY_ID,
-        },
-        ContractError,
-    };
 
     // init test
 
@@ -1126,6 +1151,12 @@ mod tests {
                 max_granularity: 5,
             }),
             cw_glob: None,
+            headstash_init_config: HeadstashInitConfig {
+                claim_msg_plaintxt: "HREAM ~ {wallet} ~ {secondary_addr} ~ {expiration}".into(),
+                end_date: None,
+                start_date: None,
+                viewing_key: "eretskeretjableret".into(),
+            },
         };
 
         // init msg
@@ -1151,7 +1182,7 @@ mod tests {
         let create_msg = ExecuteMsg::CreateIcaContract {
             salt: Some("salllllt".into()),
             channel_open_init_options: ChannelOpenInitOptions {
-                connection_id: "connection-id_69".into(),
+                connection_id: "connection-69".into(),
                 counterparty_connection_id: "connection-id_420".into(),
                 counterparty_port_id: None,
                 channel_ordering: None,
@@ -1189,7 +1220,7 @@ mod tests {
                                 ibc_endpoint_counterparty.clone(),
                                 IbcOrder::Ordered,
                                 "420",
-                                "connection-id_69",
+                                "connection-69",
                             ),
                             channel_status: ChannelStatus::Open,
                         },
@@ -1256,9 +1287,7 @@ mod tests {
         let submsg = SubMsg::reply_always(msg_store_code.clone(), UPLOAD_REPLY_ID);
 
         // simulated ibcPacketData for snip120u upload
-        let original_ica_upload_data = Response::new()
-            .add_submessage(submsg.clone())
-            .add_attribute(CUSTOM_CALLBACK, HeadstashCallback::UploadSnip120u);
+        let original_ica_upload_data = Response::new().add_submessage(submsg.clone());
 
         // simulated response w/ event from secret cosmwasm vm
         let ica_upload_wasm_result = Response::<Empty>::new()
@@ -1304,9 +1333,7 @@ mod tests {
         );
 
         // simulated mesage
-        let original_ica_upload_data = Response::new()
-            .add_submessage(submsg.clone())
-            .add_attribute(CUSTOM_CALLBACK, HeadstashCallback::UploadHeadstash);
+        let original_ica_upload_data = Response::new().add_submessage(submsg.clone());
 
         // simulated response w/ event from secret cosmwasmVM
         let ica_upload_wasm_result = Response::<Empty>::new()
@@ -1428,13 +1455,12 @@ mod tests {
 
         let instantiate_snip120u_res = Response::new()
             .add_submessages(submsgs)
-            .add_attribute(CUSTOM_CALLBACK, HeadstashCallback::InstantiateSnip120us)
             .add_attribute("msg_lens", 2.to_string())
             .add_event(
-                Event::new("_instantiate").add_attribute("contract_address", "secret1_snip120u1"),
+                Event::new("instantiate").add_attribute("contract_address", "secret1_snip120u1"),
             )
             .add_event(
-                Event::new("_instantiate").add_attribute("contract_address", "secret1_snip120u2"),
+                Event::new("instantiate").add_attribute("contract_address", "secret1_snip120u2"),
             );
 
         let on_ack_callback = IcaControllerCallbackMsg::OnAcknowledgementPacketCallback {
@@ -1465,6 +1491,7 @@ mod tests {
         // confirm the addresses have been set for each snip
         let ica_state = ICA_STATES.load(&deps.storage, 0).unwrap();
         for (i, param) in ica_state.headstash_params.token_params.iter().enumerate() {
+            println!("TEST HeadstashTokenParams: {:#?}", param);
             assert_eq!(
                 param.snip_addr,
                 Some(format!("secret1_snip120u{}", i + 1).into())
@@ -1516,7 +1543,7 @@ mod tests {
             // .add_attribute(CUSTOM_CALLBACK, HeadstashCallback::InstantiateHeadstash)
             // .add_attribute("msg_lens", 1.to_string())
             .add_event(
-                Event::new("_instantiate")
+                Event::new("instantiate")
                     .add_attribute("contract_address", headstash_addr.to_string()),
             );
 
@@ -1652,5 +1679,3 @@ mod tests {
         // reply test
     }
 }
-
-// try one snip with addr and the other without 1 ?

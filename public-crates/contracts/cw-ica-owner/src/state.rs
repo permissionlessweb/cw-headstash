@@ -181,6 +181,14 @@ pub mod headstash {
         // pub decoys: bool,
     }
 
+    #[cw_serde]
+    pub struct HeadstashInitConfig {
+        pub claim_msg_plaintxt: String,
+        pub end_date: Option<u64>,
+        pub start_date: Option<u64>,
+        pub viewing_key: String,
+    }
+
     /// Params for Headstash Tokens
     #[cw_serde]
     pub struct HeadstashTokenParams {
@@ -197,7 +205,7 @@ pub mod headstash {
         /// Total amount for specific snip
         pub total: Uint128,
     }
-    
+
     /// Params for Headstash
     #[cw_serde]
     pub struct HeadstashParams {
@@ -221,6 +229,7 @@ pub mod headstash {
         pub multiplier: bool,
         /// bloom config
         pub bloom_config: Option<BloomConfig>,
+        pub headstash_init_config: HeadstashInitConfig,
     }
 
     impl HeadstashParams {
@@ -229,6 +238,7 @@ pub mod headstash {
             cw_glob: Option<Addr>,
             snip120u_code_id: Option<u64>,
             headstash_code_id: Option<u64>,
+            headstash_init_config: HeadstashInitConfig,
             snip120u_code_hash: String,
             token_params: Vec<HeadstashTokenParams>,
             headstash_addr: Option<String>,
@@ -241,8 +251,9 @@ pub mod headstash {
                 snip120u_code_id,
                 snip120u_code_hash,
                 headstash_code_id,
-                token_params,
+                headstash_init_config,
                 headstash_addr,
+                token_params,
                 fee_granter,
                 multiplier,
                 bloom_config,

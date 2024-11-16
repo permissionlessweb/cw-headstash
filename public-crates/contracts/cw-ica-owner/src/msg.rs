@@ -52,8 +52,6 @@ pub enum ExecuteMsg {
     InitHeadstash {
         /// The ICA ID.
         ica_id: u64,
-        // /// Timestamp seconds of when headstash can begin
-        // start_date: u64,
     },
     // /// 4. Authorized the headstash contract as a minter for both snip120u contracts.
     AuthorizeMinter {

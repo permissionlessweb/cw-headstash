@@ -11,13 +11,13 @@ export const wallet = new Wallet("");
 import { generateEthKeyAndSignMessage, generateSolanaKeyAndSignMessage } from './testKeys.js';
 
 // headstash contract
-export const headstashCodeId = 1944;
-export const headstashCodeHash = "b114f46629664883f51522b0b4ba9a9ea0bf3413f07c09cef76488a8ea5fce55";
+export const headstashCodeId = 2045;
+export const headstashCodeHash = "af735546f1ee4c34489087b6aede185b1374888758477de8a1c8990b505eb0a9";
 export const headstashAddr = "";
 
 // snip-120u
-export const snip120uCodeId = 1945;
-export const snip120uCodeHash = "fb22a61a6009705137b86bf317c7fe1f62a48440cef73fef23feaf7d1998570c";
+export const snip120uCodeId = 2044;
+export const snip120uCodeHash = "3884f72403e5308db76748244d606dd8bfa98eb560b1906d5825fc7dd72f867e";
 
 // snip-1u20 addrs
 export const snip120uAddr1 = "secret1cqwafm8quzaltgtdhcfvm6xp3z9qum4whw08u5";
@@ -29,8 +29,8 @@ export const snip120uNative2 = "ibc/7477828AC3E19352BA2D63352EA6D0680E3F29C126B8
 
 export const counterpartyChannelId = "channel-165"
 export const chain_id = "secret-4";
-// export const cw_headstash_blob = fs.readFileSync("../../artifacts/cw_headstash.wasm");
-// export const snip120u_blob = fs.readFileSync("../../artifacts/snip120u_impl.wasm");
+export const cw_headstash_blob = fs.readFileSync("../../public-crates/contracts/cw-glob/src/globs/cw_headstash.wasm.gz");
+export const snip120u_blob = fs.readFileSync("../../public-crates/contracts/cw-glob/src/globs/snip120u_impl.wasm.gz");
 export const entropy = "eretskeretjableret";
 export const permitKey = entropy;
 export const txEncryptionSeed = EncryptionUtilsImpl.GenerateNewSeed();
@@ -61,9 +61,9 @@ const args = process.argv.slice(2);
 if (args.length < 1) {
   console.error('Invalid option.');
 } else if (args[0] === '-1') {
-  upload_headstash_contract(cw_headstash_blob);
-} else if (args[0] === '-2') {
   upload_snip120u(snip120u_blob);
+} else if (args[0] === '-2') {
+  upload_headstash_contract(cw_headstash_blob);
 } else if (args[0] === '-3a') {
   // name, symbol, supported-denom
   init_snip120u("secret terp test", "scrtTERP", snip120uNative1)

@@ -27,6 +27,9 @@ HeadstashParams  | Description | Type |
 `fee_granter` | Eligible address able to authorize feegrants on behalf of the ICA. | Optional `String`  |
 `multiplier` |  Enables reward multiplier for cw-headstash | `boolean` |
 `bloom_config` |  Enables reward multiplier for cw-headstash | Optional `BloomConfig` |
+`headstash_init_config` |  The configuration used to instantiate cw-headstash | `HeadstashInitConfig` |
+
+Any existing snip120u used in HeadstashTokenParams should be defined first in the list of HeadstashParams.
 
 ### `HeadstashTokenParams`
 
@@ -38,3 +41,12 @@ HeadstashTokenParams  | Description | Type |
 `ibc` | ibc token denomination of this token | `String` |
 `snip_addr` | smart contract address of the snip120u specific to this token | Optional `String` |
 `total` |  Total amount to be distributed for a specific snip | `Uint128` |
+
+### `HeadstashInitConfig`
+
+HeadstashInitConfig  | Description | Type |
+--- | --- | --- | 
+`claim_msg_plaintxt` | Snip120u symbol to use | `String` |
+`start_date` | Snip120u symbol to use | Optional `u64` |
+`end_date` | Snip120u symbol to use | Optional `u64` |
+`viewing_key` | Snip120u symbol to use | String |
