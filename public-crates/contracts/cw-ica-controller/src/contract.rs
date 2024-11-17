@@ -173,7 +173,9 @@ pub fn reply(deps: DepsMut, env: Env, msg: Reply) -> Result<Response, ContractEr
             }
             _ => Err(ContractError::UnknownReplyId(msg.id)),
         },
-        cosmwasm_std::SubMsgResult::Err(a) => return Err(ContractError::SubMsgError(a.to_string())),
+        cosmwasm_std::SubMsgResult::Err(a) => {
+            return Err(ContractError::SubMsgError(a.to_string()))
+        }
     }
 }
 

@@ -71,3 +71,18 @@ junod tx wasm e juno1r2cf69mnm82uhnv7r87uuk2g07z27sgcw86s65muemwk6qpwmu3sfkuddk 
 ```sh
 junod tx wasm e juno1r2cf69mnm82uhnv7r87uuk2g07z27sgcw86s65muemwk6qpwmu3sfkuddk '{"init_headstash": {"ica_id": 0}}' --from headstash --fees 50000ujuno
 ```
+
+### 7. Authorize Cw-Headstash as Minter For Snip120u
+```sh 
+junod tx wasm e juno1r2cf69mnm82uhnv7r87uuk2g07z27sgcw86s65muemwk6qpwmu3sfkuddk '{"authorize_minter": {"ica_id": 0}}' --from headstash --fees 50000ujuno
+```
+
+### 7. Fund Cw-Headstash Contract
+```sh 
+junod tx wasm e juno1r2cf69mnm82uhnv7r87uuk2g07z27sgcw86s65muemwk6qpwmu3sfkuddk '{"ibc_transfer_tokens": {"ica_id": 0}}' --from headstash --fees 50000ujuno
+```
+
+### 8. Add Eligible Headstashers
+```sh 
+junod tx wasm e juno1r2cf69mnm82uhnv7r87uuk2g07z27sgcw86s65muemwk6qpwmu3sfkuddk '{"add_headstash_minters": {"ica_id": 0, "to_add": [{"pubkey": "0x1234", "snips":[{"addr":"secret12345", "amount": "12345"}]},{"pubkey": "0x1234", "snips":[{"addr":"secret19876", "amount": "54321"}]}]}' --from headstash --fees 50000ujuno
+```

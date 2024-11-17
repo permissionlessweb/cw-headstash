@@ -7,12 +7,11 @@ use cosmwasm_std::{
 // use cw2::set_contract_version;
 use crate::{
     error::ContractError,
-    msg::{ExecuteMsg, InstantiateMsg, QueryMsg, SudoMsg},
+    msg::{ExecuteMsg, InstantiateMsg, QueryMsg},
     state::{
         self,
         headstash::{HeadstashParams, HeadstashTokenParams},
-        ContractState, CLOCK_INTERVAL, CONTRACT_ADDR_TO_ICA_ID, DEPLOYMENT_SEQUENCE, ICA_COUNT,
-        ICA_STATES, STATE,
+        ContractState, CONTRACT_ADDR_TO_ICA_ID, DEPLOYMENT_SEQUENCE, ICA_COUNT, ICA_STATES, STATE,
     },
 };
 use cw_ica_controller::{
@@ -134,7 +133,7 @@ pub fn execute(
         ExecuteMsg::AuthorizeMinter { ica_id } => {
             headstash::ica_authorize_snip120u_minter(deps, info, ica_id)
         }
-        ExecuteMsg::IBCTransferTokens { ica_id, channel_id } => {
+        ExecuteMsg::IbcTransferTokens { ica_id, channel_id } => {
             headstash::ibc_transfer_to_snip_contracts(deps, env, info, ica_id, channel_id)
         }
         ExecuteMsg::AddHeadstashClaimers { ica_id, to_add } => {
@@ -170,23 +169,28 @@ pub fn reply(_deps: DepsMut, _env: Env, reply: Reply) -> Result<Response, Contra
     }
 }
 
-#[cfg_attr(not(feature = "library"), entry_point)]
-pub fn sudo(deps: DepsMut, env: Env, msg: SudoMsg) -> Result<Response, ContractError> {
-    match msg {
-        SudoMsg::HandleIbcBloom {} => {
-            if env.block.height % CLOCK_INTERVAL.load(deps.storage)? != 0 {
-                // Send msg to process ibc-blooms
-                // get default ica account to call
-                // call contract as ica to handleBloom
+/// Sudo entry point
+// #[entry_point]
+// #[allow(clippy::pedantic)]
+// pub fn sudo(deps: DepsMut, env: Env, msg: SudoMsg) -> Result<Response, ContractError> {
+//     let interval = CLOCK_INTERVAL.may_load(deps.storage)?;
+//     if let Some(i) = interval {
+//         match msg {
+//             SudoMsg::HandleIbcBloom {} => {
+//                 if env.block.height % i != 0 {
+//                     // Send msg to process ibc-blooms
+//                     // get default ica account to call
+//                     // call contract as ica to handleBloom
 
-                // expect callback with new interval
-                return Ok(Response::new());
-            }
-        }
-    }
+//                     // expect callback with new interval
+//                     return Ok(Response::new());
+//                 }
+//             }
+//         }
+//     }
 
-    Ok(Response::new())
-}
+//     Ok(Response::new())
+// }
 
 pub mod upload {
 
@@ -209,8 +213,8 @@ pub mod upload {
 
     pub fn set_cw_glob(deps: DepsMut, cw_glob: String) -> Result<Response, ContractError> {
         STATE.update(deps.storage, |mut a| {
-            if a.headstash_params.cw_glob.is_none() {
-                a.headstash_params.cw_glob = Some(deps.api.addr_validate(&cw_glob)?)
+            if a.default_hs_params.cw_glob.is_none() {
+                a.default_hs_params.cw_glob = Some(deps.api.addr_validate(&cw_glob)?)
             } else {
                 return Err(ContractError::CwGlobExists {});
             }
@@ -234,7 +238,7 @@ pub mod upload {
             Some(a) => deps.api.addr_validate(&a)?,
             None => STATE
                 .load(deps.storage)?
-                .headstash_params
+                .default_hs_params
                 .cw_glob
                 .expect("no cw-blob. Either set one, or provide one."),
         };
@@ -272,7 +276,6 @@ pub mod upload {
             },
         )?;
 
-        // send as submsg to handle reply
         Ok(Response::default().add_message(upload_msg))
     }
 }
@@ -455,7 +458,7 @@ mod headstash {
             salt,
         )?;
 
-        let hs_params = headstash_params.unwrap_or(state.headstash_params); // provide new headstash params, or borrow from params set on init.
+        let hs_params = headstash_params.unwrap_or(state.default_hs_params); // provide new headstash params, or borrow from params set on init.
         let initial_state = state::IcaContractState::new(contract_addr.clone(), hs_params);
 
         ICA_STATES.save(deps.storage, ica_count, &initial_state)?;
@@ -581,7 +584,7 @@ mod headstash {
         owner: Option<String>,
     ) -> Result<Response, ContractError> {
         let mut msgs = vec![];
-        let feegranter = STATE.load(deps.storage)?.headstash_params.fee_granter;
+        let feegranter = STATE.load(deps.storage)?.default_hs_params.fee_granter;
         // fee granter may also call this entry point.
         let cw_ica_contract = match owner {
             Some(a) => {
@@ -917,7 +920,7 @@ pub mod ica {
         to_add: Vec<Headstash>,
     ) -> Result<CosmosMsg, ContractError> {
         // proto ref: https://github.com/scrtlabs/SecretNetwork/blob/master/proto/secret/compute/v1beta1/msg.proto
-        let msg = crate::state::headstash::Add { headstash: to_add };
+        let msg = crate::state::headstash::ExecuteMsg::AddEligibleHeadStash { headstash: to_add };
         Ok(
             #[allow(deprecated)]
             CosmosMsg::Stargate {
@@ -1123,7 +1126,7 @@ mod tests {
             cw_glob: Some(cw_glob.to_string()),
         };
         let msg_authorize_minter = ExecuteMsg::AuthorizeMinter { ica_id: 0 };
-        let msg_ibc_transfer = ExecuteMsg::IBCTransferTokens {
+        let msg_ibc_transfer = ExecuteMsg::IbcTransferTokens {
             ica_id: 0,
             channel_id: "transfer-channel".into(),
         };
@@ -1174,7 +1177,7 @@ mod tests {
             state::STATE.load(deps.as_ref().storage).unwrap(),
             ContractState {
                 ica_controller_code_id: 1u64,
-                headstash_params: headstash_params.clone()
+                default_hs_params: headstash_params.clone()
             }
         );
 

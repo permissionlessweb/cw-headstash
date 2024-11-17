@@ -17,3 +17,25 @@ The following is the estimated gas costs:
 | Gas Used (take-glob) snip120u | ~423,865  | ------- |
 | Gas Used (take-glob)  cw-headstash | ~402,206  | ------- |
 |----------|----------|----------| |
+
+
+### Helpful CLI Commands 
+```sh
+# to grab the gas spent:
+wasmd q tx <TX_HASH> | grep -o '"gas_used":"[^"]*' | cut -d'"' -f4
+```
+
+```sh
+# to grab the code-id:
+wasmd q tx <TX_HASH> | sed -n 's/.*"key":"code_id","value":"\([^"]*\)".*/\1/p' 
+```
+
+```sh
+# to grab the contract-addr 
+wasmd q tx <TX_HASH> | sed -n 's/.*"key":"contract_addr","value":"\([^"]*\)".*/\1/p' 
+```
+
+```sh
+# check the packet acknowledgement 
+wasmd q ibc channel  unreceived-acks wasm.juno1hec0dvrqf4tge8ellw3deezuc0zq8kgpea8r70ndgk8wxvaxdrys72pqy0 channel-625 --sequences=1 
+```

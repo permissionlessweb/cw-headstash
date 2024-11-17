@@ -29,7 +29,6 @@ pub const ICA_COUNT: Item<u64> = Item::new("ica");
 pub const CONTRACT_ADDR_TO_ICA_ID: Map<Addr, u64> = Map::new("catia");
 
 pub const CLOCK_INTERVAL: Item<u64> = Item::new("tictoc");
-
 mod contract {
 
     use super::*;
@@ -39,15 +38,15 @@ mod contract {
     pub struct ContractState {
         /// The code ID of the cw-ica-controller contract.
         pub ica_controller_code_id: u64,
-        pub headstash_params: HeadstashParams,
+        pub default_hs_params: HeadstashParams,
     }
 
     impl ContractState {
         /// Creates a new ContractState.
-        pub fn new(ica_controller_code_id: u64, headstash_params: HeadstashParams) -> Self {
+        pub fn new(ica_controller_code_id: u64, default_hs_params: HeadstashParams) -> Self {
             Self {
                 ica_controller_code_id,
-                headstash_params,
+                default_hs_params,
             }
         }
     }
@@ -106,7 +105,6 @@ mod ica {
 
 /// Headstash specific types
 pub mod headstash {
-    use crate::ContractError;
 
     #[cw_serde]
     pub struct HandleIbcBloom {}
@@ -148,12 +146,12 @@ pub mod headstash {
         pub bloom_config: Option<BloomConfig>,
     }
 
-    use super::{cw_serde, STATE};
-    use cosmwasm_std::{Addr, Coin, DepsMut, Uint128};
+    use super::cw_serde;
+    use cosmwasm_std::{Addr, Uint128};
 
     #[cw_serde]
-    pub struct Add {
-        pub headstash: Vec<Headstash>,
+    pub enum ExecuteMsg {
+        AddEligibleHeadStash { headstash: Vec<Headstash> },
     }
 
     #[cw_serde]
@@ -164,7 +162,7 @@ pub mod headstash {
     #[cw_serde]
     pub struct Headstash {
         pub pubkey: String,
-        pub snip: Vec<Snip>,
+        pub snips: Vec<Snip>,
     }
 
     #[cw_serde]
@@ -176,7 +174,7 @@ pub mod headstash {
         /// maximum number of transactions a bloom msg will process  
         pub max_granularity: u64,
         // if enabled, randomness seed is used to add random value to cadance.
-        // pub random_cadance: bool,
+        // pub starting_interval: Option<u64>,
         // /// if enabled, decoy messages are included in batches to create noise
         // pub decoys: bool,
     }
@@ -260,28 +258,6 @@ pub mod headstash {
             }
         }
     }
-
-    impl HeadstashTokenParams {
-        /// loads token params for a given coin.
-        pub fn from_coin(deps: DepsMut, coin: Coin) -> Result<Self, ContractError> {
-            let param = STATE.load(deps.storage).unwrap().headstash_params;
-            let token_param = param
-                .token_params
-                .iter()
-                .find(|tp| tp.native == coin.denom || tp.ibc == coin.denom);
-            match token_param {
-                Some(tp) => {
-                    // Create your struct using tp
-                    Ok(tp.clone())
-                }
-                None => {
-                    return Err(ContractError::BadHeadstashCoin);
-                }
-            }
-        }
-    }
-
-    impl HeadstashParams {}
 }
 
 pub mod snip120u {

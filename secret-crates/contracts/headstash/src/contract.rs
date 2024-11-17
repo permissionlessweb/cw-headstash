@@ -164,7 +164,7 @@ pub mod headstash {
         deps: DepsMut,
         env: Env,
         info: MessageInfo,
-        _rng: &mut ContractPrng,
+        rng: &mut ContractPrng,
         headstash: Vec<Headstash>,
     ) -> Result<Response, ContractError> {
         // ensure sender is admin
@@ -178,19 +178,29 @@ pub mod headstash {
         }
         // make sure airdrop has not ended
         queries::available(&config, &env)?;
+        // randomly select point in headstash array to start from.
+        let hsl = headstash.len();
 
-        add_headstash_to_state(deps, headstash.clone(), config.snip120us)?;
-
+        let rsp = utils::random_starting_point(rng, hsl.clone());
+        // println!("hsl: {:#?}", hsl);
+        // println!("rsp: {:#?}", rsp);
+        
+        add_headstash_to_state(deps, hsl, rsp, headstash.clone(), config.snip120us)?;
+        
         Ok(Response::default())
     }
-
+    
     pub fn add_headstash_to_state(
         deps: DepsMut,
+        hsl: usize,
+        rsp: usize,
         headstash: Vec<Headstash>,
         eligible: Vec<Snip120u>,
     ) -> StdResult<()> {
         // ensure pubkey is not already in KeyMap
-        for hs in headstash.into_iter() {
+        for i in 0..hsl {
+            let hs: Headstash = headstash[(i + rsp) % hsl].clone();
+            // println!("headstash: {:#?},{:#?}", i, hs.clone());
             let key = hs.addr;
             // first key suffix is eligible addr
             let l1 = HEADSTASH_OWNERS.add_suffix(key.as_bytes());
@@ -258,7 +268,7 @@ pub mod headstash {
                 sig_addr.clone(),
                 sig.clone(),
                 config.claim_msg_plaintext,
-                false,
+                true,
             )?;
         } else {
             validation::verify_headstash_sig(
@@ -853,6 +863,13 @@ pub mod utils {
     use cosmwasm_std::Decimal;
 
     use super::*;
+
+    pub fn random_starting_point(prng: &mut ContractPrng, lens: usize) -> usize {
+        let mut random_number = [0u8; 8]; // Use 8 bytes to represent a usize
+        prng.fill_bytes(&mut random_number);
+        let random_usize = usize::from_le_bytes(random_number);
+        random_usize % lens
+    }
 
     pub fn contract_randomness(env: Env) -> [u8; 32] {
         let mut prng = ContractPrng::from_env(&env);
@@ -1670,6 +1687,166 @@ mod tests {
             // assert not equal
             assert_ne!(rand1, rand2);
             assert_ne!(dec1, dec2);
+        }
+
+        #[test]
+        fn test_adding_eligible_random_starting_point() {
+            let mut deps = mock_dependencies_with_balance(&[]);
+            let env = mock_env();
+            let info = mock_info("instantiator", &[]);
+
+            // todo: setup snip120u
+            let fist_eligible_snip = Snip120u {
+                native_token: "snip1".into(),
+                addr: Addr::unchecked("snip1Addr"),
+                total_amount: Uint128::new(1000000u128),
+            };
+            let second_eligible_snip = Snip120u {
+                native_token: "snip2".into(),
+                addr: Addr::unchecked("snip2Addr"),
+                total_amount: Uint128::new(1000000u128),
+            };
+
+            let init_msg = crate::msg::InstantiateMsg {
+                owner: Addr::unchecked("admin"),
+                claim_msg_plaintext: PLAINTXT.to_string(),
+                start_date: None,
+                end_date: None,
+                // snip120u_code_id: 2,
+                snip120u_code_hash: "HASH".into(),
+                snips: vec![fist_eligible_snip, second_eligible_snip],
+                viewing_key: "viewing_key".into(),
+                bloom_config: Some(BloomConfig {
+                    default_cadance: 5u64,
+                    min_cadance: 0u64,
+                    max_granularity: 5u64,
+                }),
+                multiplier: true,
+                // channel_open_init_options: None,
+            };
+            let info = mock_info("instantiator", &[]);
+            let mut env = mock_env();
+            env.block.random = Some(Binary::from(&[0u8; 32]));
+
+            instantiate(deps.as_mut(), env.clone(), info.clone(), init_msg).unwrap();
+
+            let constants = CONFIG.load(&deps.storage).unwrap();
+
+            let handle_msg = ExecuteMsg::AddEligibleHeadStash {
+                headstash: vec![
+                    Headstash {
+                        addr: "0xF20B72c0d3992F53D0b28a190D060B6b999d861D".into(), // hs1
+                        snips: vec![Snip {
+                            amount: 100u128.into(),
+                            contract: "snip1Addr".into(),
+                        }],
+                    },
+                    Headstash {
+                        addr: "vzRrBXAlQ8SJN33bcrzG7biwCMVW3iAOGqj4ekA7EsE=".into(), // hs2
+                        snips: vec![Snip {
+                            amount: 300u128.into(),
+                            contract: "snip1Addr".into(),
+                        }],
+                    },
+                    Headstash {
+                        addr: "0x5c49a098BFe24cCEA4Aa66ac0416fD3F831Cd007".into(), // hs3
+                        snips: vec![
+                            Snip {
+                                amount: 20u128.into(),
+                                contract: "snip1Addr".into(),
+                            },
+                            Snip {
+                                amount: 200u128.into(),
+                                contract: "snip2Addr".into(),
+                            },
+                        ],
+                    },
+                    Headstash {
+                        addr: "0xdf303dc89E6d4A6122fa2889CCBE923236635b68=".into(), // hs5
+                        snips: vec![Snip {
+                            amount: 100u128.into(),
+                            contract: "snip2Addr".into(),
+                        }],
+                    },
+                    Headstash {
+                        addr: "0xF20B72c0d3992F53D0c28a190D060B6b999d861D".into(), // hs1
+                        snips: vec![Snip {
+                            amount: 100u128.into(),
+                            contract: "snip1Addr".into(),
+                        }],
+                    },
+                    Headstash {
+                        addr: "vzRrBXAlQ8SJN33bcrzG7biwCMVW3iBOGqj4ekA7EsE=".into(), // hs2
+                        snips: vec![Snip {
+                            amount: 300u128.into(),
+                            contract: "snip1Addr".into(),
+                        }],
+                    },
+                    Headstash {
+                        addr: "0x5c49a098BFe24cCEA4Aa66ac0416fD4F831Cd007".into(), // hs3
+                        snips: vec![
+                            Snip {
+                                amount: 20u128.into(),
+                                contract: "snip1Addr".into(),
+                            },
+                            Snip {
+                                amount: 200u128.into(),
+                                contract: "snip2Addr".into(),
+                            },
+                        ],
+                    },
+                    Headstash {
+                        addr: "0xdf303dc89E6d4A6122fa2889CCEE923236635b68=".into(), // hs5
+                        snips: vec![Snip {
+                            amount: 100u128.into(),
+                            contract: "snip2Addr".into(),
+                        }],
+                    },
+                    Headstash {
+                        addr: "0xF20B72c0d3902F53D0c28a190D060B6b999d861D".into(), // hs1
+                        snips: vec![Snip {
+                            amount: 100u128.into(),
+                            contract: "snip1Addr".into(),
+                        }],
+                    },
+                    Headstash {
+                        addr: "vzRrBXAlQ8SJO33bcrzG7biwCMVW3iBOGqj4ekA7EsE=".into(), // hs2
+                        snips: vec![Snip {
+                            amount: 300u128.into(),
+                            contract: "snip1Addr".into(),
+                        }],
+                    },
+                    Headstash {
+                        addr: "0x5c49a098BFe24cDEA4Aa66ac0416fD4F831Cd007".into(), // hs3
+                        snips: vec![
+                            Snip {
+                                amount: 20u128.into(),
+                                contract: "snip1Addr".into(),
+                            },
+                            Snip {
+                                amount: 200u128.into(),
+                                contract: "snip2Addr".into(),
+                            },
+                        ],
+                    },
+                    Headstash {
+                        addr: "0xdf303dc89E6d4A6122fb2889CCEE923236635b68=".into(), // hs5
+                        snips: vec![Snip {
+                            amount: 100u128.into(),
+                            contract: "snip2Addr".into(),
+                        }],
+                    },
+                ],
+            };
+
+            let mut bytes = [0u8; 32];
+            env.block.random = Some(Binary::from({
+                bytes[..4].copy_from_slice(&12345u32.to_le_bytes());
+                &bytes
+            }));
+
+            let handle_result = execute(deps.as_mut(), env.clone(), info.clone(), handle_msg);
+            handle_result.unwrap();
         }
     }
 }

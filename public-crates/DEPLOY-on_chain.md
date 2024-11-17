@@ -60,34 +60,38 @@ junod tx wasm i 4603 '{"owners":["juno1t4vx89l4da854f885x9fs7fd4jkqxy2p25z4texd8
 junod tx wasm e juno16hwsz2fgn6eu54kpgwasc7p9h9qzkt84q6hm77qgmsh8s0fhdczslxz45a '{"set_cw_glob":{"cw_glob": "juno1a2x0ha9tlj4ez0yuyvf4ncw7jgl4ypn5zrfle6tt2tqch6kr5t3qv6zm02"}}' --from headstash --fees 15000ujuno
 ```
 
-### 8. Upload Wasm From ICA On Secret 
+### 8. Upload Snipp120u Wasm From ICA On Secret 
 ```sh
 junod tx wasm e juno16hwsz2fgn6eu54kpgwasc7p9h9qzkt84q6hm77qgmsh8s0fhdczslxz45a '{"upload_contract_on_secret": {"ica_id": 0, "wasm": "snip120u"}}' --from headstash --fees 200000ujuno
 ```
-### 8. Upload Wasm From ICA On Secret 
+
+### 9. Upload Cw-Headstash Wasm From ICA On Secret 
 ```sh
-junod tx wasm e juno1appmdzw8m8nmvs23tcrrvcmxcj8l7kyyyaukqg5cw85sjg2zstms8huhrm '{"upload_contract_on_secret": {"ica_id": 0, "wasm": "snip120u"}}' --from headstash --fees 200000ujuno
+junod tx wasm e juno1appmdzw8m8nmvs23tcrrvcmxcj8l7kyyyaukqg5cw85sjg2zstms8huhrm '{"upload_contract_on_secret": {"ica_id": 0, "wasm": "cw-headstash"}}' --from headstash --fees 200000ujuno
 ```
 
-
-
-### Helpful CLI Commands 
+### 10. Instantiate Snips 
 ```sh
-# to grab the gas spent:
-wasmd q tx <TX_HASH> | grep -o '"gas_used":"[^"]*' | cut -d'"' -f4
+junod tx wasm e juno1appmdzw8m8nmvs23tcrrvcmxcj8l7kyyyaukqg5cw85sjg2zstms8huhrm '{"init_snip120u": {"ica_id": 0}}' --from headstash --fees 200000ujuno
 ```
 
+### 11. Instantiate Cw-Headstash
 ```sh
-# to grab the code-id:
-wasmd q tx <TX_HASH> | sed -n 's/.*"key":"code_id","value":"\([^"]*\)".*/\1/p' 
+junod tx wasm e juno1appmdzw8m8nmvs23tcrrvcmxcj8l7kyyyaukqg5cw85sjg2zstms8huhrm '{"init_headstash": {"ica_id": 0}}' --from headstash --fees 200000ujuno
 ```
 
+### 12. Authorize Minter
 ```sh
-# to grab the contract-addr 
-wasmd q tx <TX_HASH> | sed -n 's/.*"key":"contract_addr","value":"\([^"]*\)".*/\1/p' 
+junod tx wasm e juno1appmdzw8m8nmvs23tcrrvcmxcj8l7kyyyaukqg5cw85sjg2zstms8huhrm '{"authorize_minter": {"ica_id": 0}}' --from headstash --fees 200000ujuno
 ```
 
-```sh
-# check the packet acknowledgement 
-wasmd q ibc channel  unreceived-acks wasm.juno1hec0dvrqf4tge8ellw3deezuc0zq8kgpea8r70ndgk8wxvaxdrys72pqy0 channel-625 --sequences=1 
+### 13. Fund Cw-Headstash Contract
+```sh 
+junod tx wasm e juno1r2cf69mnm82uhnv7r87uuk2g07z27sgcw86s65muemwk6qpwmu3sfkuddk '{"ibc_transfer_tokens": {"ica_id": 0}}' --from headstash --fees 50000ujuno
 ```
+
+### 14. Add Headstashers
+```sh 
+junod tx wasm e juno1r2cf69mnm82uhnv7r87uuk2g07z27sgcw86s65muemwk6qpwmu3sfkuddk '{"add_headstash_minters": {"ica_id": 0, "to_add": [{"pubkey": "0x1234", "snips":[{"addr":"secret12345", "amount": "12345"}]},{"pubkey": "0x1234", "snips":[{"addr":"secret19876", "amount": "54321"}]}]}' --from headstash --fees 50000ujuno
+```
+

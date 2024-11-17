@@ -58,7 +58,7 @@ pub enum ExecuteMsg {
         ica_id: u64,
     },
     // /// . Transfer each token included in msg over via ics20.
-    IBCTransferTokens {
+    IbcTransferTokens {
         ica_id: u64,
         channel_id: String,
     },
