@@ -85,7 +85,7 @@ fn upload_headstash_contracts_as_secret_ica(
     // define env variables
     let mnemonic = env::var("MNEMONIC")?;
 
-    // create new cw-orch-interchain oobject with terp & secret.
+    // create new cw-orch-interchain object with terp & secret.
     let controller = networks[0].clone();
     let host = networks[1].clone();
     let mut interchain = DaemonInterchain::new(

@@ -11,7 +11,8 @@ use crate::{
     state::{
         self,
         headstash::{HeadstashParams, HeadstashTokenParams},
-        ContractState, CONTRACT_ADDR_TO_ICA_ID, DEPLOYMENT_SEQUENCE, ICA_COUNT, ICA_STATES, STATE,
+        ContractState, CONTRACT_ADDR_TO_ICA_ID, DEPLOYMENT_SEQUENCE, GRANTEE, ICA_COUNT,
+        ICA_STATES, STATE,
     },
 };
 use cw_ica_controller::{
@@ -144,6 +145,9 @@ pub fn execute(
             to_grant,
             owner,
         } => headstash::ica_authorize_feegrant(deps, info, ica_id, to_grant, owner),
+        ExecuteMsg::AuthzDeployer { ica_id, grantee } => {
+            ica::set_deployer_via_authz(deps, info, ica_id, grantee)
+        }
     }
 }
 
@@ -156,6 +160,7 @@ pub fn query(deps: Deps, _env: Env, msg: QueryMsg) -> StdResult<Binary> {
         }
         QueryMsg::GetIcaCount {} => to_json_binary(&query::ica_count(deps)?),
         QueryMsg::Ownership {} => to_json_binary(&cw_ownable::get_ownership(deps.storage)?),
+        QueryMsg::AuthzGrantee {} => to_json_binary(&GRANTEE.load(deps.storage)?),
     }
 }
 
@@ -585,7 +590,7 @@ mod headstash {
     ) -> Result<Response, ContractError> {
         let mut msgs = vec![];
         let feegranter = STATE.load(deps.storage)?.default_hs_params.fee_granter;
-        // fee granter may also call this entry point.
+        // fee granter provides owner, contract checks sender is feegranter.
         let cw_ica_contract = match owner {
             Some(a) => {
                 if let Some(b) = feegranter {
@@ -663,12 +668,19 @@ mod query {
 
 pub mod ica {
     use anybuf::Anybuf;
+    use cosmrs::{
+        proto::cosmos::authz::v1beta1::{GenericAuthorization, Grant, MsgGrant},
+        tx::MessageExt,
+        Any,
+    };
     use cosmwasm_std::{from_json, Coin, Empty, IbcTimeout, Timestamp, Uint128};
     use cw_ica_controller::{
         ibc::types::packet::acknowledgement::Data,
         types::state::{ChannelState, ChannelStatus},
     };
     use state::headstash::Headstash;
+
+    use crate::msg::constants::*;
 
     use super::*;
     /// Handles ICA controller callback messages.
@@ -829,6 +841,78 @@ pub mod ica {
                 Ok(Response::default())
             }
         }
+    }
+
+    pub fn set_deployer_via_authz(
+        deps: DepsMut,
+        info: MessageInfo,
+        ica_id: u64,
+        grantee: String,
+    ) -> Result<Response, ContractError> {
+        if GRANTEE.may_load(deps.storage)?.is_some() {
+            return Err(ContractError::AuthzGranteeExists {});
+        }
+        // grab ica info
+        let cw_ica_contract =
+            helpers::retrieve_ica_owner_account(deps.as_ref(), info.sender.clone(), ica_id)?;
+        let ica_state = ICA_STATES.load(deps.storage, ica_id)?;
+        let terp_ica_addr = ica_state.ica_state.expect("no ica state exists").ica_addr;
+
+        // form grant msgs data for x/authz module on secret. proto ref: https://github.com/cosmos/cosmos-sdk/blob/v0.45.16/proto/cosmos/authz/v1beta1/tx.proto
+        let grant_msgs: Vec<MsgGrant> = vec![
+            SECRET_COMPUTE_STORE_CODE,
+            SECRET_COMPUTE_INSTANTIATE,
+            SECRET_COMPUTE_EXECUTE,
+        ]
+        .into_iter()
+        .map(|msg| {
+            let grant = Grant {
+                authorization: Some(Any {
+                    type_url: COSMOS_GENERIC_AUTHZ.to_string(),
+                    value: GenericAuthorization {
+                        msg: msg.to_string(),
+                    }
+                    .to_bytes()
+                    .unwrap(),
+                }),
+                expiration: None,
+            };
+            MsgGrant {
+                granter: terp_ica_addr.to_string(),
+                grantee: grantee.clone(),
+                grant: Some(grant),
+            }
+        })
+        .collect();
+
+        // form Cosmos messages for ica to broadcasts. 
+        let msgs: Vec<CosmosMsg> = grant_msgs
+            .into_iter()
+            .map(|grant| {
+                // form ica-msg to grant CosmWasm Actions on behalf of ica
+                let msg = Anybuf::new()
+                    .append_string(1, terp_ica_addr.clone()) // granter
+                    .append_string(2, grantee.clone()) // grantee
+                    .append_bytes(
+                        3,                                      // grant
+                        Binary::new(grant.to_bytes().unwrap()), // cw-ica SendCosmosMsgs
+                    )
+                    .append_repeated_bytes::<Vec<u8>>(5, &[]) // funds
+                    .into_vec()
+                    .into();
+
+                #[allow(deprecated)]
+                CosmosMsg::Stargate {
+                    type_url: COSMOS_AUTHZ_GRANT.to_string(),
+                    value: msg,
+                }
+            })
+            .collect();
+
+        // push msgs for ica to run
+        let ica_msg = helpers::send_msg_as_ica(msgs, cw_ica_contract);
+
+        Ok(Response::new().add_message(ica_msg))
     }
 
     /// Instantiates a snip120u token on Secret Network via Stargate
@@ -1076,6 +1160,7 @@ mod tests {
         let cw_ica_controller = deps.api.addr_make("ica-controller-contract-addr");
         let ica_addr = Addr::unchecked("ica_addr");
         let headstash_addr = Addr::unchecked("secret1_headstash_addr");
+        let authz_grantee = Addr::unchecked("secret1_authz_grantee");
 
         // simulated token-info
         let snip_token_params = vec![
@@ -1138,6 +1223,10 @@ mod tests {
             ica_id: 0,
             to_grant: vec![],
             owner: None,
+        };
+        let msg_set_authz_grantee = ExecuteMsg::AuthzDeployer {
+            ica_id: 0,
+            grantee: authz_grantee.to_string(),
         };
 
         let headstash_params = HeadstashParams {
@@ -1679,6 +1768,23 @@ mod tests {
 
         println!("AUTHORIZE FEEGRANT {:#?}", res);
 
-        // reply test
+        // AUTHZ_GRANT
+        let err = execute(
+            deps.as_mut(),
+            env.clone(),
+            info_creator.clone(),
+            msg_set_authz_grantee.clone(),
+        )
+        .unwrap_err();
+        assert_eq!(err.to_string(), OwnershipError::NotOwner.to_string());
+
+        let res = execute(
+            deps.as_mut(),
+            env.clone(),
+            info_owner.clone(),
+            msg_set_authz_grantee,
+        )
+        .unwrap();
+        println!("AUTHZ GRANTS {:#?}", res);
     }
 }

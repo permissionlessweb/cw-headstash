@@ -21,22 +21,23 @@ pub struct InstantiateMsg {
 #[cw_ownable::cw_ownable_execute]
 #[cw_serde]
 pub enum ExecuteMsg {
+    /// Creates the ica-controller & initiates the ica creation workflow
     CreateIcaContract {
         salt: Option<String>,
         channel_open_init_options: ChannelOpenInitOptions,
         /// If none is set, loads headstash params from contract state.
         headstash_params: Option<HeadstashParams>,
     },
-    SetCwGlob{
+    /// Sets the cw-glob contract address to state
+    SetCwGlob {
         /// The storage key set in cw-glob. defaults enabled are either `snip120u` or `cw-headstash`
         cw_glob: String,
     },
-    /// 1. Upload the following contracts:
-    /// a. Headstash
-    /// b. Snip120u
-    /// c. Headstash Circuitboard
+    /// 1. Upload the following contracts in the expected sequence:
+    /// a. snip120u
+    /// b. cw-headstash
     UploadContractOnSecret {
-        /// Optional contract address of the cw-blob. 
+        /// Optional contract address of the cw-blob.
         cw_glob: Option<String>,
         /// The ICA ID.
         ica_id: u64,
@@ -48,31 +49,25 @@ pub enum ExecuteMsg {
         /// The ICA ID.
         ica_id: u64,
     },
-    // /// 3. Instantiates the secret headstash contract on Secret Network.
+    /// 3. Instantiates the secret headstash contract on Secret Network.
     InitHeadstash {
         /// The ICA ID.
         ica_id: u64,
     },
-    // /// 4. Authorized the headstash contract as a minter for both snip120u contracts.
-    AuthorizeMinter {
-        ica_id: u64,
-    },
-    // /// . Transfer each token included in msg over via ics20.
-    IbcTransferTokens {
-        ica_id: u64,
-        channel_id: String,
-    },
-    // /// 8. Add Eligible Addresses To Headstash
-    AddHeadstashClaimers {
-        ica_id: u64,
-        to_add: Vec<Headstash>,
-    },
-    // /// 9. Authorize secret network wallet with feegrant
+    /// 4. Authorized the headstash contract as a minter for both snip120u contracts.
+    AuthorizeMinter { ica_id: u64 },
+    /// . Transfer each token included in msg over via ics20.
+    IbcTransferTokens { ica_id: u64, channel_id: String },
+    /// 8. Add Eligible Addresses To Headstash
+    AddHeadstashClaimers { ica_id: u64, to_add: Vec<Headstash> },
+    /// 9. Authorize secret network wallet with feegrant
     AuthorizeFeegrant {
         ica_id: u64,
         to_grant: Vec<String>,
         owner: Option<String>,
     },
+    /// 10. Grant authorization to perform actions on behalf of ica-addr
+    AuthzDeployer { ica_id: u64, grantee: String },
 }
 #[cw_serde]
 pub enum SudoMsg {
@@ -92,6 +87,8 @@ pub enum QueryMsg {
     /// GetIcaCount returns the number of ICAs.
     #[returns(u64)]
     GetIcaCount {},
+    #[returns(String)]
+    AuthzGrantee {},
 }
 
 #[cw_serde]
@@ -136,4 +133,16 @@ impl From<String> for HeadstashCallback {
             _ => panic!("Invalid HeadstashCallback value"),
         }
     }
+}
+
+pub mod constants {
+    // Stargate (Any) type definitions
+    pub const COSMWASM_STORE_CODE: &str = "/cosmwasm.wasm.v1.MsgStoreCode";
+    pub const COSMWASM_INSTANTIATE: &str = "/cosmwasm.wasm.v1.MsgInstantiateContract";
+    pub const COSMWASM_EXECUTE: &str = "/cosmwasm.wasm.v1.MsgExecuteContract";
+    pub const COSMOS_GENERIC_AUTHZ: &str = "/cosmos.authz.v1beta1.GenericAuthorization";
+    pub const COSMOS_AUTHZ_GRANT: &str = "/cosmos.authz.v1beta1.MsgGrant";
+    pub const SECRET_COMPUTE_STORE_CODE: &str = "/secret.compute.v1beta1.MsgStoreCode";
+    pub const SECRET_COMPUTE_INSTANTIATE: &str = "/secret.compute.v1beta1.MsgInstantiateContract";
+    pub const SECRET_COMPUTE_EXECUTE: &str = "/secret.compute.v1beta1.MsgExecuteContract";
 }

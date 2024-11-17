@@ -105,50 +105,12 @@ pub fn deploy_cw_ica_controller(
     let terp_sender = terp.sender().clone();
 
     match step.as_str() {
+        //
         "upload" => {
-            rt.block_on(terp_sender.commit_tx_any(
-                vec![cosmrs::Any {
-                    type_url: COSMWASM_STORE_CODE.into(),
-                    value: Anybuf::new()
-                        .append_string(1, terp_sender.address())
-                        .append_bytes(2, include_bytes!("../../artifacts/cw_headstash.wasm"))
-                        .into_vec()
-                        .into(),
-                    }],
-                "Upload cw-headstash".into(),
-            ))?;
+            // todo: upload cw-glob, ica-owner, ica-controller
         }
         "instantiate" => {
-            if let Some(code_id) = cw_ica_code_id {
-                // create cw-ica-controller
-                let create_ica = cw_ica_controller::types::msg::InstantiateMsg {
-                    owner: Some(owner.to_string()),
-                    channel_open_init_options: ChannelOpenInitOptions {
-                        connection_id: controller_connection_id,
-                        counterparty_connection_id: host_connection_id,
-                        counterparty_port_id: None,
-                        channel_ordering: None,
-                    },
-                    send_callbacks_to: None,
-                };
-
-                let init = cosmrs::Any {
-                    type_url: COSMWASM_INSTANTIATE.to_string(),
-                    value: Anybuf::new()
-                        .append_string(1, terp.sender().address().to_string())
-                        .append_string(2, terp.sender().address().to_string())
-                        .append_uint64(3, code_id)
-                        .append_string(4, "Cw ICA Controller Contract")
-                        .append_bytes(5, to_json_binary(&create_ica)?.to_vec())
-                        .append_repeated_message::<Anybuf>(6, &vec![])
-                        .into_vec()
-                        .into(),
-                };
-                let res = rt.block_on(terp_sender.commit_tx_any(vec![init.into()], None))?;
-                println!("{:#?}", res);
-            } else {
-                panic!("noo cw-ica-code-id was provided!")
-            }
+            // todo: instantiate ica-owner, instantiate cw-glob, set-cw-glob, create ica via executeMsg
         }
         _ => {}
     }

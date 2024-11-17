@@ -18,6 +18,9 @@ The following is the estimated gas costs:
 | Gas Used (take-glob)  cw-headstash | ~402,206  | ------- |
 |----------|----------|----------| |
 
+- cw-ica-owner always will receive callbacks
+- a specific sequence is expected for deploying and configuring the contracts on secret, if there are not pre-existing values 
+
 
 ### Helpful CLI Commands 
 ```sh

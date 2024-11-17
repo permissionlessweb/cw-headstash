@@ -62,8 +62,8 @@ AuthorizeMinter | Description | Type |
 --- | --- | --- | 
 `ica_id` |  The ICA ID. | `u64` |
 
-## `IBCTransferTokens`
-IBCTransferTokens | Description | Type |
+## `IbcTransferTokens`
+IbcTransferTokens | Description | Type |
 --- | --- | --- | 
 `ica_id` | The ICA ID. | `u64` |
 `channel_id` | the channel id used to IBC Transfer the tokens from   | `String` |
@@ -80,3 +80,9 @@ AuthorizeFeegrant | Description | Type |
 `ica_id` |  The ICA ID. | `u64` |
 `to_grant` |  List of addresses to receive a feegrant from the ICA | Array of `String` |
 `owner` |  | Optional `String`  |
+
+## `AuthzDeployer`
+AuthzDeployer | Description | Type |
+--- | --- | --- | 
+`ica_id` |  The ICA ID. | `u64` |
+`grantee` |  Secret Network addr authorized to perform CosmWasm actions on behalf of ICA | `String` |

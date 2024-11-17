@@ -28,7 +28,8 @@ pub const ICA_COUNT: Item<u64> = Item::new("ica");
 /// The item used to map contract addresses to ICA IDs.
 pub const CONTRACT_ADDR_TO_ICA_ID: Map<Addr, u64> = Map::new("catia");
 
-pub const CLOCK_INTERVAL: Item<u64> = Item::new("tictoc");
+pub const GRANTEE: Item<String> = Item::new("grantee");
+
 mod contract {
 
     use super::*;
