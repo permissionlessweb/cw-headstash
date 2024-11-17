@@ -860,7 +860,7 @@ pub mod ica {
             CosmosMsg::Stargate {
                 type_url: "/secret.compute.v1beta1.MsgInstantiateContract".into(),
                 value: anybuf::Anybuf::new()
-                    .append_string(1, sender.to_string()) // sender (DAO)
+                    .append_string(1, sender.to_string()) // sender (ICA Address)
                     .append_string(2, &code_hash.to_string()) // callback_code_hash
                     .append_uint64(3, code_id) // code-id of snip-25
                     .append_string(
@@ -890,7 +890,7 @@ pub mod ica {
             CosmosMsg::Stargate {
                 type_url: "/secret.compute.v1beta1.MsgExecuteContract".into(),
                 value: anybuf::Anybuf::new()
-                    .append_string(1, sender.to_string()) // sender (DAO)
+                    .append_string(1, sender.to_string()) // sender (ICA Addr)
                     .append_string(2, &snip120u.to_string()) // contract
                     .append_bytes(3, to_json_binary(&set_minter_msg)?.as_slice())
                     .into_vec()

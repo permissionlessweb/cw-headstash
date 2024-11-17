@@ -1692,8 +1692,6 @@ mod tests {
         #[test]
         fn test_adding_eligible_random_starting_point() {
             let mut deps = mock_dependencies_with_balance(&[]);
-            let env = mock_env();
-            let info = mock_info("instantiator", &[]);
 
             // todo: setup snip120u
             let fist_eligible_snip = Snip120u {
@@ -1729,8 +1727,6 @@ mod tests {
             env.block.random = Some(Binary::from(&[0u8; 32]));
 
             instantiate(deps.as_mut(), env.clone(), info.clone(), init_msg).unwrap();
-
-            let constants = CONFIG.load(&deps.storage).unwrap();
 
             let handle_msg = ExecuteMsg::AddEligibleHeadStash {
                 headstash: vec![
