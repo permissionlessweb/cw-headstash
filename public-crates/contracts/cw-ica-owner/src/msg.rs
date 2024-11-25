@@ -15,6 +15,8 @@ pub struct InstantiateMsg {
     pub ica_controller_code_id: u64,
     /// Parameters for the cw-headstash contract
     pub headstash_params: HeadstashParams,
+    /// If enabled, contract owner may provide any addr to retrive their cw-ica-account in state, to perform action on behalf
+    pub dictatorship: bool,
 }
 
 #[ica_callback_execute]
@@ -28,7 +30,7 @@ pub enum ExecuteMsg {
         /// If none is set, loads headstash params from contract state.
         headstash_params: Option<HeadstashParams>,
     },
-    /// Sets the cw-glob contract address to state
+    /// Sets the cw-glob contract address to GLOBAL_CONTRACT_STATE
     SetCwGlob {
         /// The storage key set in cw-glob. defaults enabled are either `snip120u` or `cw-headstash`
         cw_glob: String,
@@ -39,35 +41,47 @@ pub enum ExecuteMsg {
     UploadContractOnSecret {
         /// Optional contract address of the cw-blob.
         cw_glob: Option<String>,
-        /// The ICA ID.
-        ica_id: u64,
         /// The wasm blob name to upload
         wasm: String,
     },
     /// 2. Instantiate a snip120u contract for every token defined in tokens.
-    InitSnip120u {
-        /// The ICA ID.
-        ica_id: u64,
-    },
+    InitSnip120u {},
     /// 3. Instantiates the secret headstash contract on Secret Network.
-    InitHeadstash {
-        /// The ICA ID.
-        ica_id: u64,
-    },
+    InitHeadstash {},
     /// 4. Authorized the headstash contract as a minter for both snip120u contracts.
-    AuthorizeMinter { ica_id: u64 },
+    AuthorizeMinter {},
     /// . Transfer each token included in msg over via ics20.
-    IbcTransferTokens { ica_id: u64, channel_id: String },
+    IbcTransferTokens {
+        channel_id: String,
+    },
     /// 8. Add Eligible Addresses To Headstash
-    AddHeadstashClaimers { ica_id: u64, to_add: Vec<Headstash> },
+    AddHeadstashClaimers {
+        to_add: Vec<Headstash>,
+    },
     /// 9. Authorize secret network wallet with feegrant
     AuthorizeFeegrant {
-        ica_id: u64,
         to_grant: Vec<String>,
         owner: Option<String>,
     },
     /// 10. Grant authorization to perform actions on behalf of ica-addr
-    AuthzDeployer { ica_id: u64, grantee: String },
+    AuthzDeployer {
+        grantee: String,
+    },
+    SetHeadstashCodeId {
+        code_id: u64,
+    },
+    SetSnip120uCodeId {
+        code_id: u64,
+    },
+    SetHeadstashAddr {
+        addr: String,
+    },
+    SetSnip120uAddr {
+        /// token denomination representing snip
+        denom: String,
+        /// contract addr of snip
+        addr: String,
+    },
 }
 #[cw_serde]
 pub enum SudoMsg {
@@ -83,10 +97,7 @@ pub enum QueryMsg {
     GetContractState {},
     /// GetIcaState returns the ICA state for the given ICA ID.
     #[returns(crate::state::IcaContractState)]
-    GetIcaContractState { ica_id: u64 },
-    /// GetIcaCount returns the number of ICAs.
-    #[returns(u64)]
-    GetIcaCount {},
+    GetIcaContractState {  },
     #[returns(String)]
     AuthzGrantee {},
 }

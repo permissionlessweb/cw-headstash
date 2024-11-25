@@ -48,7 +48,7 @@ junod tx wasm e juno16hwsz2fgn6eu54kpgwasc7p9h9qzkt84q6hm77qgmsh8s0fhdczslxz45a 
 
 ### 5.1 Query ICA State For Cw-ICA-Controller Addr 
 ```sh
-junod q wasm contract-state smart juno16hwsz2fgn6eu54kpgwasc7p9h9qzkt84q6hm77qgmsh8s0fhdczslxz45a '{"get_ica_contract_state":{"ica_id": 0 }}'
+junod q wasm contract-state smart juno16hwsz2fgn6eu54kpgwasc7p9h9qzkt84q6hm77qgmsh8s0fhdczslxz45a '{"get_ica_contract_state":{ }}'
 ```
 ### 6. Initialize Cw-Glob W/ Ica-Controller Addr as admin 
 ```sh
@@ -62,36 +62,36 @@ junod tx wasm e juno16hwsz2fgn6eu54kpgwasc7p9h9qzkt84q6hm77qgmsh8s0fhdczslxz45a 
 
 ### 8. Upload Snipp120u Wasm From ICA On Secret 
 ```sh
-junod tx wasm e juno16hwsz2fgn6eu54kpgwasc7p9h9qzkt84q6hm77qgmsh8s0fhdczslxz45a '{"upload_contract_on_secret": {"ica_id": 0, "wasm": "snip120u"}}' --from headstash --fees 200000ujuno
+junod tx wasm e juno16hwsz2fgn6eu54kpgwasc7p9h9qzkt84q6hm77qgmsh8s0fhdczslxz45a '{"upload_contract_on_secret": "wasm": "snip120u"}}' --from headstash --fees 200000ujuno
 ```
 
 ### 9. Upload Cw-Headstash Wasm From ICA On Secret 
 ```sh
-junod tx wasm e juno1appmdzw8m8nmvs23tcrrvcmxcj8l7kyyyaukqg5cw85sjg2zstms8huhrm '{"upload_contract_on_secret": {"ica_id": 0, "wasm": "cw-headstash"}}' --from headstash --fees 200000ujuno
+junod tx wasm e juno1appmdzw8m8nmvs23tcrrvcmxcj8l7kyyyaukqg5cw85sjg2zstms8huhrm '{"upload_contract_on_secret": "wasm": "cw-headstash"}}' --from headstash --fees 200000ujuno
 ```
 
 ### 10. Instantiate Snips 
 ```sh
-junod tx wasm e juno1appmdzw8m8nmvs23tcrrvcmxcj8l7kyyyaukqg5cw85sjg2zstms8huhrm '{"init_snip120u": {"ica_id": 0}}' --from headstash --fees 200000ujuno
+junod tx wasm e juno1appmdzw8m8nmvs23tcrrvcmxcj8l7kyyyaukqg5cw85sjg2zstms8huhrm '{"init_snip120u": {}}' --from headstash --fees 200000ujuno
 ```
 
 ### 11. Instantiate Cw-Headstash
 ```sh
-junod tx wasm e juno1appmdzw8m8nmvs23tcrrvcmxcj8l7kyyyaukqg5cw85sjg2zstms8huhrm '{"init_headstash": {"ica_id": 0}}' --from headstash --fees 200000ujuno
+junod tx wasm e juno1appmdzw8m8nmvs23tcrrvcmxcj8l7kyyyaukqg5cw85sjg2zstms8huhrm '{"init_headstash": {}}' --from headstash --fees 200000ujuno
 ```
 
 ### 12. Authorize Minter
 ```sh
-junod tx wasm e juno1appmdzw8m8nmvs23tcrrvcmxcj8l7kyyyaukqg5cw85sjg2zstms8huhrm '{"authorize_minter": {"ica_id": 0}}' --from headstash --fees 200000ujuno
+junod tx wasm e juno1appmdzw8m8nmvs23tcrrvcmxcj8l7kyyyaukqg5cw85sjg2zstms8huhrm '{"authorize_minter": {}}' --from headstash --fees 200000ujuno
 ```
 
 ### 13. Fund Cw-Headstash Contract
 ```sh 
-junod tx wasm e juno1r2cf69mnm82uhnv7r87uuk2g07z27sgcw86s65muemwk6qpwmu3sfkuddk '{"ibc_transfer_tokens": {"ica_id": 0}}' --from headstash --fees 50000ujuno
+junod tx wasm e juno1r2cf69mnm82uhnv7r87uuk2g07z27sgcw86s65muemwk6qpwmu3sfkuddk '{"ibc_transfer_tokens": {}}' --from headstash --fees 50000ujuno
 ```
 
 ### 14. Add Headstashers
 ```sh 
-junod tx wasm e juno1r2cf69mnm82uhnv7r87uuk2g07z27sgcw86s65muemwk6qpwmu3sfkuddk '{"add_headstash_minters": {"ica_id": 0, "to_add": [{"pubkey": "0x1234", "snips":[{"addr":"secret12345", "amount": "12345"}]},{"pubkey": "0x1234", "snips":[{"addr":"secret19876", "amount": "54321"}]}]}' --from headstash --fees 50000ujuno
+junod tx wasm e juno1r2cf69mnm82uhnv7r87uuk2g07z27sgcw86s65muemwk6qpwmu3sfkuddk '{"add_headstash_minters": "to_add": [{"pubkey": "0x1234", "snips":[{"addr":"secret12345", "amount": "12345"}]},{"pubkey": "0x1234", "snips":[{"addr":"secret19876", "amount": "54321"}]}]}' --from headstash --fees 50000ujuno
 ```
 

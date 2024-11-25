@@ -30,6 +30,12 @@ pub enum ContractError {
     #[error("NoSnip120uParamsSet")]
     NoSnip120uParamsSet {},
 
+    #[error("SetSnip120uCodeError")]
+    SetSnip120uCodeError {},
+
+    #[error("SetHeadstashCodeError")]
+    SetHeadstashCodeError {},
+
     #[error("NoSnip120uContract")]
     NoSnip120uContract {},
 
@@ -65,6 +71,12 @@ pub enum ContractError {
 
     #[error("headstash contract addr not set.")]
     NoHeadstashContract {},
+
+    #[error("SetHeadstashAddrError.")]
+    SetHeadstashAddrError {},
+
+    #[error("SetInitSnip120uError.")]
+    SetInitSnip120uError {},
 
     #[error("ica information is not set")]
     IcaInfoNotSet {},
@@ -103,4 +115,7 @@ pub enum ContractError {
     
     #[error("CwGlobExists")]
     CwGlobExists {},
+
+    #[error("IcaAccountExists")]
+    IcaAccountExists {},
 }

@@ -16,22 +16,47 @@ pub const UPLOAD_REPLY_ID: u64 = 710;
 ///      key defined with enumerated object position for each snip.
 /// key: cw-headstash-init = fourth action to take.
 pub const DEPLOYMENT_SEQUENCE: Map<String, bool> = Map::new("uploaded");
-
 /// The item used to store the state of the IBC application.
-pub const STATE: Item<ContractState> = Item::new("state");
+pub const GLOBAL_CONTRACT_STATE: Item<ContractState> = Item::new("state");
 /// The map used to store the state of the cw-ica-controller contracts.
-pub const ICA_STATES: Map<u64, IcaContractState> = Map::new("icas");
+pub const ICA_STATES: Item<IcaContractState> = Item::new("icas");
 /// The map used to store the state of the cw-ica-controller contracts.
 pub const HEADSTASH_STATES: Map<u64, HeadstashParams> = Map::new("hsp");
 /// The item used to store the count of the cw-ica-controller contracts.
-pub const ICA_COUNT: Item<u64> = Item::new("ica");
+pub const ICA_CREATED: Item<bool> = Item::new("ica");
 /// The item used to map contract addresses to ICA IDs.
-pub const CONTRACT_ADDR_TO_ICA_ID: Map<Addr, u64> = Map::new("catia");
+// pub const CONTRACT_ADDR_TO_ICA_ID: Map<Addr, u64> = Map::new("catia");
 
 pub const GRANTEE: Item<String> = Item::new("grantee");
 
-mod contract {
+#[cw_serde]
+pub enum DeploymentSeq {
+    UploadSnip,
+    UploadHeadstash,
+    InitSnips,
+    InitHeadstash,
+}
 
+impl From<DeploymentSeq> for String {
+    fn from(ds: DeploymentSeq) -> Self {
+        match ds {
+            DeploymentSeq::UploadSnip => "snip120u".to_string(),
+            DeploymentSeq::UploadHeadstash => "cw-headstash".to_string(),
+            DeploymentSeq::InitSnips => "snip120u-init-".to_string(),
+            DeploymentSeq::InitHeadstash => "cw-headstash-init".to_string(),
+        }
+    }
+}
+impl DeploymentSeq {
+    pub fn indexed_snip(&self, i: usize) -> String {
+        match self {
+            DeploymentSeq::InitSnips => format!("snip120u-init-{}", i),
+            _ => panic!("Invalid DeploymentSequence formatted_str value"),
+        }
+    }
+}
+
+mod contract {
     use super::*;
 
     /// ContractState is the state of the IBC application.
@@ -54,9 +79,8 @@ mod contract {
 }
 
 mod ica {
-    use cw_ica_controller::{ibc::types::metadata::TxEncoding, types::state::ChannelState};
-
     use super::*;
+    use cw_ica_controller::{ibc::types::metadata::TxEncoding, types::state::ChannelState};
 
     /// IcaContractState is the state of the cw-ica-controller contract.
     #[cw_serde]
@@ -69,7 +93,6 @@ mod ica {
     /// IcaState is the state of the ICA.
     #[cw_serde]
     pub struct IcaState {
-        pub ica_id: u64,
         pub ica_addr: String,
         pub tx_encoding: TxEncoding,
         pub channel_state: ChannelState,
@@ -89,13 +112,11 @@ mod ica {
     impl IcaState {
         /// Creates a new [`IcaState`].
         pub fn new(
-            ica_id: u64,
             ica_addr: String,
             tx_encoding: TxEncoding,
             channel_state: ChannelState,
         ) -> Self {
             Self {
-                ica_id,
                 ica_addr,
                 tx_encoding,
                 channel_state,
