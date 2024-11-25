@@ -126,7 +126,7 @@ pub fn execute(
         ExecuteMsg::InitHeadstash {} => {
             instantiate::ica_instantiate_headstash_contract(deps, env, info)
         }
-        ExecuteMsg::AuthorizeMinter {} => headstash::ica_authorize_snip120u_minter(deps, info),
+        ExecuteMsg::AuthorizeHeadstashAsSnipMinter {} => headstash::ica_authorize_snip120u_minter(deps, info),
         ExecuteMsg::IbcTransferTokens { channel_id } => {
             headstash::ibc_transfer_to_snip_contracts(deps, env, info, channel_id)
         }
@@ -245,7 +245,7 @@ pub mod upload {
                 .load(deps.storage)?
                 .default_hs_params
                 .cw_glob
-                .expect("no cw-blob. Either set one, or provide one."),
+                .expect("no cw-glob. Either set one, or provide one."),
         };
 
         match key.as_str() {
@@ -418,6 +418,7 @@ pub mod instantiate {
 }
 
 mod headstash {
+    use cosmwasm_std::coin;
     use state::{
         headstash::{Headstash, HeadstashParams},
         DeploymentSeq,
@@ -516,7 +517,8 @@ mod headstash {
             .add_attribute(CUSTOM_CALLBACK, HeadstashCallback::SetHeadstashAsSnipMinter))
     }
 
-    /// transfer each token to their respective snip120u addrs
+    /// transfer each token to their respective snip120u addrs.
+    /// This contract is expected to have a balance of the funds expected to be sent in the tokenParams
     pub fn ibc_transfer_to_snip_contracts(
         deps: DepsMut,
         env: Env,
@@ -527,23 +529,18 @@ mod headstash {
         let mut msgs = vec![];
         let state = ICA_STATES.load(deps.storage)?;
         let hp = state.headstash_params;
-        for coin in info.funds {
-            if let Some(token) = hp.token_params.iter().find(|t| t.native == coin.denom) {
-                if let Some(snip) = token.snip_addr.clone() {
-                    let msg = ica::form_ibc_transfer_msg(
-                        env.block.time,
-                        600u64,
-                        snip,
-                        channel_id.clone(),
-                        coin,
-                    )?;
-                    // add minter msg
-                    msgs.push(msg);
-                } else {
-                    return Err(ContractError::NoSnipContractAddr {});
-                }
+        for token in hp.token_params {
+            if let Some(snip) = token.snip_addr.clone() {
+                let msg = ica::form_ibc_transfer_msg(
+                    env.block.time,
+                    600u64,
+                    snip,
+                    channel_id.clone(),
+                    coin(token.total.into(), token.native),
+                )?;
+                msgs.push(msg);
             } else {
-                return Err(ContractError::NoCoinSentMatchesHeadstashParams {});
+                return Err(ContractError::NoSnipContractAddr {});
             }
         }
 
@@ -1324,7 +1321,7 @@ mod tests {
             wasm: DeploymentSeq::UploadHeadstash.into(),
             cw_glob: Some(cw_glob.to_string()),
         };
-        let msg_authorize_minter = ExecuteMsg::AuthorizeMinter {};
+        let msg_authorize_minter = ExecuteMsg::AuthorizeHeadstashAsSnipMinter {};
         let msg_ibc_transfer = ExecuteMsg::IbcTransferTokens {
             channel_id: "transfer-channel".into(),
         };
@@ -1376,7 +1373,6 @@ mod tests {
             feegranter: Some(feegranter.to_string()),
             ica_controller_code_id: 1u64,
             headstash_params: headstash_params.clone(),
-            dictatorship: false,
         };
         // instantiate cw-ica-owner
         instantiate(deps.as_mut(), env.clone(), info_creator.clone(), msg).unwrap();

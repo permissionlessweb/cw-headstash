@@ -682,7 +682,7 @@ mod tests {
                 msg_responses: vec![],
             }),
         };
-        // println!("simulated reply from cw-blob: {:#?}", msg);
+        // println!("simulated reply from cw-glob: {:#?}", msg);
 
         // simulate response from cw-glob
         let res = reply(deps.as_mut(), env.clone(), msg).unwrap();

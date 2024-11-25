@@ -233,10 +233,10 @@ pub mod headstash {
         pub cw_glob: Option<Addr>,
         /// The code ID of the snip120u contract, on Secret Network.
         pub snip120u_code_id: Option<u64>,
-        /// Code id of Headstash contract on Secret Network
-        pub headstash_code_id: Option<u64>,
         /// The code hash of the snip120u contract, on Secret Network. Not optional for pre-deployment verification
         pub snip120u_code_hash: String,
+        /// Code id of Headstash contract on Secret Network
+        pub headstash_code_id: Option<u64>,
         /// Params defined by deployer for tokens included.
         pub token_params: Vec<HeadstashTokenParams>,
         /// Headstash contract address this contract is admin of.

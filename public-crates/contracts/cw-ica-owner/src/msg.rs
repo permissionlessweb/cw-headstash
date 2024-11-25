@@ -15,8 +15,6 @@ pub struct InstantiateMsg {
     pub ica_controller_code_id: u64,
     /// Parameters for the cw-headstash contract
     pub headstash_params: HeadstashParams,
-    /// If enabled, contract owner may provide any addr to retrive their cw-ica-account in state, to perform action on behalf
-    pub dictatorship: bool,
 }
 
 #[ica_callback_execute]
@@ -39,7 +37,7 @@ pub enum ExecuteMsg {
     /// a. snip120u
     /// b. cw-headstash
     UploadContractOnSecret {
-        /// Optional contract address of the cw-blob.
+        /// Optional contract address of the cw-glob.
         cw_glob: Option<String>,
         /// The wasm blob name to upload
         wasm: String,
@@ -49,7 +47,7 @@ pub enum ExecuteMsg {
     /// 3. Instantiates the secret headstash contract on Secret Network.
     InitHeadstash {},
     /// 4. Authorized the headstash contract as a minter for both snip120u contracts.
-    AuthorizeMinter {},
+    AuthorizeHeadstashAsSnipMinter {},
     /// . Transfer each token included in msg over via ics20.
     IbcTransferTokens {
         channel_id: String,
