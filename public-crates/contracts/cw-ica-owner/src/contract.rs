@@ -774,11 +774,16 @@ mod query {
 
 pub mod ica {
     use anybuf::Anybuf;
-    use cosmrs::{
-        proto::cosmos::authz::v1beta1::{GenericAuthorization, Grant, MsgGrant},
-        tx::MessageExt,
-        Any,
+    use cosmos_sdk_proto::{
+        cosmos::authz::v1beta1::{GenericAuthorization, Grant, MsgGrant},
+        prost, Any,
     };
+    use prost::Message;
+    // use cosmrs::{
+    //     proto::cosmos::authz::v1beta1::{GenericAuthorization, Grant, MsgGrant},
+    //     tx::MessageExt,
+    //     Any,
+    // };
     use cosmwasm_std::{from_json, Coin, Empty, IbcTimeout, Timestamp, Uint128};
     use cw_ica_controller::{
         ibc::types::packet::acknowledgement::Data,
@@ -985,8 +990,7 @@ pub mod ica {
                     value: GenericAuthorization {
                         msg: msg.to_string(),
                     }
-                    .to_bytes()
-                    .unwrap(),
+                    .encode_to_vec(),
                 }),
                 expiration: None,
             };
@@ -1007,8 +1011,8 @@ pub mod ica {
                     .append_string(1, terp_ica_addr.clone()) // granter
                     .append_string(2, grantee.clone()) // grantee
                     .append_bytes(
-                        3,                                      // grant
-                        Binary::new(grant.to_bytes().unwrap()), // cw-ica SendCosmosMsgs
+                        3,                                  // grant
+                        Binary::new(grant.encode_to_vec()), // cw-ica SendCosmosMsgs
                     )
                     .append_repeated_bytes::<Vec<u8>>(5, &[]) // funds
                     .into_vec()

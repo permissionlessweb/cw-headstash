@@ -1,6 +1,5 @@
 use std::num::ParseIntError;
 
-use cosmrs::proto::prost::EncodeError;
 use cosmwasm_std::{Instantiate2AddressError, StdError};
 use thiserror::Error;
 
@@ -11,9 +10,6 @@ pub enum ContractError {
 
     #[error("{0}")]
     Std(#[from] StdError),
-
-    #[error("{0}")]
-    EncodeError(#[from] EncodeError),
 
     #[error("error when computing the instantiate2 address: {0}")]
     Instantiate2AddressError(#[from] Instantiate2AddressError),

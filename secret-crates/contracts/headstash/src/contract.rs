@@ -55,7 +55,7 @@ pub fn instantiate(
         end_date: msg.end_date,
         snip120us: msg.snips,
         start_date,
-        viewing_key: msg.viewing_key,
+        random_key: msg.random_key,
         snip_hash: msg.snip120u_code_hash,
         bloom: msg.bloom_config,
         multiplier: msg.multiplier,
@@ -181,7 +181,7 @@ pub mod headstash {
         // randomly select point in headstash array to start from.
         let hsl = headstash.len();
 
-        let rsp = utils::random_starting_point(rng, hsl.clone());
+        let rsp = utils::random_starting_point(rng, hsl.clone(),config.random_key);
         // println!("hsl: {:#?}", hsl);
         // println!("rsp: {:#?}", rsp);
         
@@ -864,10 +864,13 @@ pub mod utils {
 
     use super::*;
 
-    pub fn random_starting_point(prng: &mut ContractPrng, lens: usize) -> usize {
-        let mut random_number = [0u8; 8]; // Use 8 bytes to represent a usize
+    pub fn random_starting_point(prng: &mut ContractPrng, lens: usize, random_key: String) -> usize {
+        let mut random_number = [0u8; 4]; // Use 4 bytes to represent a u32
+        let key_bytes = random_key.as_bytes();
+        random_number.copy_from_slice(&key_bytes[..4]); // Copy the first 4 bytes of the key
         prng.fill_bytes(&mut random_number);
-        let random_usize = usize::from_le_bytes(random_number);
+        let random_u32 = u32::from_le_bytes(random_number);
+        let random_usize = random_u32 as usize;
         random_usize % lens
     }
 
@@ -1077,7 +1080,7 @@ mod tests {
                 // snip120u_code_id: 2,
                 snip120u_code_hash: "HASH".into(),
                 snips: vec![fist_eligible_snip, second_eligible_snip],
-                viewing_key: "viewing_key".into(),
+                random_key: "random_key".into(),
                 bloom_config: Some(BloomConfig {
                     default_cadance: 5u64,
                     min_cadance: 0u64,
@@ -1127,7 +1130,7 @@ mod tests {
                 ]
             );
             assert_eq!(constants.snip_hash.as_str(), "HASH");
-            assert_eq!(constants.viewing_key.as_str(), "viewing_key");
+            assert_eq!(constants.random_key.as_str(), "viewing_key");
         }
 
         #[test]
@@ -1713,7 +1716,7 @@ mod tests {
                 // snip120u_code_id: 2,
                 snip120u_code_hash: "HASH".into(),
                 snips: vec![fist_eligible_snip, second_eligible_snip],
-                viewing_key: "viewing_key".into(),
+                random_key: "random_key".into(),
                 bloom_config: Some(BloomConfig {
                     default_cadance: 5u64,
                     min_cadance: 0u64,

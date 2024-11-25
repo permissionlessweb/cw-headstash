@@ -16,11 +16,11 @@ tokio = "1.40.0"
 serde_json = "1.0.128"
 anybuf =  "0.5.0"
 anyhow =  "1.0.87"
-cw-headstash = {path = "../contracts/headstash"}
+cw-headstash = {path = "../secret-crates/contracts/headstash"}
 reqwest = "0.12.7"
 clap = { version = "4.5.0", features = ["derive"] }
 log = "0.4.22"
-# snip120u-impl = { version = "1.0.0", path = "../contract/snip120u"}
+# snip120u-impl = { version = "1.0.0", path = "../secret-crates/contracts/snip120u"}
 # cosmos specific deps
 cw-ica-controller = { git = "https://github.com/permissionlessweb/cw-ica-controller" , default-features = false }
 cw-orch-interchain = {version = "0.4.0", features = ["daemon"]}

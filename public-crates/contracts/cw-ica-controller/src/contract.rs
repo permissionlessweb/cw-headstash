@@ -531,15 +531,14 @@ mod migrate {
 
 #[cfg(test)]
 mod tests {
-    use std::any::Any;
-
-    use crate::types::msg::options::ChannelOpenInitOptions;
 
     use super::*;
+    use crate::types::msg::options::ChannelOpenInitOptions;
     use cosmwasm_std::testing::{message_info, mock_dependencies, mock_env};
     use cosmwasm_std::{
         Api, CosmosMsg, Empty, Event, IbcTimeout, IbcTimeoutBlock, StdError, SubMsg,
     };
+    use std::any::Any;
     // use state::headstash::HeadstashTokenParams;
 
     #[test]

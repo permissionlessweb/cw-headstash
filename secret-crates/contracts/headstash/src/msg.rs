@@ -29,8 +29,8 @@ pub struct InstantiateMsg {
     pub snips: Vec<Snip120u>,
     /// Option to enable contract to add multiplier on allocations when claiming. currently 1.33x.
     pub multiplier: bool,
-    /// viewing key permit.
-    pub viewing_key: String,
+    /// random seed provided by user.
+    pub random_key: String,
     /// optional bloom configuration
     pub bloom_config: Option<BloomConfig>,
     // /// The options to initialize the IBC channel upon contract instantiation.

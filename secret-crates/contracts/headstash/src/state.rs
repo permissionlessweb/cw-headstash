@@ -88,7 +88,7 @@ pub struct Config {
     pub end_date: Option<u64>,
     pub snip120us: Vec<snip::Snip120u>,
     pub snip_hash: String,
-    pub viewing_key: String,
+    pub random_key: String,
     pub multiplier: bool,
     pub bloom: Option<BloomConfig>,
 }

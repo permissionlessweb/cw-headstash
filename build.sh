@@ -9,7 +9,7 @@ cat ../public-crates/contracts/cw-glob/src/globs/snip20_reference_impl.wasm | gz
 # sha256sum ../public-crates/contracts/cw-glob/src/globs/snip20_reference_impl.wasm
 # sha256sum ../public-crates/contracts/cw-glob/src/globs/cw_headstash.wasm.gz
 # sha256sum ../public-crates/contracts/cw-glob/src/globs/snip120u_impl.wasm.gz
-rm ../public-crates/contracts/cw-glob/src/globs/cw_headstash.wasm && rm ../public-crates/contracts/cw-glob/src/globs/snip20_reference_impl.wasm
+# rm ../public-crates/contracts/cw-glob/src/globs/cw_headstash.wasm && rm ../public-crates/contracts/cw-glob/src/globs/snip20_reference_impl.wasm
 
 # 3. build public crates 
 cd ../public-crates && docker run --rm -v "$(pwd)":/code \

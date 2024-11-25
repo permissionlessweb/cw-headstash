@@ -1,5 +1,9 @@
 
 # create ibc configuration
+## Terp -> Scrt Connection ID: 
+## Scrt -> Terp Connection ID:
+## TERP ibc hash 
+## SCRT ibc hash 
 
 # upload contracts to controller chain 
 
