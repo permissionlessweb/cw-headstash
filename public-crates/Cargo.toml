@@ -1,6 +1,5 @@
 [workspace]
 members = [
-
   # Secret Headstash Contract
   "contracts/cw-glob",
   "contracts/cw-ica-controller",
@@ -8,6 +7,13 @@ members = [
   # "scripts",
 ]
 exclude = ["scripts"]
+
+# [workspace.package]
+# edition = "2021"
+# license = "BSD-3-Clause"
+# repository = "https://https://github.com/permissionlessweb/cw-headstash/public-crates"
+# rust-version = "1.67"
+# version = "1.1.0"
 
 [profile.release]
 opt-level = 3

@@ -86,7 +86,7 @@ pub fn instantiate(
     } else {
         DEPLOYMENT_SEQUENCE.save(deps.storage, DeploymentSeq::InitHeadstash.into(), &true)?;
     }
-
+    ICA_CREATED.save(deps.storage, &false)?;
     GLOBAL_CONTRACT_STATE.save(
         deps.storage,
         &ContractState::new(msg.ica_controller_code_id, msg.headstash_params),
@@ -126,7 +126,9 @@ pub fn execute(
         ExecuteMsg::InitHeadstash {} => {
             instantiate::ica_instantiate_headstash_contract(deps, env, info)
         }
-        ExecuteMsg::AuthorizeHeadstashAsSnipMinter {} => headstash::ica_authorize_snip120u_minter(deps, info),
+        ExecuteMsg::AuthorizeHeadstashAsSnipMinter {} => {
+            headstash::ica_authorize_snip120u_minter(deps, info)
+        }
         ExecuteMsg::IbcTransferTokens { channel_id } => {
             headstash::ibc_transfer_to_snip_contracts(deps, env, info, channel_id)
         }
@@ -157,6 +159,7 @@ pub fn query(deps: Deps, _env: Env, msg: QueryMsg) -> StdResult<Binary> {
         QueryMsg::GetIcaContractState {} => to_json_binary(&query::ica_state(deps)?),
         QueryMsg::Ownership {} => to_json_binary(&cw_ownable::get_ownership(deps.storage)?),
         QueryMsg::AuthzGrantee {} => to_json_binary(&GRANTEE.load(deps.storage)?),
+        QueryMsg::GetDeploymentState {} => todo!(),
     }
 }
 
@@ -310,16 +313,14 @@ pub mod instantiate {
             && hp.snip120u_code_id.is_none()
         {
             return Err(ContractError::NoSnipCodeId {});
-        } else if !DEPLOYMENT_SEQUENCE.load(deps.storage, "cw-headstash".to_string())?
+        } else if !DEPLOYMENT_SEQUENCE.load(deps.storage, DeploymentSeq::UploadHeadstash.into())?
             && hp.headstash_code_id.is_none()
         {
             return Err(ContractError::NoHeadstashCodeId {});
         }
 
-        let length = hp.token_params.len();
-
         for token in &hp.token_params {
-            if length != 0 {
+            if hp.token_params.len() != 0 {
                 if let Some(t) = hp.token_params.iter().find(|t| t.native == token.native) {
                     let msg = self::ica::form_instantiate_snip120u(
                         cw_ica_contract.addr().to_string(),
@@ -358,7 +359,7 @@ pub mod instantiate {
         // iterate and enumerate for each snip in snip params, if they deployment sequence is not met, and there is addr for each snip, error.
         for (i, hstp) in hs_params.token_params.iter().enumerate() {
             // println!("token_param: {i}, {:#?}", param);
-            if !DEPLOYMENT_SEQUENCE.load(deps.storage, format!("snip120u-init-{}", i))?
+            if !DEPLOYMENT_SEQUENCE.load(deps.storage, DeploymentSeq::InitSnips.indexed_snip(i))?
                 && hstp.snip_addr.is_none()
             {
                 return Err(ContractError::NoSnip120uContract {});
@@ -396,7 +397,7 @@ pub mod instantiate {
                                 .unwrap_or(env.block.time.plus_days(365u64).nanos()), // one year
                         ),
                         start_date: hs_params.headstash_init_config.end_date,
-                        viewing_key: hs_params.headstash_init_config.viewing_key,
+                        random_key: hs_params.headstash_init_config.random_key,
                         owner: Addr::unchecked(ica.ica_addr),
                         snip120u_code_hash: hs_params.snip120u_code_hash,
                         snips: hs_snips,
@@ -518,7 +519,8 @@ mod headstash {
     }
 
     /// transfer each token to their respective snip120u addrs.
-    /// This contract is expected to have a balance of the funds expected to be sent in the tokenParams
+    /// This contract is expected to have a balance of the funds expected to be sent in the tokenParams\
+    /// todo: add custom amount to transfer, ensure contract has balance or funds were sent in msg.
     pub fn ibc_transfer_to_snip_contracts(
         deps: DepsMut,
         env: Env,
@@ -1033,7 +1035,7 @@ pub mod ica {
     pub fn form_instantiate_snip120u(
         sender: String,
         coin: HeadstashTokenParams,
-        code_hash: String,
+        _code_hash: String,
         code_id: u64,
         headstash: Option<String>,
         symbol: String,
@@ -1052,6 +1054,7 @@ pub mod ica {
             config: None,
             supported_denoms: Some(vec![coin.ibc.clone()]),
         };
+        
         Ok(
             #[allow(deprecated)]
             // proto ref: https://github.com/scrtlabs/SecretNetwork/blob/master/proto/secret/compute/v1beta1/msg.proto
@@ -1059,14 +1062,12 @@ pub mod ica {
                 type_url: "/secret.compute.v1beta1.MsgInstantiateContract".into(),
                 value: anybuf::Anybuf::new()
                     .append_string(1, sender.to_string()) // sender (ICA Address)
-                    .append_string(2, &code_hash.to_string()) // callback_code_hash
                     .append_uint64(3, code_id) // code-id of snip-25
                     .append_string(
                         4,
                         "SNIP120U For Secret Network - ".to_owned() + coin.name.as_str(),
                     ) // label of snip20
                     .append_bytes(5, to_json_binary(&init_msg)?.as_slice())
-                    .append_string(8, &code_hash.to_string()) // callback_code_hash
                     .into_vec()
                     .into(),
             },
@@ -1363,7 +1364,7 @@ mod tests {
                 claim_msg_plaintxt: "HREAM ~ {wallet} ~ {secondary_addr} ~ {expiration}".into(),
                 end_date: None,
                 start_date: None,
-                viewing_key: "eretskeretjableret".into(),
+                random_key: "eretskeretjableret".into(),
             },
         };
 
@@ -1813,7 +1814,7 @@ mod tests {
                 claim_msg_plaintext: "{wallet}".into(),
                 end_date: Some(env.block.time.plus_days(365u64).nanos()),
                 start_date: None,
-                viewing_key: "eretskeretjablret".into(),
+                random_key: "eretskeretjablret".into(),
                 owner: Addr::unchecked(ica_addr),
                 snip120u_code_hash: hs_params.snip120u_code_hash,
                 snips: hs_snips,

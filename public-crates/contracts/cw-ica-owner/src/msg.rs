@@ -65,15 +65,19 @@ pub enum ExecuteMsg {
     AuthzDeployer {
         grantee: String,
     },
+    // Admin feature to manually set code-id for cw-headstash on Secret.
     SetHeadstashCodeId {
         code_id: u64,
     },
+    // Admin feature to manually set code-id for snip120u on Secret.
     SetSnip120uCodeId {
         code_id: u64,
     },
+    // Admin feature to manually set contract-addr for cw-headstash on Secret.
     SetHeadstashAddr {
         addr: String,
     },
+    // Admin feature to manually set contract-addr for snip120u on Secret.
     SetSnip120uAddr {
         /// token denomination representing snip
         denom: String,
@@ -81,6 +85,9 @@ pub enum ExecuteMsg {
         addr: String,
     },
 }
+
+
+
 #[cw_serde]
 pub enum SudoMsg {
     HandleIbcBloom {},
@@ -93,9 +100,11 @@ pub enum QueryMsg {
     /// GetContractState returns the contact's state.
     #[returns(crate::state::ContractState)]
     GetContractState {},
+    #[returns(String)]
+    GetDeploymentState {},
     /// GetIcaState returns the ICA state for the given ICA ID.
     #[returns(crate::state::IcaContractState)]
-    GetIcaContractState {  },
+    GetIcaContractState {},
     #[returns(String)]
     AuthzGrantee {},
 }

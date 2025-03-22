@@ -82,4 +82,7 @@ let instantiate_headstash_contract = async () => {
     }
 }
 
+// query wasm info 
+// query owner info 
+
 export { upload_headstash_contract, instantiate_headstash_contract }

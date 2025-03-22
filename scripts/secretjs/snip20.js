@@ -29,8 +29,8 @@ let upload_snip120u = async (wasm) => {
         console.log("codeId:", codeId);
         const contractCodeHash = (await secretjs.query.compute.codeHashByCodeId({ code_id: codeId })).code_hash;
         console.log(`Contract hash: ${contractCodeHash}`);
-    } else 
-    console.log(`Tx Error: ${tx.rawLog}`);
+    } else
+        console.log(`Tx Error: ${tx.rawLog}`);
 }
 
 // initiates a new snip120u, with sender as admin, and single supported denom
@@ -157,6 +157,13 @@ let query_token_config = async (contract, code_hash) => {
 
     console.log(tokenInfoQuery);
 };
+
+/// Wasm Queries 
+let query_contract_info = async (code_id) => {
+    const tokenInfoQuery = await secretjs.query.compute.codeHashByCodeId({ code_id })
+
+    console.log(tokenInfoQuery);
+};
 let query_balance = async (contract, key) => {
     const tokenInfoQuery = await secretjs.query.compute.queryContract({
         contract_address: contract,
@@ -169,4 +176,15 @@ let query_balance = async (contract, key) => {
     console.log(tokenInfoQuery);
 };
 
-export { upload_snip120u, init_snip120u,set_headstash_as_minter, deposit_to_snip20, query_token_info, query_token_config, set_viewing_key, query_balance, fund_headstash }
+export {
+    upload_snip120u,
+    init_snip120u,
+    set_headstash_as_minter,
+    deposit_to_snip20,
+    query_token_info,
+    query_token_config,
+    set_viewing_key,
+    query_balance,
+    fund_headstash,
+    query_contract_info
+}

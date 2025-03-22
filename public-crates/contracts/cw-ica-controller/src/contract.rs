@@ -47,8 +47,6 @@ pub fn instantiate(
         msg.channel_open_init_options.channel_ordering,
     );
 
-    // CW_GLOB.save(deps.storage, &deps.api.addr_validate(&msg.cw_glob)?)?;
-
     Ok(Response::new().add_message(ica_channel_open_init_msg))
 }
 
@@ -205,11 +203,10 @@ pub fn migrate(deps: DepsMut, _env: Env, _msg: MigrateMsg) -> Result<Response, C
 }
 
 mod execute {
-    use super::CUSTOM_CALLBACK;
     use crate::{
         ibc::types::packet::IcaPacketData,
         types::{
-            msg::{options::ChannelOpenInitOptions, HeadstashCallback},
+            msg::options::ChannelOpenInitOptions,
             state::{CW_GLOB, UPLOAD_REPLY_ID},
         },
     };
@@ -268,9 +265,7 @@ mod execute {
             },
         )?;
 
-        Ok(Response::new()
-            .add_submessage(SubMsg::reply_always(upload_msg, UPLOAD_REPLY_ID))
-            .add_attribute(CUSTOM_CALLBACK, HeadstashCallback::UploadHeadstash))
+        Ok(Response::new().add_submessage(SubMsg::reply_always(upload_msg, UPLOAD_REPLY_ID)))
     }
 
     /// Submits a stargate `MsgChannelOpenInit` to the chain.

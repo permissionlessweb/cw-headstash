@@ -214,8 +214,8 @@ mod convert_to_protobuf {
     use cosmos_sdk_proto::{
         cosmos::{
             bank::v1beta1::{
-                QueryAllBalancesRequest, QueryBalanceRequest, QueryDenomMetadataRequest,
-                QueryDenomsMetadataRequest, QuerySupplyOfRequest,
+                QueryBalanceRequest, QueryDenomMetadataRequest, QueryDenomsMetadataRequest,
+                QuerySupplyOfRequest,
             },
             base::query::v1beta1::PageRequest,
         },
@@ -236,15 +236,15 @@ mod convert_to_protobuf {
                 QueryBalanceRequest { address, denom }.encode_to_vec(),
                 false,
             ),
-            BankQuery::AllBalances { address } => (
-                constants::ALL_BALANCES.to_string(),
-                QueryAllBalancesRequest {
-                    address,
-                    pagination: None,
-                }
-                .encode_to_vec(),
-                false,
-            ),
+            // BankQuery::AllBalances { address } => (
+            //     constants::ALL_BALANCES.to_string(),
+            //     QueryAllBalancesRequest {
+            //         address,
+            //         pagination: None,
+            //     }
+            //     .encode_to_vec(),
+            //     false,
+            // ),
             BankQuery::DenomMetadata { denom } => (
                 constants::DENOM_METADATA.to_string(),
                 QueryDenomMetadataRequest { denom }.encode_to_vec(),

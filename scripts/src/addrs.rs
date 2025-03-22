@@ -5,7 +5,7 @@ use serde_json::Value;
 
 /// retrives the list of eligible pubkey and their headstash allocations
 pub fn get_addrs_from_json() {
-    let data = fs::read_to_string("../../tools/example-data/distribution.json")
+    let data = fs::read_to_string("../data/distribution.json")
         .expect("Something went wrong reading the file");
 
     let json_value: Vec<Value> = serde_json::from_str(&data).unwrap();
@@ -28,8 +28,12 @@ pub fn get_addrs_from_json() {
         }
 
         addrs.push(Headstash {
-            pubkey: address,
-            snip: headstash_vec,
+            addr: address.to_string(),
+            snips: vec![Snip],
+        });
+        addrs.push(Headstash {
+            addr: todo!(),
+            snips: todo!(),
         });
     }
 }

@@ -182,9 +182,6 @@ pub mod headstash {
         let hsl = headstash.len();
 
         let rsp = utils::random_starting_point(rng, hsl.clone(),config.random_key);
-        // println!("hsl: {:#?}", hsl);
-        // println!("rsp: {:#?}", rsp);
-        
         add_headstash_to_state(deps, hsl, rsp, headstash.clone(), config.snip120us)?;
         
         Ok(Response::default())
@@ -200,7 +197,6 @@ pub mod headstash {
         // ensure pubkey is not already in KeyMap
         for i in 0..hsl {
             let hs: Headstash = headstash[(i + rsp) % hsl].clone();
-            // println!("headstash: {:#?},{:#?}", i, hs.clone());
             let key = hs.addr;
             // first key suffix is eligible addr
             let l1 = HEADSTASH_OWNERS.add_suffix(key.as_bytes());
@@ -250,15 +246,6 @@ pub mod headstash {
 
         // make sure airdrop has not ended
         queries::available(&config, &env)?;
-
-        // ensure snip defined is one eligible for this headstash
-        // if !config
-        //     .snip120us
-        //     .iter()
-        //     .any(|a| a.native_token.as_str() == denom)
-        // {
-        //     return Err(ContractError::InvalidSnip120u {});
-        // }
 
         // if pubkey does not start with 0x1, we expect it is a solana wallet and we must verify
         if sig_addr.starts_with("0x") {
@@ -1130,7 +1117,7 @@ mod tests {
                 ]
             );
             assert_eq!(constants.snip_hash.as_str(), "HASH");
-            assert_eq!(constants.random_key.as_str(), "viewing_key");
+            assert_eq!(constants.random_key.as_str(), "random_key");
         }
 
         #[test]

@@ -6,9 +6,28 @@ slug: /how-it-works/headstash-workflow
 ---
 
 
+## The Deployment Workflow 
+
+To deploy, or verify a deployment of the headstash contracts, an ibc connection between Terp Network & Secret Network will be used:
+
+### A. Build Wasm Artifacts
+Building the contracts from source code is a great way to verify code stored on-chain, is the exact same, line for line, with the same source code you are using.
+This allows for verification that the code deployed will function as we can see it should. With the scripts available, you the wasm blobs can be built and checksums generating an authenticity garuntee.
 
 
-## Headstash LifeCycle
+### B. Deploy Public Crates 
+
+We deploy the wasm artifacts for the public crates first. 
+
+### C. Deploy Private Crates (Optional)
+It is optional to deploy or use existing snip120u or headstash code-ids, however to deploy your own, there are secret.js scripts available for deploying the contract artifacts manually.
+
+### E. Create ICA Account 
+An Ica account is created with a contract call to the ica-owner. An admin is set either explicity, or the message sender will be. Various public configurations for the headstash and snip120u contracts during this step
+
+### F. Configure Headstash Parameters
+
+## The Headstash User Experience (UX) Workflow: 
 
 ### A. Connect Eligible Wallet
 

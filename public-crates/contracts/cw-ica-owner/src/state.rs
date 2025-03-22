@@ -147,26 +147,27 @@ pub mod headstash {
     pub struct InstantiateMsg {
         /// owner of contract
         pub owner: Addr,
-        /// {wallet}
+        /// HREAM ~ {wallet} ~ {secondary_addr} ~ {expiration}
         pub claim_msg_plaintext: String,
         /// optional date that once reached, will start headstash distribution event.
         pub start_date: Option<u64>,
         /// optional date that once reached, will end headstash distribution event.
         pub end_date: Option<u64>,
-        /// code-id of custom snip20 contract for headstashes
-        // pub snip120u_code_id: u64,
         /// code hash of custom snip20 contract for headstashes
         pub snip120u_code_hash: String,
         /// A list of custom snip20-headstash contracts.
         /// This contract must be set as an authorized minter for each, or else this contract will not work.
         pub snips: Vec<Snip120u>,
-        /// viewing key permit.
-        pub viewing_key: String,
         /// Option to enable contract to add multiplier on allocations when claiming. currently 1.33x.
         pub multiplier: bool,
+        /// random seed provided by user.
+        pub random_key: String,
         /// optional bloom configuration
         pub bloom_config: Option<BloomConfig>,
+        // /// The options to initialize the IBC channel upon contract instantiation.
+        // pub channel_open_init_options: Option<options::ChannelOpenInitOptions>,
     }
+    
 
     use super::cw_serde;
     use cosmwasm_std::{Addr, Uint128};
@@ -206,7 +207,7 @@ pub mod headstash {
         pub claim_msg_plaintxt: String,
         pub end_date: Option<u64>,
         pub start_date: Option<u64>,
-        pub viewing_key: String,
+        pub random_key: String,
     }
 
     /// Params for Headstash Tokens
