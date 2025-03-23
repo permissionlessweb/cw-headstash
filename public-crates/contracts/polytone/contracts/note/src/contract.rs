@@ -2,7 +2,7 @@
 use cosmwasm_std::entry_point;
 use cosmwasm_std::{
     to_json_binary, Binary, Deps, DepsMut, Env, IbcMsg, IbcTimeout, MessageInfo, Response,
-    StdResult,
+    StdError, StdResult,
 };
 use cw2::set_contract_version;
 use polytone::callbacks::CallbackRequestType;
@@ -10,6 +10,7 @@ use polytone::{accounts, callbacks, ibc};
 
 use crate::error::ContractError;
 
+use crate::headstash::constants::DEFAULT_TIMEOUT;
 use crate::ibc::ERR_GAS_NEEDED;
 use crate::msg::{ExecuteMsg, HeadstashParams, InstantiateMsg, MigrateMsg, Pair, QueryMsg};
 use crate::state::{
@@ -106,21 +107,18 @@ pub fn execute(
     info: MessageInfo,
     msg: ExecuteMsg,
 ) -> Result<Response, ContractError> {
+    let mut hscb = false;
+
     let (msg, callback, timeout_seconds, request_type) = match msg {
         ExecuteMsg::Execute {
             headstash_msg,
-            callback,
             timeout_seconds,
+            ..
         } => (
             ibc::Msg::Execute {
-                msgs: headstash_msg.to_secret_msg(
-                    &env,
-                    deps.storage,
-                    deps.api.clone(),
-                    info.clone(),
-                )?, //  custom circuit for headstashes
+                msgs: headstash_msg.to_cosmos_msgs(&env, deps.storage, deps.api, info.clone())?,
             },
-            callback,
+            headstash_msg.to_callback_request(&env, deps.storage, deps.api)?,
             timeout_seconds,
             CallbackRequestType::Execute,
         ),
@@ -130,46 +128,72 @@ pub fn execute(
             timeout_seconds,
         } => (
             ibc::Msg::Query { msgs },
-            Some(callback),
+            callback,
             timeout_seconds,
             CallbackRequestType::Query,
         ),
+        ExecuteMsg::HeadstashCallBack { rx } => {
+            hscb = true;
+            (
+                ibc::Msg::Execute {
+                    msgs: rx.into_headstash_msg(deps.storage)?,
+                },
+                rx.into_callback(env.contract.address.to_string())?,
+                DEFAULT_TIMEOUT.into(),
+                CallbackRequestType::Execute,
+            )
+        }
     };
 
-    let channel_id = CHANNEL
-        .may_load(deps.storage)?
-        .ok_or(ContractError::NoPair)?;
+    // currently only local callbacks for headstash.
+    // todo: implement ibc packet callbacks for headstash
+    let response = match hscb {
+        false => {
+            let channel_id = CHANNEL
+                .may_load(deps.storage)?
+                .ok_or(ContractError::NoPair)?;
 
-    let sequence_number = increment_sequence_number(deps.storage, channel_id.clone())?;
+            let sequence_number = increment_sequence_number(deps.storage, channel_id.clone())?;
 
-    callbacks::request_callback(
-        deps.storage,
-        deps.api,
-        channel_id.clone(),
-        sequence_number,
-        info.sender.clone(),
-        callback,
-        request_type,
-    )?;
+            callbacks::request_callback(
+                deps.storage,
+                deps.api,
+                channel_id.clone(),
+                sequence_number,
+                info.sender.clone(),
+                Some(callback),
+                request_type,
+            )?;
 
-    accounts::on_send_packet(
-        deps.storage,
-        channel_id.clone(),
-        sequence_number,
-        &info.sender,
-    )?;
+            accounts::on_send_packet(
+                deps.storage,
+                channel_id.clone(),
+                sequence_number,
+                &info.sender,
+            )?;
 
-    Ok(Response::default()
-        .add_attribute("method", "execute")
-        .add_message(IbcMsg::SendPacket {
-            channel_id,
-            data: to_json_binary(&ibc::Packet {
-                sender: info.sender.into_string(),
-                msg,
+            Response::new().add_message(IbcMsg::SendPacket {
+                channel_id,
+                data: to_json_binary(&ibc::Packet {
+                    sender: info.sender.into_string(),
+                    msg,
+                })
+                .expect("msgs are known to be serializable"),
+                timeout: IbcTimeout::with_timestamp(
+                    env.block.time.plus_seconds(timeout_seconds.u64()),
+                ),
             })
-            .expect("msgs are known to be serializable"),
-            timeout: IbcTimeout::with_timestamp(env.block.time.plus_seconds(timeout_seconds.u64())),
-        }))
+        }
+        true => {
+            let msgs = match msg {
+                ibc::Msg::Execute { msgs } => Ok(msgs),
+                _ => Err(ContractError::Std(StdError::generic_err("unimplemented"))),
+            }?;
+            Response::new().add_messages(msgs)
+        }
+    };
+
+    Ok(response)
 }
 
 #[cfg_attr(not(feature = "library"), entry_point)]

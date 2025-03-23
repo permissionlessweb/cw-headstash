@@ -26,6 +26,8 @@ pub mod constants {
     pub const SECRET_COMPUTE_EXECUTE: &str = "/secret.compute.v1beta1.MsgExecuteContract";
     pub const COSMOS_GENERIC_FEEGRANT_ALLOWANCE: &str = "/cosmos.feegrant.v1beta1.BasicAllowance";
     pub const COSMOS_GENERIC_FEEGRANT_MSG: &str = "/cosmos.feegrant.v1beta1.MsgGrantAllowance";
+
+    pub const DEFAULT_TIMEOUT: u64 = 10000u64;
 }
 use constants::*;
 
@@ -57,7 +59,7 @@ pub fn set_cw_glob(
     Ok(Response::new())
 }
 
-pub fn set_contract_on_secret(
+pub fn upload_contract_on_secret(
     storage: &mut dyn Storage,
     api: &dyn Api,
     info: &MessageInfo,
@@ -339,7 +341,7 @@ pub fn authorize_headstash_as_snip_minter(
 ) -> Result<Response, ContractError> {
     let mut msgs = vec![];
     if let Some(remote_account) = polytone::accounts::query_account(storage, info.sender.clone())? {
-        let mut hp = HEADSTASH_PARAMS.load(storage)?;
+        let hp = HEADSTASH_PARAMS.load(storage)?;
 
         if let Some(hs_addr) = hp.headstash_addr {
             // load snip120u's from state
@@ -467,6 +469,10 @@ pub fn fund_headstash(storage: &mut dyn Storage, api: &dyn Api) -> Result<Respon
     Ok(Response::new())
 }
 
+pub mod callbacks {
+
+    use super::*;
+}
 pub mod headstash_anybuf {
     use super::*;
     use crate::state::{headstash::Headstash, CW_GLOB};

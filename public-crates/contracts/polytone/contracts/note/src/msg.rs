@@ -1,13 +1,15 @@
 use cosmwasm_schema::{cw_serde, QueryResponses};
 use cosmwasm_std::{
-    Addr, Api, CosmosMsg, Empty, Env, MessageInfo, QueryRequest, StdError, Storage, Uint128, Uint64,
+    to_json_binary, Addr, Api, Binary, CosmosMsg, Empty, Env, MessageInfo, QueryRequest, StdError,
+    Storage, Uint128, Uint64,
 };
 
 use polytone::callbacks::CallbackRequest;
 
 use crate::{
     error::ContractError,
-    state::{bloom::BloomConfig, headstash::Headstash},
+    headstash::callbacks,
+    state::{bloom::BloomConfig, headstash::Headstash, HeadstashSeq, HEADSTASH_SEQUENCE},
 };
 #[cw_serde]
 pub struct InstantiateMsg {
@@ -59,6 +61,10 @@ pub enum ExecuteMsg {
         callback: Option<CallbackRequest>,
         timeout_seconds: Uint64,
     },
+    /// Entrypoint for Headstash callbacks from actions on the voice chain on behalf
+    /// of the headstash-note chain sender.
+    #[cfg_attr(feature = "interface", fn_name("headstash_callback"))]
+    HeadstashCallBack { rx: HeadstashCallback },
 }
 
 #[cw_serde]
@@ -155,7 +161,7 @@ pub enum HeadstashNote {
         /// The storage key set in cw-glob. defaults enabled are either `snip120u` or `cw-headstash`
         cw_glob: String,
     },
-    SetContractOnSecret {
+    UploadWasmOnSecret {
         cw_glob: Option<String>,
         wasm: String,
     },
@@ -189,7 +195,7 @@ pub enum HeadstashNote {
 }
 
 impl HeadstashNote {
-    pub fn to_secret_msg(
+    pub fn to_cosmos_msgs(
         &self,
         env: &Env,
         storage: &mut dyn Storage,
@@ -201,8 +207,8 @@ impl HeadstashNote {
             HeadstashNote::SetCwGlob { cw_glob } => {
                 crate::headstash::set_cw_glob(storage, api, &info, cw_glob)
             }
-            HeadstashNote::SetContractOnSecret { cw_glob, wasm } => {
-                crate::headstash::set_contract_on_secret(storage, api, &info, wasm, cw_glob)
+            HeadstashNote::UploadWasmOnSecret { cw_glob, wasm } => {
+                crate::headstash::upload_contract_on_secret(storage, api, &info, wasm, cw_glob)
             }
             HeadstashNote::SetHeadstashCodeId { code_id } => {
                 crate::headstash::set_headstash_code_id_on_secret(storage, api, &info, *code_id)
@@ -241,5 +247,105 @@ impl HeadstashNote {
             _ => Err(ContractError::Std(StdError::generic_err("unimplemented"))),
         };
         Ok(msgs)
+    }
+
+    pub fn to_callback_request(
+        &self,
+        env: &Env,
+        storage: &mut dyn Storage,
+        api: &dyn Api,
+    ) -> Result<CallbackRequest, ContractError> {
+        let callback_request = match self {
+            HeadstashNote::UploadWasmOnSecret { cw_glob, wasm } => {
+                to_json_binary(&HeadstashCallback::UploadWasmOnSecret {})?
+            }
+            HeadstashNote::CreateSnip120u {} => {
+                to_json_binary(&HeadstashCallback::CreateSnip120u {})?
+            }
+            HeadstashNote::CreateHeadstash {} => {
+                to_json_binary(&HeadstashCallback::CreateHeadstash {})?
+            }
+            HeadstashNote::ConfigureSnip120uMinter {} => {
+                to_json_binary(&HeadstashCallback::ConfigureSnip120uMinter {})?
+            }
+            HeadstashNote::AddHeadstashes { to_add } => {
+                to_json_binary(&HeadstashCallback::AddHeadstashes {})?
+            }
+            HeadstashNote::AuthorizeFeeGrants { to_grant, owner } => {
+                to_json_binary(&HeadstashCallback::AuthorizeFeeGrants {})?
+            }
+            HeadstashNote::AuthzDeployer { grantee } => {
+                to_json_binary(&HeadstashCallback::AuthzDeployer {})?
+            }
+            // HeadstashNote::SetCwGlob { cw_glob } => todo!(),
+            // HeadstashNote::SetHeadstashCodeId { code_id } => todo!(),
+            // HeadstashNote::SetSnip120uCodeId { code_id } => todo!(),
+            // HeadstashNote::SetHeadstashAddr { addr } => todo!(),
+            // HeadstashNote::SetSnip120uAddr { denom, addr } => todo!(),
+            HeadstashNote::FundHeadstash {} => {
+                to_json_binary(&HeadstashCallback::FundHeadstash {})?
+            }
+            _ => unimplemented!(),
+        };
+        Ok(CallbackRequest {
+            receiver: env.contract.address.to_string(),
+            msg: callback_request,
+        })
+    }
+}
+
+#[cw_serde]
+pub enum HeadstashCallback {
+    UploadWasmOnSecret {},
+    CreateHeadstash {},
+    CreateSnip120u {},
+    ConfigureSnip120uMinter {},
+    AddHeadstashes {},
+    AuthorizeFeeGrants {},
+    AuthzDeployer {},
+    FundHeadstash {},
+}
+
+impl HeadstashCallback {
+    pub fn into_headstash_msg(
+        &self,
+        storage: &mut dyn Storage,
+    ) -> Result<Vec<CosmosMsg<Empty>>, ContractError> {
+        let mut msgs = vec![];
+
+        match self {
+            HeadstashCallback::UploadWasmOnSecret {} => {
+                // save code ids of wasms uploaded (snip or headstash)
+            }
+            HeadstashCallback::CreateHeadstash {} => {
+                // save contract address of headstash
+            }
+            HeadstashCallback::CreateSnip120u {} => {
+                // save contract addresses of snips to internal storage
+            }
+            HeadstashCallback::ConfigureSnip120uMinter {} => {
+                // n/a
+            }
+            HeadstashCallback::AddHeadstashes {} => {
+                // n/a
+            }
+            HeadstashCallback::AuthorizeFeeGrants {} => {
+                // n/a
+            }
+            HeadstashCallback::AuthzDeployer {} => {
+                // n/a
+            },
+            HeadstashCallback::FundHeadstash {} => {
+                // n/a
+            },
+        }
+        Ok(msgs)
+    }
+
+    pub fn into_callback(&self, addr: String) -> Result<CallbackRequest, ContractError> {
+        Ok(CallbackRequest {
+            receiver: addr,
+            msg: Binary(vec![]),
+        })
     }
 }

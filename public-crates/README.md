@@ -1,10 +1,11 @@
 # Public Crates
 
 ## TODO: POLYTONE VERSION
-### migrate steps:
 - fund headstash msg
 - cw-glob support 
 - callback-support 
+- admin assertions
+- secret proxy & voice support
 
 
 ## Deployment Details
