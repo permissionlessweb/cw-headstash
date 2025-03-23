@@ -1,5 +1,6 @@
 use cosmwasm_std::StdError; // Instantiate2AddressError
-use cw_utils::ParseReplyError;
+
+use polytone::utils::ParseReplyError;
 use thiserror::Error;
 
 #[derive(Error, Debug, PartialEq)]

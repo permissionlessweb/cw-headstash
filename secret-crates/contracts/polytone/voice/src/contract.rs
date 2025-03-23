@@ -1,11 +1,10 @@
 #[cfg(not(feature = "library"))]
 use cosmwasm_std::entry_point;
 use cosmwasm_std::{
-    from_json, instantiate2_address, to_json_binary, to_json_vec, Binary, CanonicalAddr,
-    CodeInfoResponse, ContractResult, Deps, DepsMut, Env, MessageInfo, Response, StdResult, SubMsg,
-    SystemResult, Uint64, WasmMsg,
+    from_binary, to_binary, to_json_vec, Binary, CanonicalAddr, CodeInfoResponse, ContractResult,
+    Deps, DepsMut, Env, MessageInfo, Response, StdResult, SubMsg, SystemResult, Uint64, WasmMsg,
 };
-use cw2::set_contract_version;
+// use cw2::set_contract_version;
 
 use polytone::ack::{ack_query_fail, ack_query_success};
 use polytone::ibc::{Msg, Packet};
@@ -17,8 +16,8 @@ use crate::state::{
     SenderInfo, BLOCK_MAX_GAS, CONTRACT_ADDR_LEN, PROXY_CODE_ID, PROXY_TO_SENDER, SENDER_TO_PROXY,
 };
 
-const CONTRACT_NAME: &str = "crates.io:polytone-voice";
-const CONTRACT_VERSION: &str = env!("CARGO_PKG_VERSION");
+// const CONTRACT_NAME: &str = "crates.io:polytone-voice";
+// const CONTRACT_VERSION: &str = env!("CARGO_PKG_VERSION");
 
 #[cfg_attr(not(feature = "library"), entry_point)]
 pub fn instantiate(
@@ -27,7 +26,7 @@ pub fn instantiate(
     _info: MessageInfo,
     msg: InstantiateMsg,
 ) -> Result<Response, ContractError> {
-    set_contract_version(deps.storage, CONTRACT_NAME, CONTRACT_VERSION)?;
+    // set_contract_version(deps.storage, CONTRACT_NAME, CONTRACT_VERSION)?;
 
     if msg.proxy_code_id.is_zero() {
         return Err(ContractError::CodeIdCantBeZero);
@@ -72,7 +71,7 @@ pub fn execute(
             if info.sender != env.contract.address {
                 Err(ContractError::NotSelf)
             } else {
-                let Packet { sender, msg } = from_json(data)?;
+                let Packet { sender, msg } = from_binary(&data)?;
                 match msg {
                     Msg::Query { msgs } => {
                         let mut results = Vec::with_capacity(msgs.len());
@@ -148,7 +147,7 @@ pub fn execute(
                                     admin: None,
                                     code_id,
                                     label: format!("polytone-proxy {sender}"),
-                                    msg: to_json_binary(&polytone_proxy::msg::InstantiateMsg {})?,
+                                    msg: to_binary(&polytone_proxy::msg::InstantiateMsg {})?,
                                     funds: vec![],
                                     code_hash: "".to_string(),
                                     // salt,
@@ -162,7 +161,7 @@ pub fn execute(
                             .add_submessage(SubMsg::reply_always(
                                 WasmMsg::Execute {
                                     contract_addr: proxy.into_string(),
-                                    msg: to_json_binary(&polytone_proxy::msg::ExecuteMsg::Proxy {
+                                    msg: to_binary(&polytone_proxy::msg::ExecuteMsg::Proxy {
                                         msgs,
                                     })?,
                                     funds: vec![],
@@ -199,10 +198,10 @@ fn salt(local_connection: &str, counterparty_port: &str, remote_sender: &str) ->
 #[cfg_attr(not(feature = "library"), entry_point)]
 pub fn query(deps: Deps, _env: Env, msg: QueryMsg) -> StdResult<Binary> {
     match msg {
-        QueryMsg::BlockMaxGas => to_json_binary(&BLOCK_MAX_GAS.load(deps.storage)?),
-        QueryMsg::ProxyCodeId => to_json_binary(&PROXY_CODE_ID.load(deps.storage)?),
-        QueryMsg::ContractAddrLen => to_json_binary(&CONTRACT_ADDR_LEN.load(deps.storage)?),
-        QueryMsg::SenderInfoForProxy { proxy } => to_json_binary(
+        QueryMsg::BlockMaxGas => to_binary(&BLOCK_MAX_GAS.load(deps.storage)?),
+        QueryMsg::ProxyCodeId => to_binary(&PROXY_CODE_ID.load(deps.storage)?),
+        QueryMsg::ContractAddrLen => to_binary(&CONTRACT_ADDR_LEN.load(deps.storage)?),
+        QueryMsg::SenderInfoForProxy { proxy } => to_binary(
             &PROXY_TO_SENDER
                 .get(deps.storage, &deps.api.addr_validate(&proxy)?)
                 .expect("shouldnt panic"),

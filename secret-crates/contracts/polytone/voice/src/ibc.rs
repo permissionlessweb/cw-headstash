@@ -7,12 +7,12 @@ use cosmwasm_std::{
     SubMsgResult, WasmMsg,
 };
 
-use cw_utils::{parse_reply_execute_data, MsgExecuteContractResponse};
 use polytone::{
     ack::{ack_execute_fail, ack_fail},
     callbacks::Callback,
     handshake::voice,
     ibc::Never,
+    utils::{parse_reply_execute_data, MsgExecuteContractResponse},
 };
 
 use crate::{
