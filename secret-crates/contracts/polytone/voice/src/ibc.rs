@@ -1,9 +1,9 @@
 #[cfg(not(feature = "library"))]
 use cosmwasm_std::entry_point;
 use cosmwasm_std::{
-    from_json, to_json_binary, DepsMut, Env, IbcBasicResponse, IbcChannelCloseMsg,
+    from_binary, to_binary, DepsMut, Env, IbcBasicResponse, IbcChannelCloseMsg,
     IbcChannelConnectMsg, IbcChannelOpenMsg, IbcChannelOpenResponse, IbcPacketAckMsg,
-    IbcPacketReceiveMsg, IbcPacketTimeoutMsg, IbcReceiveResponse, Never, Reply, Response, SubMsg,
+    IbcPacketReceiveMsg, IbcPacketTimeoutMsg, IbcReceiveResponse, Reply, Response, SubMsg,
     SubMsgResult, WasmMsg,
 };
 
@@ -12,6 +12,7 @@ use polytone::{
     ack::{ack_execute_fail, ack_fail},
     callbacks::Callback,
     handshake::voice,
+    ibc::Never,
 };
 
 use crate::{
@@ -48,9 +49,9 @@ pub fn ibc_channel_connect(
     msg: IbcChannelConnectMsg,
 ) -> Result<IbcBasicResponse, ContractError> {
     voice::connect(&msg, &["JSON-CosmosMsg"])?;
-    CHANNEL_TO_CONNECTION.save(
+    CHANNEL_TO_CONNECTION.insert(
         deps.storage,
-        msg.channel().endpoint.channel_id.clone(),
+        &msg.channel().endpoint.channel_id,
         &msg.channel().connection_id,
     )?;
     Ok(IbcBasicResponse::new()
@@ -65,7 +66,7 @@ pub fn ibc_channel_close(
     _env: Env,
     msg: IbcChannelCloseMsg,
 ) -> Result<IbcBasicResponse, ContractError> {
-    CHANNEL_TO_CONNECTION.remove(deps.storage, msg.channel().endpoint.channel_id.clone());
+    CHANNEL_TO_CONNECTION.remove(deps.storage, &msg.channel().endpoint.channel_id)?;
     Ok(IbcBasicResponse::default()
         .add_attribute("method", "ibc_channel_close")
         .add_attribute("connection_id", msg.channel().connection_id.as_str())
@@ -82,7 +83,7 @@ pub fn ibc_packet_receive(
     msg: IbcPacketReceiveMsg,
 ) -> Result<IbcReceiveResponse, Never> {
     let connection_id = CHANNEL_TO_CONNECTION
-        .load(deps.storage, msg.packet.dest.channel_id.clone())
+        .get(deps.storage, &msg.packet.dest.channel_id)
         .expect("handshake sets mapping");
     Ok(IbcReceiveResponse::default()
         .add_attribute("method", "ibc_packet_receive")
@@ -94,13 +95,14 @@ pub fn ibc_packet_receive(
             id: REPLY_ACK,
             msg: WasmMsg::Execute {
                 contract_addr: env.contract.address.into_string(),
-                msg: to_json_binary(&ExecuteMsg::Rx {
+                msg: to_binary(&ExecuteMsg::Rx {
                     connection_id,
                     counterparty_port: msg.packet.src.port_id,
                     data: msg.packet.data,
                 })
                 .unwrap(),
                 funds: vec![],
+                code_hash: "".into(),
             }
             .into(),
             gas_limit: Some(
@@ -125,7 +127,7 @@ pub fn reply(_deps: DepsMut, _env: Env, msg: Reply) -> Result<Response, Contract
                     .expect("execution succeeded")
                     .data
                     .expect("reply_forward_data sets data");
-                match from_json::<Callback>(&data) {
+                match from_binary::<Callback>(&data) {
                     Ok(_) => Response::default().set_data(data),
                     Err(e) => Response::default()
                         .set_data(ack_fail(format!("unmarshalling callback data: ({e})"))),

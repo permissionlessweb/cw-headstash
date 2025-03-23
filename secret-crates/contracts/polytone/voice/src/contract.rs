@@ -121,22 +121,22 @@ pub fn execute(
                                 deps.querier.query_wasm_code_info(code_id)?;
                             let salt = salt(&connection_id, &counterparty_port, &sender);
                             let init2_addr_data: CanonicalAddr =
-                                instantiate2_address(&checksum.as_slice(), &contract, &salt)?.to_vec()
-                                    [0..addr_len as usize]
+                                instantiate2_address(&checksum.as_slice(), &contract, &salt)?
+                                    .to_vec()[0..addr_len as usize]
                                     .into();
                             let proxy = deps.api.addr_humanize(&init2_addr_data)?;
-                            SENDER_TO_PROXY.save(
+                            SENDER_TO_PROXY.insert(
                                 deps.storage,
-                                (
+                                &(
                                     connection_id.clone(),
                                     counterparty_port.clone(),
                                     sender.clone(),
                                 ),
                                 &proxy,
                             )?;
-                            PROXY_TO_SENDER.save(
+                            PROXY_TO_SENDER.insert(
                                 deps.storage,
-                                proxy.clone(),
+                                &proxy,
                                 &SenderInfo {
                                     connection_id,
                                     remote_port: counterparty_port,
@@ -144,13 +144,14 @@ pub fn execute(
                                 },
                             )?;
                             (
-                                Some(WasmMsg::Instantiate2 {
+                                Some(WasmMsg::Instantiate {
                                     admin: None,
                                     code_id,
                                     label: format!("polytone-proxy {sender}"),
                                     msg: to_json_binary(&polytone_proxy::msg::InstantiateMsg {})?,
                                     funds: vec![],
-                                    salt,
+                                    code_hash: "".to_string(),
+                                    // salt,
                                 }),
                                 proxy,
                             )
@@ -165,6 +166,7 @@ pub fn execute(
                                         msgs,
                                     })?,
                                     funds: vec![],
+                                    code_hash: "".to_string(),
                                 },
                                 REPLY_FORWARD_DATA,
                             )))
@@ -200,9 +202,11 @@ pub fn query(deps: Deps, _env: Env, msg: QueryMsg) -> StdResult<Binary> {
         QueryMsg::BlockMaxGas => to_json_binary(&BLOCK_MAX_GAS.load(deps.storage)?),
         QueryMsg::ProxyCodeId => to_json_binary(&PROXY_CODE_ID.load(deps.storage)?),
         QueryMsg::ContractAddrLen => to_json_binary(&CONTRACT_ADDR_LEN.load(deps.storage)?),
-        QueryMsg::SenderInfoForProxy { proxy } => {
-            to_json_binary(&PROXY_TO_SENDER.load(deps.storage, deps.api.addr_validate(&proxy)?)?)
-        }
+        QueryMsg::SenderInfoForProxy { proxy } => to_json_binary(
+            &PROXY_TO_SENDER
+                .get(deps.storage, &deps.api.addr_validate(&proxy)?)
+                .expect("shouldnt panic"),
+        ),
     }
 }
 

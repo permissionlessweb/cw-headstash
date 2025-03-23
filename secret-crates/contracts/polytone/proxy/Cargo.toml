@@ -14,7 +14,7 @@ crate-type = ["cdylib", "rlib"]
 [features]
 # disables #[entry_point] (i.e. instantiate/execute/query) export
 library = []
-interface = ["dep:cw-orch"]
+# interface = ["dep:cw-orch"]
 
 # This is here inspite of the warnings to make sure it is not missed
 # if the contract is taken out of the workspace
@@ -32,12 +32,13 @@ rpath            = false
 [dependencies]
 cosmwasm-schema = { workspace = true }
 cosmwasm-std    = { workspace = true }
-cw-storage-plus = { workspace = true }
+#  cw-storage-plus = { workspace = true }
+secret-toolkit = { workspace = true }
 cw-utils        = { workspace = true }
 cw2             = { workspace = true }
 thiserror       = { workspace = true }
 polytone        = { workspace = true }
-cw-orch         = { workspace = true, optional = true }
+# cw-orch         = { workspace = true, optional = true }
 
 [dev-dependencies]
-cw-multi-test = { workspace = true }
+# cw-multi-test = { workspace = true }
