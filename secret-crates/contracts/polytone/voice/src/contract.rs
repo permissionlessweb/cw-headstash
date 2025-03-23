@@ -1,8 +1,9 @@
 #[cfg(not(feature = "library"))]
 use cosmwasm_std::entry_point;
 use cosmwasm_std::{
-    from_binary, to_binary, to_json_vec, Binary, CanonicalAddr, CodeInfoResponse, ContractResult,
-    Deps, DepsMut, Env, MessageInfo, Response, StdResult, SubMsg, SystemResult, Uint64, WasmMsg,
+    from_binary, to_binary, Addr, Attribute, Binary, ContractResult, Deps, DepsMut, Empty, Env,
+    Event, MessageInfo, Response, StdError, StdResult, Storage, SubMsg, SystemResult, Uint64,
+    WasmMsg,
 };
 // use cw2::set_contract_version;
 
@@ -10,10 +11,11 @@ use polytone::ack::{ack_query_fail, ack_query_success};
 use polytone::ibc::{Msg, Packet};
 
 use crate::error::ContractError;
-use crate::ibc::{ACK_GAS_NEEDED, REPLY_FORWARD_DATA};
+use crate::ibc::{ACK_GAS_NEEDED, REPLY_FORWARD_DATA, REPLY_INIT_PROXY};
 use crate::msg::{ExecuteMsg, InstantiateMsg, MigrateMsg, QueryMsg};
 use crate::state::{
-    SenderInfo, BLOCK_MAX_GAS, CONTRACT_ADDR_LEN, PROXY_CODE_ID, PROXY_TO_SENDER, SENDER_TO_PROXY,
+    BLOCK_MAX_GAS, CONTRACT_ADDR_LEN, PENDING_PROXY_TXS, PROXY_CODE_ID, PROXY_TO_SENDER,
+    SENDER_TO_PROXY,
 };
 
 // const CONTRACT_NAME: &str = "crates.io:polytone-voice";
@@ -76,7 +78,7 @@ pub fn execute(
                     Msg::Query { msgs } => {
                         let mut results = Vec::with_capacity(msgs.len());
                         for msg in msgs {
-                            let query_result = deps.querier.raw_query(&to_json_vec(&msg)?);
+                            let query_result = deps.querier.raw_query(&to_binary(&msg)?);
                             let error = match query_result {
                                 SystemResult::Ok(ContractResult::Err(error)) => {
                                     format!("contract: {error}")
@@ -102,46 +104,18 @@ pub fn execute(
                             .set_data(ack_query_success(results)))
                     }
                     Msg::Execute { msgs } => {
-                        let (instantiate, proxy) = if let Some(proxy) = SENDER_TO_PROXY.may_load(
+                        let (instantiate, proxy) = if let Some(proxy) = SENDER_TO_PROXY.get(
                             deps.storage,
-                            (
+                            &(
                                 connection_id.clone(),
                                 counterparty_port.clone(),
                                 sender.clone(),
                             ),
-                        )? {
+                        ) {
                             (None, proxy)
                         } else {
-                            let contract =
-                                deps.api.addr_canonicalize(env.contract.address.as_str())?;
+                            // create proxy, save to state using submessage reply
                             let code_id = PROXY_CODE_ID.load(deps.storage)?;
-                            let addr_len = CONTRACT_ADDR_LEN.load(deps.storage)?;
-                            let CodeInfoResponse { checksum, .. } =
-                                deps.querier.query_wasm_code_info(code_id)?;
-                            let salt = salt(&connection_id, &counterparty_port, &sender);
-                            let init2_addr_data: CanonicalAddr =
-                                instantiate2_address(&checksum.as_slice(), &contract, &salt)?
-                                    .to_vec()[0..addr_len as usize]
-                                    .into();
-                            let proxy = deps.api.addr_humanize(&init2_addr_data)?;
-                            SENDER_TO_PROXY.insert(
-                                deps.storage,
-                                &(
-                                    connection_id.clone(),
-                                    counterparty_port.clone(),
-                                    sender.clone(),
-                                ),
-                                &proxy,
-                            )?;
-                            PROXY_TO_SENDER.insert(
-                                deps.storage,
-                                &proxy,
-                                &SenderInfo {
-                                    connection_id,
-                                    remote_port: counterparty_port,
-                                    remote_sender: sender.clone(),
-                                },
-                            )?;
                             (
                                 Some(WasmMsg::Instantiate {
                                     admin: None,
@@ -150,25 +124,26 @@ pub fn execute(
                                     msg: to_binary(&polytone_proxy::msg::InstantiateMsg {})?,
                                     funds: vec![],
                                     code_hash: "".to_string(),
-                                    // salt,
                                 }),
-                                proxy,
+                                Addr::unchecked("placeholder"), // set placeholder
                             )
                         };
+
+                        // secret network does not support instantiate2. helper to pass either proxy init msgs, or tx for proxy to handle on reply
+                        let submsg = proxy_submessage_helper(
+                            deps.storage,
+                            &connection_id,
+                            &counterparty_port,
+                            proxy,
+                            &sender,
+                            msgs,
+                            instantiate,
+                        )?;
+
                         Ok(Response::default()
                             .add_attribute("method", "rx_execute")
-                            .add_messages(instantiate)
-                            .add_submessage(SubMsg::reply_always(
-                                WasmMsg::Execute {
-                                    contract_addr: proxy.into_string(),
-                                    msg: to_binary(&polytone_proxy::msg::ExecuteMsg::Proxy {
-                                        msgs,
-                                    })?,
-                                    funds: vec![],
-                                    code_hash: "".to_string(),
-                                },
-                                REPLY_FORWARD_DATA,
-                            )))
+                            .add_submessage(submsg.0)
+                            .add_event(Event::new("headstash").add_attributes(submsg.1)))
                     }
                 }
             }
@@ -176,24 +151,24 @@ pub fn execute(
     }
 }
 
-/// Generates the salt used to generate an address for a user's
-/// account.
-///
-/// `local_channel` is not attacker controlled and protects from
-/// collision from an attacker generated duplicate
-/// chain. `remote_port` ensures that two different modules on the
-/// same chain produce different addresses for the same
-/// `remote_sender`.
-fn salt(local_connection: &str, counterparty_port: &str, remote_sender: &str) -> Binary {
-    use sha2::{Digest, Sha512};
-    // the salt can be a max of 64 bytes (512 bits).
-    let hash = Sha512::default()
-        .chain_update(local_connection.as_bytes())
-        .chain_update(counterparty_port.as_bytes())
-        .chain_update(remote_sender.as_bytes())
-        .finalize();
-    Binary::from(hash.as_slice())
-}
+// /// Generates the salt used to generate an address for a user's
+// /// account.
+// ///
+// /// `local_channel` is not attacker controlled and protects from
+// /// collision from an attacker generated duplicate
+// /// chain. `remote_port` ensures that two different modules on the
+// /// same chain produce different addresses for the same
+// /// `remote_sender`.
+// fn salt(local_connection: &str, counterparty_port: &str, remote_sender: &str) -> Binary {
+//     use sha2::{Digest, Sha512};
+//     // the salt can be a max of 64 bytes (512 bits).
+//     let hash = Sha512::default()
+//         .chain_update(local_connection.as_bytes())
+//         .chain_update(counterparty_port.as_bytes())
+//         .chain_update(remote_sender.as_bytes())
+//         .finalize();
+//     Binary::from(hash.as_slice())
+// }
 
 #[cfg_attr(not(feature = "library"), entry_point)]
 pub fn query(deps: Deps, _env: Env, msg: QueryMsg) -> StdResult<Binary> {
@@ -246,35 +221,75 @@ pub fn migrate(deps: DepsMut, _env: Env, msg: MigrateMsg) -> Result<Response, Co
     }
 }
 
-#[cfg(test)]
-mod tests {
-    use cosmwasm_std::{instantiate2_address, CanonicalAddr, HexBinary};
+/// if proxy is placeholder, we pass the proxy instantiate msgs as submessage, allowing us to save proxy addr to contract state.
+fn proxy_submessage_helper(
+    storage: &mut dyn Storage,
+    connection_id: &str,
+    counterparty_port: &str,
+    proxy: Addr,
+    sender: &str,
+    msgs: Vec<cosmwasm_std::CosmosMsg>,
+    instantate_msg: Option<WasmMsg>,
+) -> Result<(SubMsg, Vec<Attribute>), ContractError> {
+    let mut attrs = vec![];
 
-    use super::salt;
-
-    fn gen_address(
-        local_connection: &str,
-        counterparty_port: &str,
-        remote_sender: &str,
-    ) -> CanonicalAddr {
-        let checksum =
-            HexBinary::from_hex("13a1fc994cc6d1c81b746ee0c0ff6f90043875e0bf1d9be6b7d779fc978dc2a5")
-                .unwrap();
-        let creator = CanonicalAddr::from((0..90).map(|_| 9).collect::<Vec<u8>>().as_slice());
-
-        let salt = salt(local_connection, counterparty_port, remote_sender);
-        assert!(salt.len() <= 64);
-        instantiate2_address(checksum.as_slice(), &creator, &salt).unwrap()
-    }
-
-    /// Addresses can be generated, and changing inputs changes
-    /// output.
-    #[test]
-    fn test_address_generation() {
-        let one = gen_address("c1", "c1", "c1");
-        let two = gen_address("c2", "c1", "c1");
-        let three = gen_address("c1", "c2", "c1");
-        let four = gen_address("c1", "c1", "c2");
-        assert!(one != two && two != three && three != four)
+    if proxy != Addr::unchecked("placeholder") {
+        // pass msgs to proxy normally
+        let submsg: SubMsg<Empty> = SubMsg::reply_always(
+            WasmMsg::Execute {
+                contract_addr: proxy.into_string(),
+                msg: to_binary(&polytone_proxy::msg::ExecuteMsg::Proxy { msgs })?,
+                funds: vec![],
+                code_hash: "".to_string(),
+            },
+            REPLY_FORWARD_DATA,
+        );
+        return Ok((submsg, attrs));
+    } else if let Some(init_msg) = instantate_msg {
+        // pass instantiate msg first, save msgs to pass to proxy once instantiated to state
+        let submsg: SubMsg<Empty> = SubMsg::reply_always(init_msg, REPLY_INIT_PROXY);
+        attrs.extend(vec![
+            Attribute::new("connection-id", connection_id),
+            Attribute::new("counterparty-port", counterparty_port),
+        ]);
+        if msgs.len() != 0 {
+            PENDING_PROXY_TXS.save(storage, &to_binary(&msgs)?)?;
+        }
+        return Ok((submsg, attrs));
+    } else {
+        return Err(ContractError::Std(StdError::generic_err(
+            "proxy has not been instantiated, and no instantiate message passed, panic.",
+        )));
     }
 }
+
+// #[cfg(test)]
+// mod tests {
+//     use cosmwasm_std::{CanonicalAddr, HexBinary};
+
+//     fn gen_address(
+//         local_connection: &str,
+//         counterparty_port: &str,
+//         remote_sender: &str,
+//     ) -> CanonicalAddr {
+//         let checksum =
+//             HexBinary::from_hex("13a1fc994cc6d1c81b746ee0c0ff6f90043875e0bf1d9be6b7d779fc978dc2a5")
+//                 .unwrap();
+//         let creator = CanonicalAddr::from((0..90).map(|_| 9).collect::<Vec<u8>>().as_slice());
+
+//         let salt = salt(local_connection, counterparty_port, remote_sender);
+//         assert!(salt.len() <= 64);
+//         // instantiate2_address(checksum.as_slice(), &creator, &salt).unwrap()
+//     }
+
+//     /// Addresses can be generated, and changing inputs changes
+//     /// output.
+//     #[test]
+//     fn test_address_generation() {
+//         let one = gen_address("c1", "c1", "c1");
+//         let two = gen_address("c2", "c1", "c1");
+//         let three = gen_address("c1", "c2", "c1");
+//         let four = gen_address("c1", "c1", "c2");
+//         assert!(one != two && two != three && three != four)
+//     }
+// }

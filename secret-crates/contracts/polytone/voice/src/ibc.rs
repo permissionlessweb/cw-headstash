@@ -1,10 +1,10 @@
 #[cfg(not(feature = "library"))]
 use cosmwasm_std::entry_point;
 use cosmwasm_std::{
-    from_binary, to_binary, DepsMut, Env, IbcBasicResponse, IbcChannelCloseMsg,
-    IbcChannelConnectMsg, IbcChannelOpenMsg, IbcChannelOpenResponse, IbcPacketAckMsg,
-    IbcPacketReceiveMsg, IbcPacketTimeoutMsg, IbcReceiveResponse, Reply, Response, SubMsg,
-    SubMsgResult, WasmMsg,
+    from_binary, to_binary, Addr, CosmosMsg, DepsMut, Empty, Env, IbcBasicResponse,
+    IbcChannelCloseMsg, IbcChannelConnectMsg, IbcChannelOpenMsg, IbcChannelOpenResponse,
+    IbcPacketAckMsg, IbcPacketReceiveMsg, IbcPacketTimeoutMsg, IbcReceiveResponse, Reply, Response,
+    SubMsg, SubMsgResult, WasmMsg,
 };
 
 use polytone::{
@@ -18,11 +18,15 @@ use polytone::{
 use crate::{
     error::ContractError,
     msg::ExecuteMsg,
-    state::{BLOCK_MAX_GAS, CHANNEL_TO_CONNECTION},
+    state::{
+        SenderInfo, BLOCK_MAX_GAS, CHANNEL_TO_CONNECTION, PENDING_PROXY_TXS, PROXY_TO_SENDER,
+        SENDER_TO_PROXY,
+    },
 };
 
 const REPLY_ACK: u64 = 0;
 pub(crate) const REPLY_FORWARD_DATA: u64 = 1;
+pub(crate) const REPLY_INIT_PROXY: u64 = 710;
 
 /// The amount of gas that needs to be reserved for the reply method
 /// to return an ACK for a submessage that runs out of gas.
@@ -116,7 +120,8 @@ pub fn ibc_packet_receive(
 }
 
 #[cfg_attr(not(feature = "library"), entry_point)]
-pub fn reply(_deps: DepsMut, _env: Env, msg: Reply) -> Result<Response, ContractError> {
+pub fn reply(deps: DepsMut, _env: Env, msg: Reply) -> Result<Response, ContractError> {
+    let mut msgs = vec![];
     match msg.id {
         REPLY_ACK => Ok(match msg.result {
             SubMsgResult::Err(e) => Response::default()
@@ -154,6 +159,89 @@ pub fn reply(_deps: DepsMut, _env: Env, msg: Reply) -> Result<Response, Contract
                 .add_attribute("method", "reply_forward_data_error")
                 .set_data(ack_execute_fail(err))),
         },
+        REPLY_INIT_PROXY => {
+            match msg.result {
+                SubMsgResult::Ok(sub_msg_response) => {
+                    let events = sub_msg_response.events;
+                    let proxy_addr = &events
+                        .iter()
+                        .find(|e| e.ty == "wasm")
+                        .expect("should exist")
+                        .attributes
+                        .iter()
+                        .find(|a| a.key == "contract_address")
+                        .expect("should have the proxy addr ")
+                        .value;
+
+                    let proxy_event = events
+                        .iter()
+                        .find(|e| e.ty == "headstash")
+                        .map(|a| a)
+                        .expect("should always have custom headstash event replied here");
+
+                    let connection_id = &proxy_event
+                        .attributes
+                        .iter()
+                        .find(|a| a.key == "connection-id".to_string())
+                        .expect("should never be empty")
+                        .value;
+                    let counterparty_port = &proxy_event
+                        .attributes
+                        .iter()
+                        .find(|a| a.key == "counterparty-port".to_string())
+                        .expect("should never be empty")
+                        .value;
+                    let sender = &proxy_event
+                        .attributes
+                        .iter()
+                        .find(|a| a.key == "sender".to_string())
+                        .expect("should never be empty")
+                        .value;
+
+                    SENDER_TO_PROXY.insert(
+                        deps.storage,
+                        &(
+                            connection_id.clone(),
+                            counterparty_port.clone(),
+                            sender.clone(),
+                        ),
+                        &Addr::unchecked(proxy_addr),
+                    )?;
+
+                    PROXY_TO_SENDER.insert(
+                        deps.storage,
+                        &Addr::unchecked(proxy_addr),
+                        &SenderInfo {
+                            connection_id: connection_id.to_string(),
+                            remote_port: counterparty_port.to_string(),
+                            remote_sender: sender.clone(),
+                        },
+                    )?;
+                    let sequence = msg.id;
+
+                    // load tx to process now that we have the proxy addr
+                    let pending: Vec<CosmosMsg> =
+                        from_binary(&PENDING_PROXY_TXS.load(deps.storage)?)?;
+                    let submsg: SubMsg<Empty> = SubMsg::reply_always(
+                        WasmMsg::Execute {
+                            contract_addr: proxy_addr.to_string(),
+                            msg: to_binary(&polytone_proxy::msg::ExecuteMsg::Proxy {
+                                msgs: pending,
+                            })?,
+                            funds: vec![],
+                            code_hash: "".to_string(),
+                        },
+                        REPLY_FORWARD_DATA,
+                    );
+
+                    msgs.push(submsg)
+                }
+                SubMsgResult::Err(_) => todo!(),
+            }
+
+            Ok(Response::new().add_submessage(msgs[0].clone()))
+        }
+
         _ => unreachable!("unknown reply ID"),
     }
 }

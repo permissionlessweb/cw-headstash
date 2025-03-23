@@ -1,4 +1,4 @@
-use cosmwasm_std::{Addr, SubMsgResponse};
+use cosmwasm_std::{Addr, Binary, SubMsgResponse};
 use secret_toolkit::storage::{Item, Keymap};
 
 // SENDER_TO_PROXY
@@ -24,6 +24,10 @@ pub const BLOCK_MAX_GAS: Item<u64> = Item::new(KEY_BLOCK_MAX_GAS);
 // CONTRACT_ADDR_LEN
 pub const KEY_CONTRACT_ADDR_LEN: &[u8] = b"contract_addr_len";
 pub const CONTRACT_ADDR_LEN: Item<u8> = Item::new(KEY_CONTRACT_ADDR_LEN);
+
+// PENDING PROXY TX
+pub const KEY_PENDING_PROXY_TX: &[u8] = b"pending_proxy_tx";
+pub const PENDING_PROXY_TXS: Item<Binary> = Item::new(KEY_PENDING_PROXY_TX);
 
 #[cosmwasm_schema::cw_serde]
 pub struct SenderInfo {
