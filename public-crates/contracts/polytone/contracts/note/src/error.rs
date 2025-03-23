@@ -28,7 +28,47 @@ pub enum ContractError {
 
     #[error("CwGlobExists")]
     CwGlobExists {},
-    
+
     #[error("NoSnip120uParamsSet")]
     NoSnip120uParamsSet {},
+
+    #[error("SetSnip120uCodeError")]
+    SetSnip120uCodeError {},
+
+    #[error("SetHeadstashCodeError")]
+    SetHeadstashCodeError {},
+
+    #[error("SetHeadstashAddrError.")]
+    SetHeadstashAddrError {},
+
+    #[error("SetInitSnip120uError.")]
+    SetInitSnip120uError {},
+
+    #[error("Snip120uAddrAlreadySet")]
+    Snip120uAddrAlreadySet {},
+
+    #[error("snip code-id not set")]
+    NoSnipCodeId {},
+
+    #[error("headstash code-id not set.")]
+    NoHeadstashCodeId {},
+
+    #[error("NoSnip120uContract")]
+    NoSnip120uContract {},
+
+    #[error("snip token not set")]
+    NoSnipContractAddr {},
+
+    #[error("BadContractId")]
+    BadContractId {},
+
+    #[error("AuthzGranteeExists")]
+    AuthzGranteeExists {},
+
+    #[error("headstash contract addr not set.")]
+    NoHeadstashContract {},
+
+    #[error("not a valid feegranter address")]
+    NotValidFeegranter {},
+
 }

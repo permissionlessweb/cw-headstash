@@ -642,7 +642,6 @@ mod headstash {
     pub fn set_snip120u_code_id(
         deps: DepsMut,
         info: MessageInfo,
-
         code_id: u64,
     ) -> Result<Response, ContractError> {
         cw_ownable::assert_owner(deps.storage, &info.sender)?;
@@ -663,7 +662,6 @@ mod headstash {
     pub fn set_headstash_code_id(
         deps: DepsMut,
         info: MessageInfo,
-
         code_id: u64,
     ) -> Result<Response, ContractError> {
         cw_ownable::assert_owner(deps.storage, &info.sender)?;
@@ -688,7 +686,6 @@ mod headstash {
     pub fn set_headstash_addr(
         deps: DepsMut,
         info: MessageInfo,
-
         addr_to_set: String,
     ) -> Result<Response, ContractError> {
         cw_ownable::assert_owner(deps.storage, &info.sender)?;
@@ -1073,6 +1070,7 @@ pub mod ica {
             },
         )
     }
+    
     pub fn form_authorize_minter(
         sender: String,
         headstash: String,

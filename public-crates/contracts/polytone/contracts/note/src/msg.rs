@@ -1,12 +1,14 @@
 use cosmwasm_schema::{cw_serde, QueryResponses};
 use cosmwasm_std::{
-    Addr, Api, CosmosMsg, DepsMut, Empty, MessageInfo, QueryRequest, StdError, Storage, Uint128,
-    Uint64,
+    Addr, Api, CosmosMsg, Empty, Env, MessageInfo, QueryRequest, StdError, Storage, Uint128, Uint64,
 };
 
 use polytone::callbacks::CallbackRequest;
 
-use crate::error::ContractError;
+use crate::{
+    error::ContractError,
+    state::{bloom::BloomConfig, headstash::Headstash},
+};
 #[cw_serde]
 pub struct InstantiateMsg {
     /// This contract pairs with the first voice module that a relayer
@@ -81,6 +83,21 @@ pub enum QueryMsg {
     BlockMaxGas,
 }
 
+/// This contract's voice. There is one voice per note, and many notes
+/// per voice.
+#[cw_serde]
+pub struct Pair {
+    pub connection_id: String,
+    pub remote_port: String,
+}
+
+#[cw_serde]
+pub enum MigrateMsg {
+    /// Updates the contract's configuration. To update the config
+    /// without updating the code, migrate to the same code ID.
+    WithUpdate { block_max_gas: Uint64 },
+}
+
 /// Params for Headstash
 #[cw_serde]
 pub struct HeadstashParams {
@@ -115,20 +132,6 @@ pub struct HeadstashInitConfig {
     pub random_key: String,
 }
 
-#[cw_serde]
-pub struct BloomConfig {
-    /// minimum cadance before messages are eligible to be added to mempool (in blocks)
-    pub default_cadance: u64,
-    /// minimum cadance that can be set before messages are eligible for mempool. if 0, default_cadance is set.
-    pub min_cadance: u64,
-    /// maximum number of transactions a bloom msg will process  
-    pub max_granularity: u64,
-    // if enabled, randomness seed is used to add random value to cadance.
-    // pub starting_interval: Option<u64>,
-    // /// if enabled, decoy messages are included in batches to create noise
-    // pub decoys: bool,
-}
-
 /// Params for Headstash Tokens
 #[cw_serde]
 pub struct HeadstashTokenParams {
@@ -146,43 +149,49 @@ pub struct HeadstashTokenParams {
     pub total: Uint128,
 }
 
-/// This contract's voice. There is one voice per note, and many notes
-/// per voice.
-#[cw_serde]
-pub struct Pair {
-    pub connection_id: String,
-    pub remote_port: String,
-}
-
-#[cw_serde]
-pub enum MigrateMsg {
-    /// Updates the contract's configuration. To update the config
-    /// without updating the code, migrate to the same code ID.
-    WithUpdate { block_max_gas: Uint64 },
-}
-
 #[cw_serde]
 pub enum HeadstashNote {
     SetCwGlob {
         /// The storage key set in cw-glob. defaults enabled are either `snip120u` or `cw-headstash`
         cw_glob: String,
     },
-    SetContractOnSecret {},
-    SetHeadstashCodeId {},
-    SetHeadstashAddr {},
-    SetSnip120uAddr {},
+    SetContractOnSecret {
+        cw_glob: Option<String>,
+        wasm: String,
+    },
+    SetHeadstashCodeId {
+        code_id: u64,
+    },
+    SetSnip120uCodeId {
+        code_id: u64,
+    },
+    SetHeadstashAddr {
+        addr: String,
+    },
+    SetSnip120uAddr {
+        denom: String,
+        addr: String,
+    },
     CreateSnip120u {},
     CreateHeadstash {},
     ConfigureSnip120uMinter {},
-    AddHeadstashes {},
-    AuthorizeFeeGrants {},
-    AuthzDeployer {},
+    AddHeadstashes {
+        to_add: Vec<Headstash>,
+    },
+    AuthorizeFeeGrants {
+        to_grant: Vec<String>,
+        owner: Option<String>,
+    },
+    AuthzDeployer {
+        grantee: String,
+    },
     FundHeadstash {},
 }
 
 impl HeadstashNote {
     pub fn to_secret_msg(
         &self,
+        env: &Env,
         storage: &mut dyn Storage,
         api: &dyn Api,
         info: MessageInfo,
@@ -190,19 +199,45 @@ impl HeadstashNote {
         let msgs: Vec<CosmosMsg<Empty>> = Vec::new();
         let _ = match self {
             HeadstashNote::SetCwGlob { cw_glob } => {
-                crate::headstash::set_cw_glob(storage, api, info, cw_glob)
+                crate::headstash::set_cw_glob(storage, api, &info, cw_glob)
             }
-            // HeadstashNote::SetContractOnSecret {} => todo!(),
-            // HeadstashNote::SetHeadstashCodeId {} => todo!(),
-            // HeadstashNote::SetHeadstashAddr {} => todo!(),
-            // HeadstashNote::SetSnip120uAddr {} => todo!(),
-            // HeadstashNote::CreateSnip120u {} => todo!(),
-            // HeadstashNote::CreateHeadstash {} => todo!(),
-            // HeadstashNote::ConfigureSnip120uMinter {} => todo!(),
-            // HeadstashNote::AddHeadstashes {} => todo!(),
-            // HeadstashNote::AuthorizeFeeGrants {} => todo!(),
-            // HeadstashNote::AuthzDeployer {} => todo!(),
-            // HeadstashNote::FundHeadstash {} => todo!(),
+            HeadstashNote::SetContractOnSecret { cw_glob, wasm } => {
+                crate::headstash::set_contract_on_secret(storage, api, &info, wasm, cw_glob)
+            }
+            HeadstashNote::SetHeadstashCodeId { code_id } => {
+                crate::headstash::set_headstash_code_id_on_secret(storage, api, &info, *code_id)
+            }
+            HeadstashNote::SetSnip120uCodeId { code_id } => {
+                crate::headstash::set_snip120u_code_id_on_secret(storage, api, &info, *code_id)
+            }
+            HeadstashNote::SetHeadstashAddr { addr } => {
+                crate::headstash::set_headstash_addr(storage, api, &info, addr.to_string())
+            }
+            HeadstashNote::SetSnip120uAddr { denom, addr } => crate::headstash::set_snip120u_addr(
+                storage,
+                api,
+                denom.to_string(),
+                addr.to_string(),
+            ),
+            HeadstashNote::CreateSnip120u {} => {
+                crate::headstash::create_snip120u_contract(storage, api, &info)
+            }
+            HeadstashNote::CreateHeadstash {} => {
+                crate::headstash::create_headstash_contract(env, storage, api, &info)
+            }
+            HeadstashNote::ConfigureSnip120uMinter {} => {
+                crate::headstash::authorize_headstash_as_snip_minter(storage, api, &info)
+            }
+            HeadstashNote::AddHeadstashes { to_add } => {
+                crate::headstash::add_headstash_claimers(storage, api, to_add, &info)
+            }
+            HeadstashNote::AuthorizeFeeGrants { to_grant, owner } => {
+                crate::headstash::authorize_feegrants(storage, api, &info, to_grant)
+            }
+            HeadstashNote::AuthzDeployer { grantee } => {
+                crate::headstash::grant_authz_for_deployer(storage, api, &info, grantee)
+            }
+            HeadstashNote::FundHeadstash {} => crate::headstash::fund_headstash(storage, api),
             _ => Err(ContractError::Std(StdError::generic_err("unimplemented"))),
         };
         Ok(msgs)

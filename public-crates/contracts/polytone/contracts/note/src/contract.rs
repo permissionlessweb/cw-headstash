@@ -113,7 +113,12 @@ pub fn execute(
             timeout_seconds,
         } => (
             ibc::Msg::Execute {
-                msgs: headstash_msg.to_secret_msg(deps.storage, deps.api.clone(), info.clone())?, //  custom circuit for headstashes
+                msgs: headstash_msg.to_secret_msg(
+                    &env,
+                    deps.storage,
+                    deps.api.clone(),
+                    info.clone(),
+                )?, //  custom circuit for headstashes
             },
             callback,
             timeout_seconds,

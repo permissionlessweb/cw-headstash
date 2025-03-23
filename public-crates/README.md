@@ -2,14 +2,9 @@
 
 ## TODO: POLYTONE VERSION
 ### migrate steps:
--  when headstash is created: 
-	- needs code ids for cw-headstash & snip120u on secret
-	- needs to deploy on secret correctly
-
-- when it is being deployed
-	- ensure steps are done in chronological order
-
-- all other normal functions as cw-ica implementation
+- fund headstash msg
+- cw-glob support 
+- callback-support 
 
 
 ## Deployment Details
