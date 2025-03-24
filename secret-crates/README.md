@@ -1,5 +1,9 @@
 #  Secret Headstash
 
+## POLYTONE TODO:
+- custom parse to save proxy in reply handler (replaces instantiate2)
+
+
 Transparency-minimized airdrop contract for cosmos bech32 addresses to claim via ownership verification of an ethereum account.
 
 ## Table Of Contents -->

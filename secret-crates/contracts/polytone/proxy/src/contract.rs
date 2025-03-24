@@ -1,18 +1,18 @@
 #[cfg(not(feature = "library"))]
 use cosmwasm_std::entry_point;
 use cosmwasm_std::{
-    to_json_binary, Binary, Deps, DepsMut, Env, MessageInfo, Reply, Response, StdResult, SubMsg,
+    to_binary, Binary, Deps, DepsMut, Env, MessageInfo, Reply, Response, StdResult, SubMsg,
     SubMsgResponse, SubMsgResult,
 };
-use cw2::set_contract_version;
+// use cw2::set_contract_version;
 use polytone::ack::ack_execute_success;
 
 use crate::error::ContractError;
 use crate::msg::{ExecuteMsg, InstantiateMsg, QueryMsg};
 use crate::state::{COLLECTOR, INSTANTIATOR};
 
-const CONTRACT_NAME: &str = "crates.io:polytone-proxy";
-const CONTRACT_VERSION: &str = env!("CARGO_PKG_VERSION");
+// const CONTRACT_NAME: &str = "crates.io:polytone-proxy";
+// const CONTRACT_VERSION: &str = env!("CARGO_PKG_VERSION");
 
 #[cfg_attr(not(feature = "library"), entry_point)]
 pub fn instantiate(
@@ -21,7 +21,7 @@ pub fn instantiate(
     info: MessageInfo,
     _msg: InstantiateMsg,
 ) -> Result<Response, ContractError> {
-    set_contract_version(deps.storage, CONTRACT_NAME, CONTRACT_VERSION)?;
+    // set_contract_version(deps.storage, CONTRACT_NAME, CONTRACT_VERSION)?;
     INSTANTIATOR.save(deps.storage, &info.sender)?;
 
     Ok(Response::default()
@@ -65,7 +65,7 @@ pub fn execute(
 #[cfg_attr(not(feature = "library"), entry_point)]
 pub fn query(deps: Deps, _env: Env, msg: QueryMsg) -> StdResult<Binary> {
     match msg {
-        QueryMsg::Instantiator {} => to_json_binary(&INSTANTIATOR.load(deps.storage)?),
+        QueryMsg::Instantiator {} => to_binary(&INSTANTIATOR.load(deps.storage)?),
     }
 }
 

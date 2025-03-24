@@ -1,8 +1,8 @@
-use cosmwasm_std::{Addr, Empty, Uint64};
-use cw_multi_test::{App, AppResponse, Contract, ContractWrapper, Executor};
+use cosmwasm_std::{Addr, ContractInfo, Empty, Uint64};
 
 use crate::msg::QueryMsg::{BlockMaxGas, ContractAddrLen, ProxyCodeId};
 use crate::msg::{InstantiateMsg, MigrateMsg};
+use shade_protocol::multi_test::{App, AppResponse, Contract, ContractInstantiationInfo, ContractWrapper, Executor};
 
 pub const CREATOR_ADDR: &str = "creator";
 
@@ -19,8 +19,8 @@ fn voice_contract() -> Box<dyn Contract<Empty>> {
 pub(crate) struct Suite {
     app: App,
     pub _admin: Addr,
-    pub voice_address: Addr,
-    pub voice_code: u64,
+    pub voice_address: ContractInfo,
+    pub voice_code: ContractInstantiationInfo,
 }
 
 pub(crate) struct SuiteBuilder {
@@ -47,7 +47,7 @@ impl SuiteBuilder {
 
         let voice_address = app
             .instantiate_contract(
-                voice_code,
+                voice_code.clone(),
                 Addr::unchecked(CREATOR_ADDR),
                 &self.instantiate,
                 &[],
@@ -81,7 +81,7 @@ impl SuiteBuilder {
 }
 
 impl Suite {
-    pub fn store_voice_contract(&mut self) -> u64 {
+    pub fn store_voice_contract(&mut self) -> ContractInstantiationInfo {
         self.app.store_code(voice_contract())
     }
 }
@@ -91,21 +91,21 @@ impl Suite {
     pub fn query_block_max_gas(&self) -> u64 {
         self.app
             .wrap()
-            .query_wasm_smart(&self.voice_address, &BlockMaxGas)
+            .query_wasm_smart(&self.voice_address.code_hash,&self.voice_address.address, &BlockMaxGas)
             .unwrap()
     }
 
     pub fn query_proxy_code_id(&self) -> u64 {
         self.app
             .wrap()
-            .query_wasm_smart(&self.voice_address, &ProxyCodeId)
+            .query_wasm_smart(&self.voice_address.code_hash, &self.voice_address.address,&ProxyCodeId)
             .unwrap()
     }
 
     pub fn query_contract_addr_len(&self) -> u8 {
         self.app
             .wrap()
-            .query_wasm_smart(&self.voice_address, &ContractAddrLen)
+            .query_wasm_smart(&self.voice_address.code_hash,&self.voice_address.address, &ContractAddrLen)
             .unwrap()
     }
 }
@@ -121,13 +121,13 @@ impl Suite {
     ) -> anyhow::Result<AppResponse> {
         self.app.migrate_contract(
             sender,
-            self.voice_address.clone(),
+            self.voice_address.address.clone(),
             &MigrateMsg::WithUpdate {
                 proxy_code_id: contract_code_id.into(),
                 block_max_gas: block_max_gas.into(),
                 contract_addr_len,
             },
-            self.voice_code,
+            self.voice_code.code_id.clone(),
         )
     }
 }

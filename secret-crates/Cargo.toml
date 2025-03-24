@@ -3,9 +3,19 @@ resolver = "2"
 members = [
   "contracts/headstash",
   "contracts/snip120u",
+  "contracts/polytone/proxy",
+  "contracts/polytone/voice",
   # "scripts",
 ]
 exclude = ["scripts"]
+
+
+[workspace.package]
+edition = "2021"
+license = "BSD-3-Clause"
+repository = "https://https://github.com/permissionlessweb/cw-headstash/secret-crates"
+rust-version = "1.67"
+version = "1.1.0"
 
 
 [profile.release]
@@ -18,3 +28,21 @@ codegen-units = 1
 panic = 'abort'
 incremental = false
 overflow-checks = true
+
+[workspace.dependencies]
+polytone = { path = "packages/secret-polytone", version = "1.1.0" }
+polytone-proxy = { path = "contracts/polytone/proxy", version = "1.1.0" }
+polytone-voice = { path = "contracts/polytone/voice", version = "1.1.0" }
+
+cosmwasm-schema = { version = "1.1.8" }
+cosmwasm-std = { package = "secret-cosmwasm-std", version = "1.1.11"  }
+cosmwasm-storage = { package = "secret-cosmwasm-storage", version = "1.1.11"  }
+
+# cw-utils = "1.0.1"
+# cw2 = "=1.1.2"
+
+thiserror = "1.0.31"
+sha2 = { version = "0.10.2", default-features = false }
+anyhow = { version = "1.0.51" }
+
+[workspace.dev-dependencies]

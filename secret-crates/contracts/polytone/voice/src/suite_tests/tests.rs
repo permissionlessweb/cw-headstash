@@ -16,12 +16,12 @@ fn test_update() {
     let proxy_code_new = suite.store_voice_contract();
 
     suite
-        .update(Addr::unchecked(CREATOR_ADDR), proxy_code_new, 111_000, 32)
+        .update(Addr::unchecked(CREATOR_ADDR), proxy_code_new.code_id, 111_000, 32)
         .unwrap();
 
     // assert that both fields updated succesfully
     suite.assert_block_max_gas(111_000);
-    suite.assert_proxy_code(proxy_code_new);
+    suite.assert_proxy_code(proxy_code_new.code_id);
 }
 
 #[test]
@@ -31,7 +31,7 @@ fn test_query_block_max_gas() {
     suite.assert_block_max_gas(110_000);
 
     suite
-        .update(Addr::unchecked(CREATOR_ADDR), suite.voice_code, 111_000, 32)
+        .update(Addr::unchecked(CREATOR_ADDR), suite.voice_code.code_id, 111_000, 32)
         .unwrap();
 
     suite.assert_block_max_gas(111_000);

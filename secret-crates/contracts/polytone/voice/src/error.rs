@@ -1,5 +1,6 @@
-use cosmwasm_std::{Instantiate2AddressError, StdError};
-use cw_utils::ParseReplyError;
+use cosmwasm_std::StdError; // Instantiate2AddressError
+
+use polytone::utils::ParseReplyError;
 use thiserror::Error;
 
 #[derive(Error, Debug, PartialEq)]
@@ -10,8 +11,8 @@ pub enum ContractError {
     #[error(transparent)]
     Parse(#[from] ParseReplyError),
 
-    #[error(transparent)]
-    Instantiate2(#[from] Instantiate2AddressError),
+    // #[error(transparent)]
+    // Instantiate2(#[from] Instantiate2AddressError),
 
     #[error(transparent)]
     Handshake(#[from] polytone::handshake::error::HandshakeError),
