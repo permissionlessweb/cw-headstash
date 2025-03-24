@@ -30,7 +30,7 @@ pub enum ExecuteMsg {
 
 #[cw_serde]
 #[derive(QueryResponses)]
-#[cfg_attr(feature = "interface", derive(cw_orch::QueryFns))] // cw-orch automatic
+// #[cfg_attr(feature = "interface", derive(cw_orch::QueryFns))] // cw-orch automatic
 pub enum QueryMsg {
     /// Queries the configured block max gas. Serialized as
     /// `"block_max_gas"`.

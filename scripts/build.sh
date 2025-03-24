@@ -1,5 +1,5 @@
 # 1. build secret-crate contracts
-cd secret-crates && RUSTFLAGS='-C link-arg=-s' cargo build --release --target wasm32-unknown-unknown
+cd secret-crates && rustup target add wasm32-unknown-unknown && RUSTFLAGS='-C link-arg=-s' cargo build  --release --target wasm32-unknown-unknown --no-default-features
 # 2. optimize and move wasm binaries into globs folder
 mv ./target/wasm32-unknown-unknown/release/cw_headstash.wasm ../public-crates/contracts/cw-glob/src/globs/cw_headstash.wasm &&
 mv ./target/wasm32-unknown-unknown/release/snip20_reference_impl.wasm ../public-crates/contracts/cw-glob/src/globs/snip20_reference_impl.wasm &&

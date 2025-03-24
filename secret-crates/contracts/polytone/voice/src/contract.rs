@@ -129,7 +129,7 @@ pub fn execute(
                             )
                         };
 
-                        // secret network does not support instantiate2. helper to pass either proxy init msgs, or tx for proxy to handle on reply
+                        // secret network does not support instantiate2. helper to pass proxy init msgs first if exists, or tx for proxy to handle on reply
                         let submsg = proxy_submessage_helper(
                             deps.storage,
                             &connection_id,
@@ -231,8 +231,6 @@ fn proxy_submessage_helper(
     msgs: Vec<cosmwasm_std::CosmosMsg>,
     instantate_msg: Option<WasmMsg>,
 ) -> Result<(SubMsg, Vec<Attribute>), ContractError> {
-    let mut attrs = vec![];
-
     if proxy != Addr::unchecked("placeholder") {
         // pass msgs to proxy normally
         let submsg: SubMsg<Empty> = SubMsg::reply_always(
@@ -240,22 +238,22 @@ fn proxy_submessage_helper(
                 contract_addr: proxy.into_string(),
                 msg: to_binary(&polytone_proxy::msg::ExecuteMsg::Proxy { msgs })?,
                 funds: vec![],
-                code_hash: "".to_string(),
+                code_hash: "codehash".to_string(),
             },
             REPLY_FORWARD_DATA,
         );
-        return Ok((submsg, attrs));
+        return Ok((submsg, vec![]));
     } else if let Some(init_msg) = instantate_msg {
         // pass instantiate msg first, save msgs to pass to proxy once instantiated to state
         let submsg: SubMsg<Empty> = SubMsg::reply_always(init_msg, REPLY_INIT_PROXY);
-        attrs.extend(vec![
-            Attribute::new("connection-id", connection_id),
-            Attribute::new("counterparty-port", counterparty_port),
-        ]);
         if msgs.len() != 0 {
             PENDING_PROXY_TXS.save(storage, &to_binary(&msgs)?)?;
         }
-        return Ok((submsg, attrs));
+        return Ok((submsg, vec![
+            Attribute::new("connection-id", connection_id),
+            Attribute::new("counterparty-port", counterparty_port),
+            Attribute::new("sender", sender),
+        ]));
     } else {
         return Err(ContractError::Std(StdError::generic_err(
             "proxy has not been instantiated, and no instantiate message passed, panic.",

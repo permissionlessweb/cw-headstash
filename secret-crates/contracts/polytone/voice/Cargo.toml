@@ -34,13 +34,16 @@ cosmwasm-schema = { workspace = true }
 cosmwasm-std    = { workspace = true  }  
 # cw-orch         = { workspace = true, optional = true }
 # cw-storage-plus = { workspace = true }
-secret-toolkit = { workspace = true }
-cw2             = { workspace = true }
+# cw2             = { workspace = true }
 polytone        = { workspace = true }
 polytone-proxy  = { workspace = true }
 sha2            = { workspace = true }
 thiserror       = { workspace = true }
+chrono = "0.4.40"
+secret-toolkit = { git = "https://github.com/SolarRepublic/secret-toolkit.git", default-features = false, features = ["permit", "storage", "viewing-key", "notification"] }
 
 [dev-dependencies]
+shade-protocol = { version = "0.1.0",package = "shade-protocol", git = "https://github.com/permissionlessweb/shade", features = ["multi-test", "admin"] }
+shade-multi-test = { git = "https://github.com/permissionlessweb/shade"  }
 # cw-multi-test = { workspace = true }
 anyhow        = { workspace = true }

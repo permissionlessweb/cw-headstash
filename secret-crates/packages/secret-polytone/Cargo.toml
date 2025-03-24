@@ -9,7 +9,7 @@ version = { workspace = true }
 
 [dependencies]
 cosmwasm-schema = { workspace = true }
-secret-toolkit = { workspace = true }
-cosmwasm-std = { workspace = true }
+secret-toolkit = { git = "https://github.com/SolarRepublic/secret-toolkit.git", default-features = false, features = ["permit", "storage", "viewing-key", "notification"] }
+cosmwasm-std = { workspace = true , features = ["ibc3"]}
 # cw-storage-plus = { workspace = true }
 thiserror = { workspace = true }
