@@ -113,6 +113,7 @@ pub fn try_add_dnas_api_middlware_entrypoint(
         let MiddlewareData {
             dm_bech32_addr,
             nonce,
+            dao_addr,
         } = from_binary(&mw_data)?;
 
         let DmAuthSignDoc {
@@ -248,13 +249,7 @@ pub mod queries {
             .secp256k1_verify(&dm_msg_hash_actual, &dm_sig, &dm_pubkey.value)?;
 
         // Deserialize DAO member's signed message
-        let MemberUseDnasRequestData {
-            nonce: dm_nonce,
-            scrt_dnas_addr,
-            key_hash,
-            dao_addr,
-            middleware_operator_addr,
-        } = from_binary(&dm_msg)?;
+        let DmAuthSignDoc { msgs, .. } = from_binary(&dm_msg)?;
 
         // Validate request parameters
         if scrt_dnas_addr != env.contract.address {

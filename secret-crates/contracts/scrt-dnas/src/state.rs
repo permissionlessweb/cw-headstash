@@ -66,6 +66,7 @@ pub struct DaoMemberData {
 
 #[cw_serde]
 pub struct MiddlewareData {
+    pub dao_addr: String,
     pub dm_bech32_addr: String,
     pub nonce: u64,
 }
