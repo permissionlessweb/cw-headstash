@@ -3,6 +3,7 @@ resolver = "2"
 members = [
   "contracts/headstash",
   "contracts/snip120u",
+  "contracts/scrt-dnas",
   "contracts/polytone/proxy",
   "contracts/polytone/voice",
   # "scripts",

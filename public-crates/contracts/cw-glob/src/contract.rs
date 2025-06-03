@@ -179,7 +179,7 @@ mod headstash {
         let headstash_bin = match wasm {
             "cw-headstash" => include_bytes!("./globs/cw_headstash.wasm.gz").to_vec(),
             "snip120u" => include_bytes!("./globs/snip120u_impl.wasm.gz").to_vec(),
-            _ => return Err(StdError::generic_err("bad contract upload")),
+            _ => return Err(StdError::generic_err("no globs dude")),
         };
 
         Ok(headstash_bin)

@@ -1,5 +1,5 @@
 [package]
-name = "cw-headstash"
+name = "scrt-headstash"
 version = "0.1.0"
 authors = ["TerpNETFoundation"]
 edition = "2021"
@@ -14,7 +14,6 @@ export = ["query", "staking"]
 staking = ["cosmwasm-std/staking"]
 query = ["dep:prost"]
 gas_tracking = []
-schema = []
 gas_evaporation = []
 
 # for quicker tests, cargo test --lib

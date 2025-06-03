@@ -48,13 +48,12 @@ pub struct CallbackInfo {
 
 #[cw_serde]
 pub enum ExecuteMsg {
-
     /// Admin function to add eligible addrs for each snip120u availables amount.
     AddEligibleHeadStash {
         headstash: Vec<Headstash>,
     },
     /// Eligible address are able to claim by providing the offline signature and the public address that generated it.
-    /// 
+    ///
     Claim {
         sig_addr: String,
         sig: String,

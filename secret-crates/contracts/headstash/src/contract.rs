@@ -27,8 +27,8 @@ pub fn instantiate(
     };
 
     validation::validate_plaintext_msg(msg.claim_msg_plaintext.clone())?;
-
     let mut unique_snips: Vec<crate::state::snip::Snip120u> = Vec::new();
+
     if msg.snips.len() == 0 {
         return Err(StdError::generic_err("must provide atleast 1 snip120u"));
     }
