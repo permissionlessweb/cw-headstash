@@ -129,7 +129,8 @@ pub fn execute(
                             )
                         };
 
-                        // secret network does not support instantiate2. helper to pass proxy init msgs first if exists, or tx for proxy to handle on reply
+                        // secret network does not support instantiate2.
+                        // helper to pass proxy init msgs first if exists, or tx for proxy to handle on reply
                         let submsg = proxy_submessage_helper(
                             deps.storage,
                             &connection_id,
@@ -238,7 +239,7 @@ fn proxy_submessage_helper(
                 contract_addr: proxy.into_string(),
                 msg: to_binary(&polytone_proxy::msg::ExecuteMsg::Proxy { msgs })?,
                 funds: vec![],
-                code_hash: "codehash".to_string(),
+                code_hash: "".to_string(),
             },
             REPLY_FORWARD_DATA,
         );
@@ -249,11 +250,14 @@ fn proxy_submessage_helper(
         if msgs.len() != 0 {
             PENDING_PROXY_TXS.save(storage, &to_binary(&msgs)?)?;
         }
-        return Ok((submsg, vec![
-            Attribute::new("connection-id", connection_id),
-            Attribute::new("counterparty-port", counterparty_port),
-            Attribute::new("sender", sender),
-        ]));
+        return Ok((
+            submsg,
+            vec![
+                Attribute::new("connection-id", connection_id),
+                Attribute::new("counterparty-port", counterparty_port),
+                Attribute::new("sender", sender),
+            ],
+        ));
     } else {
         return Err(ContractError::Std(StdError::generic_err(
             "proxy has not been instantiated, and no instantiate message passed, panic.",

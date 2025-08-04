@@ -8,7 +8,7 @@ use crate::{
     // types::callbacks::IcaControllerCallbackMsg,
 };
 use cosmwasm_schema::cw_serde;
-use cosmwasm_std::{Addr, Binary, Uint128};
+use cosmwasm_std::{Addr, Binary, Coin, Uint128};
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
@@ -89,6 +89,7 @@ pub enum QueryMsg {
     Config {},
     Dates {},
     Clawback {},
+    Allocation { addr: String },
 }
 
 #[cw_serde]
@@ -104,6 +105,9 @@ pub enum QueryAnswer {
     },
     ClawbackResponse {
         bool: bool,
+    },
+    AllocationResponse {
+        amount: Vec<Coin>,
     },
 }
 
@@ -266,55 +270,5 @@ pub mod snip {
             funds,
         };
         Ok(execute.into())
-    }
-}
-
-/// Option types for other messages.
-pub mod options {
-    use crate::ibc::types::{keys::HOST_PORT_ID, metadata::TxEncoding};
-
-    use cosmwasm_std::IbcOrder;
-
-    /// The options needed to initialize the IBC channel.
-    #[derive(
-        serde::Serialize,
-        serde::Deserialize,
-        Clone,
-        Debug,
-        PartialEq,
-        cosmwasm_schema::schemars::JsonSchema,
-    )]
-    #[allow(clippy::derive_partial_eq_without_eq)]
-    #[schemars(crate = "::cosmwasm_schema::schemars")]
-    pub struct ChannelOpenInitOptions {
-        /// The connection id on this chain.
-        pub connection_id: String,
-        /// The counterparty connection id on the counterparty chain.
-        pub counterparty_connection_id: String,
-        /// The counterparty port id. If not specified, [`crate::ibc::types::keys::HOST_PORT_ID`] is used.
-        /// Currently, this contract only supports the host port.
-        pub counterparty_port_id: Option<String>,
-        /// TxEncoding is the encoding used for the ICA txs. If not specified, [`TxEncoding::Protobuf`] is used.
-        pub tx_encoding: Option<TxEncoding>,
-        /// The order of the channel. If not specified, [`IbcOrder::Ordered`] is used.
-        /// [`IbcOrder::Unordered`] is only supported if the counterparty chain is using `ibc-go`
-        /// v8.1.0 or later.
-        pub channel_ordering: Option<IbcOrder>,
-    }
-
-    impl ChannelOpenInitOptions {
-        /// Returns the counterparty port id.
-        #[must_use]
-        pub fn counterparty_port_id(&self) -> String {
-            self.counterparty_port_id
-                .clone()
-                .unwrap_or_else(|| HOST_PORT_ID.to_string())
-        }
-
-        /// Returns the tx encoding.
-        #[must_use]
-        pub fn tx_encoding(&self) -> TxEncoding {
-            self.tx_encoding.clone().unwrap_or(TxEncoding::Protobuf)
-        }
     }
 }

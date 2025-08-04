@@ -37,6 +37,7 @@ optimize = """docker run --rm -v "$(pwd)":/code \
 
 [dependencies]
 anybuf = "0.5.0"
+headstash-public = {path = "../../packages/headstash-public"}
 cosmwasm-schema = "2.1.0"
 cosmwasm-std = { version = "2.1.0", features = [
   "cosmwasm_1_4",

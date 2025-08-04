@@ -1,16 +1,15 @@
 use cosmwasm_schema::{cw_serde, QueryResponses};
 use cosmwasm_std::{
-    to_json_binary, Addr, Api, Binary, CosmosMsg, Empty, Env, MessageInfo, QueryRequest, StdError,
-    Storage, Uint128, Uint64,
+    Binary, CosmosMsg, Empty, Env, MessageInfo, QuerierWrapper, QueryRequest, Storage, Uint64,
 };
 
-use polytone::callbacks::CallbackRequest;
-
-use crate::{
-    error::ContractError,
-    headstash::callbacks,
-    state::{bloom::BloomConfig, headstash::Headstash, HeadstashSeq, HEADSTASH_SEQUENCE},
+use headstash_public::state::{Headstash, HeadstashParams, Lhsm};
+use polytone::{
+    callbacks::{CallbackMessage, CallbackRequest},
+    headstash::HeadstashCallback,
 };
+
+use crate::error::ContractError;
 #[cw_serde]
 pub struct InstantiateMsg {
     /// This contract pairs with the first voice module that a relayer
@@ -38,7 +37,6 @@ pub enum ExecuteMsg {
     /// Performs the requested queries on the voice chain and returns
     /// a callback of Vec<QuerierResult>, or ACK-FAIL if unmarshalling
     /// any of the query requests fails.
-    #[cfg_attr(feature = "interface", fn_name("ibc_query"))]
     Query {
         msgs: Vec<QueryRequest<Empty>>,
         callback: CallbackRequest,
@@ -55,7 +53,6 @@ pub enum ExecuteMsg {
     /// perform no additional actions, pass an empty list to
     /// `msgs`. Accounts are queryable via the `RemoteAddress {
     /// local_address }` query after they have been created.
-    #[cfg_attr(feature = "interface", fn_name("ibc_execute"))]
     Execute {
         headstash_msg: HeadstashNote,
         callback: Option<CallbackRequest>,
@@ -63,8 +60,8 @@ pub enum ExecuteMsg {
     },
     /// Entrypoint for Headstash callbacks from actions on the voice chain on behalf
     /// of the headstash-note chain sender.
-    #[cfg_attr(feature = "interface", fn_name("headstash_callback"))]
-    HeadstashCallBack { rx: HeadstashCallback },
+    HeadstashCallBack(HeadstashCallback),
+    Callback(CallbackMessage),
 }
 
 #[cw_serde]
@@ -104,81 +101,28 @@ pub enum MigrateMsg {
     WithUpdate { block_max_gas: Uint64 },
 }
 
-/// Params for Headstash
-#[cw_serde]
-pub struct HeadstashParams {
-    /// The contract addr for cw-glob on the native chain.
-    pub cw_glob: Option<Addr>,
-    /// The code ID of the snip120u contract, on Secret Network.
-    pub snip120u_code_id: Option<u64>,
-    /// The code hash of the snip120u contract, on Secret Network. Not optional for pre-deployment verification
-    pub snip120u_code_hash: String,
-    /// Code id of Headstash contract on Secret Network
-    pub headstash_code_id: Option<u64>,
-    /// Params defined by deployer for tokens included.
-    pub token_params: Vec<HeadstashTokenParams>,
-    /// Headstash contract address this contract is admin of.
-    /// We save this address in the first callback msg sent during setup_headstash,
-    /// and then use it to set as admin for snip120u of assets after 1st callback.
-    pub headstash_addr: Option<String>,
-    /// The wallet address able to create feegrant authorizations on behalf of this contract
-    pub fee_granter: Option<String>,
-    /// Enables reward multiplier for cw-headstash
-    pub multiplier: bool,
-    /// bloom config
-    pub bloom_config: Option<BloomConfig>,
-    pub headstash_init_config: HeadstashInitConfig,
-}
-
-#[cw_serde]
-pub struct HeadstashInitConfig {
-    pub claim_msg_plaintxt: String,
-    pub end_date: Option<u64>,
-    pub start_date: Option<u64>,
-    pub random_key: String,
-}
-
-/// Params for Headstash Tokens
-#[cw_serde]
-pub struct HeadstashTokenParams {
-    /// Name to use in snip120u state
-    pub name: String,
-    /// Symbol to use
-    pub symbol: String,
-    /// native token name
-    pub native: String,
-    /// ibc string on Secret
-    pub ibc: String,
-    /// snip20 addr on Secret
-    pub snip_addr: Option<String>,
-    /// Total amount for specific snip
-    pub total: Uint128,
-}
-
 #[cw_serde]
 pub enum HeadstashNote {
-    SetCwGlob {
-        /// The storage key set in cw-glob. defaults enabled are either `snip120u` or `cw-headstash`
-        cw_glob: String,
-    },
-    UploadWasmOnSecret {
-        cw_glob: Option<String>,
-        wasm: String,
-    },
-    SetHeadstashCodeId {
-        code_id: u64,
-    },
-    SetSnip120uCodeId {
-        code_id: u64,
-    },
-    SetHeadstashAddr {
-        addr: String,
-    },
-    SetSnip120uAddr {
-        denom: String,
-        addr: String,
-    },
-    CreateSnip120u {},
+    UploadHeadstashOnSecret {},
+    // SetCwGlob {
+    //     /// The storage key set in cw-glob. defaults enabled are either `snip120u` or `cw-headstash`
+    //     cw_glob: String,
+    // },
+    // SetHeadstashCodeId {
+    //     code_id: u64,
+    // },
+    // SetSnip120uCodeId {
+    //     code_id: u64,
+    // },
+    // SetHeadstashAddr {
+    //     addr: String,
+    // },
+    // SetSnip120uAddr {
+    //     denom: String,
+    //     addr: String,
+    // },
+    // FundHeadstash {},
+    CreateSnips {},
     CreateHeadstash {},
     ConfigureSnip120uMinter {},
     AddHeadstashes {
@@ -192,6 +136,10 @@ pub enum HeadstashNote {
         grantee: String,
     },
     FundHeadstash {},
+    /// Generic action on destination chain. Will trigger default polytone workflow.
+    GenericMsg {
+        msgs: Vec<CosmosMsg>,
+    },
 }
 
 impl HeadstashNote {
@@ -199,153 +147,79 @@ impl HeadstashNote {
         &self,
         env: &Env,
         storage: &mut dyn Storage,
-        api: &dyn Api,
         info: MessageInfo,
-    ) -> Result<Vec<CosmosMsg<Empty>>, ContractError> {
-        let msgs: Vec<CosmosMsg<Empty>> = Vec::new();
-        let _ = match self {
-            HeadstashNote::SetCwGlob { cw_glob } => {
-                crate::headstash::set_cw_glob(storage, api, &info, cw_glob)
-            }
-            HeadstashNote::UploadWasmOnSecret { cw_glob, wasm } => {
-                crate::headstash::upload_contract_on_secret(storage, api, &info, wasm, cw_glob)
-            }
-            HeadstashNote::SetHeadstashCodeId { code_id } => {
-                crate::headstash::set_headstash_code_id_on_secret(storage, api, &info, *code_id)
-            }
-            HeadstashNote::SetSnip120uCodeId { code_id } => {
-                crate::headstash::set_snip120u_code_id_on_secret(storage, api, &info, *code_id)
-            }
-            HeadstashNote::SetHeadstashAddr { addr } => {
-                crate::headstash::set_headstash_addr(storage, api, &info, addr.to_string())
-            }
-            HeadstashNote::SetSnip120uAddr { denom, addr } => crate::headstash::set_snip120u_addr(
-                storage,
-                api,
-                denom.to_string(),
-                addr.to_string(),
+        querier: QuerierWrapper,
+    ) -> Result<(Lhsm, Vec<CosmosMsg<Empty>>), ContractError> {
+        Ok(match self {
+            HeadstashNote::UploadHeadstashOnSecret {} => (
+                Lhsm::Ibc,
+                vec![crate::headstash::upload_contract_on_secret(
+                    querier, storage, &info,
+                )?],
             ),
-            HeadstashNote::CreateSnip120u {} => {
-                crate::headstash::create_snip120u_contract(storage, api, &info)
-            }
-            HeadstashNote::CreateHeadstash {} => {
-                crate::headstash::create_headstash_contract(env, storage, api, &info)
-            }
-            HeadstashNote::ConfigureSnip120uMinter {} => {
-                crate::headstash::authorize_headstash_as_snip_minter(storage, api, &info)
-            }
-            HeadstashNote::AddHeadstashes { to_add } => {
-                crate::headstash::add_headstash_claimers(storage, api, to_add, &info)
-            }
-            HeadstashNote::AuthorizeFeeGrants { to_grant, owner } => {
-                crate::headstash::authorize_feegrants(storage, api, &info, to_grant)
-            }
-            HeadstashNote::AuthzDeployer { grantee } => {
-                crate::headstash::grant_authz_for_deployer(storage, api, &info, grantee)
-            }
-            HeadstashNote::FundHeadstash {} => crate::headstash::fund_headstash(storage, api),
-            _ => Err(ContractError::Std(StdError::generic_err("unimplemented"))),
-        };
-        Ok(msgs)
-    }
-
-    pub fn to_callback_request(
-        &self,
-        env: &Env,
-        storage: &mut dyn Storage,
-        api: &dyn Api,
-    ) -> Result<CallbackRequest, ContractError> {
-        let callback_request = match self {
-            HeadstashNote::UploadWasmOnSecret { cw_glob, wasm } => {
-                to_json_binary(&HeadstashCallback::UploadWasmOnSecret {})?
-            }
-            HeadstashNote::CreateSnip120u {} => {
-                to_json_binary(&HeadstashCallback::CreateSnip120u {})?
-            }
-            HeadstashNote::CreateHeadstash {} => {
-                to_json_binary(&HeadstashCallback::CreateHeadstash {})?
-            }
-            HeadstashNote::ConfigureSnip120uMinter {} => {
-                to_json_binary(&HeadstashCallback::ConfigureSnip120uMinter {})?
-            }
-            HeadstashNote::AddHeadstashes { to_add } => {
-                to_json_binary(&HeadstashCallback::AddHeadstashes {})?
-            }
-            HeadstashNote::AuthorizeFeeGrants { to_grant, owner } => {
-                to_json_binary(&HeadstashCallback::AuthorizeFeeGrants {})?
-            }
-            HeadstashNote::AuthzDeployer { grantee } => {
-                to_json_binary(&HeadstashCallback::AuthzDeployer {})?
-            }
-            // HeadstashNote::SetCwGlob { cw_glob } => todo!(),
-            // HeadstashNote::SetHeadstashCodeId { code_id } => todo!(),
-            // HeadstashNote::SetSnip120uCodeId { code_id } => todo!(),
-            // HeadstashNote::SetHeadstashAddr { addr } => todo!(),
-            // HeadstashNote::SetSnip120uAddr { denom, addr } => todo!(),
-            HeadstashNote::FundHeadstash {} => {
-                to_json_binary(&HeadstashCallback::FundHeadstash {})?
-            }
-            _ => unimplemented!(),
-        };
-        Ok(CallbackRequest {
-            receiver: env.contract.address.to_string(),
-            msg: callback_request,
+            HeadstashNote::CreateSnips {} => (
+                Lhsm::Ibc,
+                crate::headstash::create_snip120u_contract(storage, &info)?,
+            ),
+            HeadstashNote::CreateHeadstash {} => (
+                Lhsm::Ibc,
+                crate::headstash::create_headstash_contract(env, storage, &info)?,
+            ),
+            HeadstashNote::ConfigureSnip120uMinter {} => (
+                Lhsm::Ibc,
+                crate::headstash::authorize_headstash_as_snip_minter(storage, &info)?,
+            ),
+            HeadstashNote::AddHeadstashes { to_add } => (
+                Lhsm::Ibc,
+                crate::headstash::add_headstash_claimers(storage, to_add, &info)?,
+            ),
+            HeadstashNote::AuthorizeFeeGrants { to_grant, .. } => (
+                Lhsm::Ibc,
+                crate::headstash::authorize_feegrants(storage, &info, to_grant)?,
+            ),
+            HeadstashNote::AuthzDeployer { grantee } => (
+                Lhsm::Ibc,
+                crate::headstash::grant_authz_for_deployer(storage, &info, grantee)?,
+            ),
+            HeadstashNote::FundHeadstash {} => (
+                Lhsm::Local,
+                crate::headstash::fund_headstash(
+                    storage,
+                    &env.contract.address,
+                    info.funds,
+                    env.block.time,
+                )?,
+            ),
+            HeadstashNote::GenericMsg { msgs } => (Lhsm::Callback, msgs.clone()),
         })
     }
-}
 
-#[cw_serde]
-pub enum HeadstashCallback {
-    UploadWasmOnSecret {},
-    CreateHeadstash {},
-    CreateSnip120u {},
-    ConfigureSnip120uMinter {},
-    AddHeadstashes {},
-    AuthorizeFeeGrants {},
-    AuthzDeployer {},
-    FundHeadstash {},
-}
-
-impl HeadstashCallback {
-    pub fn into_headstash_msg(
-        &self,
-        storage: &mut dyn Storage,
-    ) -> Result<Vec<CosmosMsg<Empty>>, ContractError> {
-        let mut msgs = vec![];
-
+    /// Assign a unique u64 ID to each variant.
+    ///  000 means we never should have a callback as this msg is being executed locally.
+    pub const fn callback_digits(&self) -> u32 {
         match self {
-            HeadstashCallback::UploadWasmOnSecret {} => {
-                // save code ids of wasms uploaded (snip or headstash)
-            }
-            HeadstashCallback::CreateHeadstash {} => {
-                // save contract address of headstash
-            }
-            HeadstashCallback::CreateSnip120u {} => {
-                // save contract addresses of snips to internal storage
-            }
-            HeadstashCallback::ConfigureSnip120uMinter {} => {
-                // n/a
-            }
-            HeadstashCallback::AddHeadstashes {} => {
-                // n/a
-            }
-            HeadstashCallback::AuthorizeFeeGrants {} => {
-                // n/a
-            }
-            HeadstashCallback::AuthzDeployer {} => {
-                // n/a
-            },
-            HeadstashCallback::FundHeadstash {} => {
-                // n/a
-            },
+            // HeadstashNote::SetCwGlob { .. } => 000,
+            // HeadstashNote::SetHeadstashCodeId { .. } => 000,
+            // HeadstashNote::SetSnip120uCodeId { .. } => 000,
+            // HeadstashNote::SetHeadstashAddr { .. } => 000,
+            // HeadstashNote::SetSnip120uAddr { .. } => 000,
+            HeadstashNote::UploadHeadstashOnSecret {} => 101,
+            HeadstashNote::CreateSnips {} => 202,
+            HeadstashNote::CreateHeadstash {} => 303,
+            HeadstashNote::ConfigureSnip120uMinter {} => 404,
+            HeadstashNote::AddHeadstashes { .. } => 505,
+            HeadstashNote::AuthorizeFeeGrants { .. } => 606,
+            HeadstashNote::AuthzDeployer { .. } => 707,
+            HeadstashNote::FundHeadstash {} => 808,
+            HeadstashNote::GenericMsg { .. } => 909,
         }
-        Ok(msgs)
     }
 
-    pub fn into_callback(&self, addr: String) -> Result<CallbackRequest, ContractError> {
+    pub fn to_callback_request(&self, env: &Env) -> Result<CallbackRequest, ContractError> {
         Ok(CallbackRequest {
-            receiver: addr,
-            msg: Binary(vec![]),
+            receiver: env.contract.address.to_string(),
+            msg: Binary::new(vec![]), // empty as we can infer msg that triggered callback from headstash_digits. saves some bytes.
+            headstash_digits: self.callback_digits(),
         })
     }
 }

@@ -19,7 +19,7 @@ Transparency-minimized airdrop contract for cosmos bech32 addresses to claim via
 - headstash: Update total_amount when additional accepted token is sent, allow claim proportional to distribution amount after each claim.
 - headstash: add option to define recipient other than signer during claim.
 - headstash: add support for claim and authorization of actions performed by an ica-callback contract. 
-- headstash: mimic delayed-write-buffer for
+- query: permit query if addr has claimed
     - ~~adding eligible address & amounts~~
     - ~~claiming headstashes~~
     - registering ibc-blooms txs 

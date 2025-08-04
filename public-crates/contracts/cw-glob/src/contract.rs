@@ -5,6 +5,7 @@ use cosmwasm_std::{
     StdError, StdResult, Storage,
 };
 use cw2::set_contract_version;
+use headstash_public::state::GLOB_HEADSTASH_KEY;
 use sha2::{Digest, Sha256};
 
 use crate::error::ContractError;
@@ -29,8 +30,8 @@ pub fn instantiate(
     }
     OWNER.save(deps.storage, &msg.owners)?;
 
-    // hash cw-headstsh & snip120u
-    let default_keys = vec!["cw-headstash".to_string(), "snip120u".to_string()];
+    // storage key for headstash contract
+    let default_keys = vec![GLOB_HEADSTASH_KEY.to_string()];
     let res = perform_hash_glob(deps.storage, default_keys)?;
 
     Ok(res)
@@ -178,7 +179,6 @@ mod headstash {
         // define headstash wasm binary
         let headstash_bin = match wasm {
             "cw-headstash" => include_bytes!("./globs/cw_headstash.wasm.gz").to_vec(),
-            "snip120u" => include_bytes!("./globs/snip120u_impl.wasm.gz").to_vec(),
             _ => return Err(StdError::generic_err("no globs dude")),
         };
 

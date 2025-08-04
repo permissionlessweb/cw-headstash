@@ -132,7 +132,7 @@ pub fn on_ack(
         original_packet,
         ..
     }: &IbcPacketAckMsg,
-) -> (Option<CosmosMsg>, Option<String>) {
+) -> StdResult<(Option<CosmosMsg>, Option<String>)> {
     let result = unmarshal_ack(acknowledgement);
 
     let executed_by = match result {
@@ -145,10 +145,10 @@ pub fn on_ack(
         storage,
         original_packet.src.channel_id.clone(),
         original_packet.sequence,
-    )
+    )?
     .map(|request| callback_message(request, result));
 
-    (callback_message, executed_by)
+    Ok((callback_message, executed_by))
 }
 
 /// Call on every packet timeout. Returns a callback message to execute,
@@ -156,8 +156,9 @@ pub fn on_ack(
 pub fn on_timeout(
     storage: &mut dyn Storage,
     IbcPacketTimeoutMsg { packet, .. }: &IbcPacketTimeoutMsg,
-) -> Option<CosmosMsg> {
-    let request = dequeue_callback(storage, packet.src.channel_id.clone(), packet.sequence)?;
+) -> StdResult<Option<CosmosMsg>> {
+    let request = dequeue_callback(storage, packet.src.channel_id.clone(), packet.sequence)?
+        .expect("expects a callback");
     let timeout = "timeout".to_string();
     let result = match request.request_type {
         CallbackRequestType::Execute => Callback::Execute(Err(timeout)),
@@ -166,7 +167,7 @@ pub fn on_timeout(
             error: timeout,
         })),
     };
-    Some(callback_message(request, result))
+    Ok(Some(callback_message(request, result)))
 }
 
 fn callback_message(request: PendingCallback, result: Callback) -> CosmosMsg {
@@ -194,12 +195,12 @@ fn dequeue_callback(
     storage: &mut dyn Storage,
     channel_id: String,
     sequence_number: u64,
-) -> Option<PendingCallback> {
+) -> StdResult<Option<PendingCallback>> {
     let request = CALLBACKS
         .get(storage, &(channel_id.clone(), sequence_number))
         .unwrap();
-    CALLBACKS.remove(storage, &(channel_id, sequence_number));
-    Some(request)
+    CALLBACKS.remove(storage, &(channel_id, sequence_number))?;
+    Ok(Some(request))
 }
 
 #[cw_serde]

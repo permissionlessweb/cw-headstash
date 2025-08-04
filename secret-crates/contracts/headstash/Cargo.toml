@@ -50,7 +50,7 @@ serde-json-wasm = "1.0"
 serde_with = "3.8"
 # secret-toolkit-crypto = { version = "0.10.0", features = ["rand"] }
 secret-toolkit-crypto = { git = "https://github.com/SolarRepublic/secret-toolkit.git", default-features = false, features = ["hash"] }
-secret-toolkit = { git = "https://github.com/SolarRepublic/secret-toolkit.git", default-features = false, features = ["permit", "storage", "viewing-key", "notification"] }
+secret-toolkit = { git = "https://github.com/SolarRepublic/secret-toolkit.git", default-features = false, features = ["permit", "storage", "viewing-key", "notification","snip20"] }
 prost = { version = "0.13", optional = true }
 serde-big-array = "0.5.1"
 static_assertions = "1.1.0"

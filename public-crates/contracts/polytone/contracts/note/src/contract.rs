@@ -1,22 +1,25 @@
 #[cfg(not(feature = "library"))]
 use cosmwasm_std::entry_point;
 use cosmwasm_std::{
-    to_json_binary, Binary, Deps, DepsMut, Env, IbcMsg, IbcTimeout, MessageInfo, Response,
-    StdError, StdResult,
+    from_json, to_json_binary, Binary, Deps, DepsMut, Env, IbcMsg, IbcTimeout, MessageInfo,
+    Response, StdError, StdResult,
 };
 use cw2::set_contract_version;
-use polytone::callbacks::CallbackRequestType;
+use headstash_public::state::{HeadstashParams, Lhsm};
+use polytone::ack::Callback;
+use polytone::callbacks::{CallbackMessage, CallbackRequest, CallbackRequestType};
+use polytone::headstash::{HEADSTASH_PARAMS, HEADSTASH_SEQUENCE};
 use polytone::{accounts, callbacks, ibc};
 
 use crate::error::ContractError;
 
-use crate::headstash::constants::DEFAULT_TIMEOUT;
 use crate::ibc::ERR_GAS_NEEDED;
-use crate::msg::{ExecuteMsg, HeadstashParams, InstantiateMsg, MigrateMsg, Pair, QueryMsg};
+use crate::msg::{ExecuteMsg, InstantiateMsg, MigrateMsg, Pair, QueryMsg};
 use crate::state::{
     increment_sequence_number, HeadstashSeq, BLOCK_MAX_GAS, CHANNEL, CONNECTION_REMOTE_PORT,
-    HEADSTASH_PARAMS, HEADSTASH_SEQUENCE,
+    RESULTS,
 };
+use polytone::headstash::constants::DEFAULT_TIMEOUT;
 
 const CONTRACT_NAME: &str = "crates.io:polytone-note";
 const CONTRACT_VERSION: &str = env!("CARGO_PKG_VERSION");
@@ -107,21 +110,29 @@ pub fn execute(
     info: MessageInfo,
     msg: ExecuteMsg,
 ) -> Result<Response, ContractError> {
-    let mut hscb = false;
+    // LocalHeadstashMsg: Identifier if a msg is to be a local msg, not requiring an IBC packet formation & callback expectation.
+    let mut lhsm = Lhsm::Ibc;
 
     let (msg, callback, timeout_seconds, request_type) = match msg {
         ExecuteMsg::Execute {
             headstash_msg,
             timeout_seconds,
             ..
-        } => (
-            ibc::Msg::Execute {
-                msgs: headstash_msg.to_cosmos_msgs(&env, deps.storage, deps.api, info.clone())?,
-            },
-            headstash_msg.to_callback_request(&env, deps.storage, deps.api)?,
-            timeout_seconds,
-            CallbackRequestType::Execute,
-        ),
+        } => {
+            let (set_callback, msgs) = headstash_msg.to_cosmos_msgs(
+                &env,
+                deps.storage,
+                info.clone(),
+                deps.querier.clone(),
+            )?;
+            lhsm = set_callback;
+            (
+                ibc::Msg::Execute { msgs },
+                headstash_msg.to_callback_request(&env)?,
+                timeout_seconds,
+                CallbackRequestType::Execute,
+            )
+        }
         ExecuteMsg::Query {
             msgs,
             callback,
@@ -132,23 +143,33 @@ pub fn execute(
             timeout_seconds,
             CallbackRequestType::Query,
         ),
-        ExecuteMsg::HeadstashCallBack { rx } => {
-            hscb = true;
+        ExecuteMsg::HeadstashCallBack(rx) => {
+            lhsm = Lhsm::Local;
             (
                 ibc::Msg::Execute {
                     msgs: rx.into_headstash_msg(deps.storage)?,
                 },
-                rx.into_callback(env.contract.address.to_string())?,
+                rx.into_callback_request(env.contract.address.to_string())?,
+                DEFAULT_TIMEOUT.into(),
+                CallbackRequestType::Execute,
+            )
+        }
+        ExecuteMsg::Callback(callback_message) => {
+            lhsm = Lhsm::Callback;
+            (
+                ibc::Msg::Execute { msgs: vec![] },
+                CallbackRequest::callback_template(
+                    env.contract.address.to_string(),
+                    callback_message,
+                ),
                 DEFAULT_TIMEOUT.into(),
                 CallbackRequestType::Execute,
             )
         }
     };
 
-    // currently only local callbacks for headstash.
-    // todo: implement ibc packet callbacks for headstash
-    let response = match hscb {
-        false => {
+    let response = match lhsm {
+        Lhsm::Ibc => {
             let channel_id = CHANNEL
                 .may_load(deps.storage)?
                 .ok_or(ContractError::NoPair)?;
@@ -184,12 +205,32 @@ pub fn execute(
                 ),
             })
         }
-        true => {
+        // includes any local messages to prepare polytone with headstash params
+        Lhsm::Local => {
             let msgs = match msg {
                 ibc::Msg::Execute { msgs } => Ok(msgs),
                 _ => Err(ContractError::Std(StdError::generic_err("unimplemented"))),
             }?;
             Response::new().add_messages(msgs)
+        }
+        Lhsm::Callback => {
+            // Only the note can execute the callback on this contract.
+            if info.sender != env.contract.address {
+                return Err(ContractError::Unauthorized {});
+            }
+
+            let cb: CallbackMessage = from_json(callback.msg)?;
+
+            RESULTS.save(
+                deps.storage,
+                (cb.initiator.to_string(), cb.initiator_msg.to_string()),
+                &cb,
+            )?;
+
+            Response::default()
+                .add_attribute("method", "callback")
+                .add_attribute("initiator", cb.initiator.to_string())
+                .add_attribute("initiator_msg", cb.initiator_msg.to_string())
         }
     };
 

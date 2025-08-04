@@ -2,13 +2,12 @@
 resolver = "2"
 members = [
   "contracts/headstash",
-  "contracts/snip120u",
-  "contracts/scrt-dnas",
+  # "contracts/scrt-dnas",
   "contracts/polytone/proxy",
   "contracts/polytone/voice",
   # "scripts",
 ]
-exclude = ["scripts"]
+# exclude = ["scripts"]
 
 
 [workspace.package]

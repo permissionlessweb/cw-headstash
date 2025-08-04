@@ -4,16 +4,19 @@ members = [
   "contracts/cw-glob",
   "contracts/cw-ica-controller",
   "contracts/cw-ica-owner",
+  "packages/cw-orch-polytone",
+  "packages/polytone",
+  "packages/headstash-public",
   # "scripts",
 ]
-exclude = ["scripts"]
+exclude = ["scripts", "contracts/polytone"]
 
-# [workspace.package]
-# edition = "2021"
-# license = "BSD-3-Clause"
-# repository = "https://https://github.com/permissionlessweb/cw-headstash/public-crates"
-# rust-version = "1.67"
-# version = "1.1.0"
+[workspace.package]
+edition = "2021"
+rust-version = "1.67"
+license = "BSD-3-Clause"
+repository = "https://https://github.com/permissionlessweb/cw-headstash/public-crates"
+version = "1.0.0"
 
 [profile.release]
 opt-level = 3
@@ -25,3 +28,6 @@ codegen-units = 1
 panic = 'abort'
 incremental = false
 overflow-checks = true
+
+
+[workspace.dependencies]

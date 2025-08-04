@@ -4,14 +4,13 @@ use cosmwasm_std::{
     to_json_binary, Addr, Binary, CosmosMsg, Deps, DepsMut, Env, MessageInfo, Reply, Response,
     StdResult,
 };
+use headstash_public::state::HeadstashParams;
 // use cw2::set_contract_version;
 use crate::{
     error::ContractError,
     msg::{ExecuteMsg, InstantiateMsg, QueryMsg},
     state::{
-        self,
-        headstash::{HeadstashParams, HeadstashTokenParams},
-        ContractState, DeploymentSeq, DEPLOYMENT_SEQUENCE, GLOBAL_CONTRACT_STATE, GRANTEE,
+        self, ContractState, DeploymentSeq, DEPLOYMENT_SEQUENCE, GLOBAL_CONTRACT_STATE, GRANTEE,
         ICA_CREATED, ICA_STATES,
     },
 };
@@ -114,7 +113,7 @@ pub fn execute(
             channel_open_init_options,
             headstash_params,
         ),
-        ExecuteMsg::SetCwGlob { cw_glob } => upload::set_cw_glob(deps, info, cw_glob),
+        // ExecuteMsg::SetCwGlob { cw_glob } => upload::set_cw_glob(deps, info, cw_glob),
         ExecuteMsg::UploadContractOnSecret { wasm, cw_glob } => {
             upload::ica_upload_contract_on_secret(deps, info, wasm, cw_glob)
         }
@@ -215,22 +214,22 @@ pub mod upload {
         .into())
     }
 
-    pub fn set_cw_glob(
-        deps: DepsMut,
-        info: MessageInfo,
-        cw_glob: String,
-    ) -> Result<Response, ContractError> {
-        cw_ownable::assert_owner(deps.storage, &info.sender)?;
-        GLOBAL_CONTRACT_STATE.update(deps.storage, |mut a| {
-            if a.default_hs_params.cw_glob.is_none() {
-                a.default_hs_params.cw_glob = Some(deps.api.addr_validate(&cw_glob)?)
-            } else {
-                return Err(ContractError::CwGlobExists {});
-            }
-            Ok(a)
-        })?;
-        Ok(Response::new())
-    }
+    // pub fn set_cw_glob(
+    //     deps: DepsMut,
+    //     info: MessageInfo,
+    //     cw_glob: String,
+    // ) -> Result<Response, ContractError> {
+    //     cw_ownable::assert_owner(deps.storage, &info.sender)?;
+    //     GLOBAL_CONTRACT_STATE.update(deps.storage, |mut a| {
+    //         if a.default_hs_params.cw_glob.is_none() {
+    //             a.default_hs_params.cw_glob = Some(deps.api.addr_validate(&cw_glob)?)
+    //         } else {
+    //             return Err(ContractError::CwGlobExists {});
+    //         }
+    //         Ok(a)
+    //     })?;
+    //     Ok(Response::new())
+    // }
 
     /// uploads specific wasm blobs.
     pub fn ica_upload_contract_on_secret(
@@ -244,11 +243,12 @@ pub mod upload {
 
         let blob = match cw_blob.clone() {
             Some(a) => deps.api.addr_validate(&a)?,
-            None => GLOBAL_CONTRACT_STATE
-                .load(deps.storage)?
-                .default_hs_params
-                .cw_glob
-                .expect("no cw-glob. Either set one, or provide one."),
+            None => {
+                GLOBAL_CONTRACT_STATE
+                    .load(deps.storage)?
+                    .default_hs_params
+                    .cw_glob
+            }
         };
 
         match key.as_str() {
@@ -291,7 +291,8 @@ pub mod upload {
 }
 
 pub mod instantiate {
-    use state::headstash::Snip120u;
+
+    use headstash_public::state::{InstantiateMsg, Snip120u};
 
     use super::helpers::*;
     use super::*;
@@ -388,7 +389,7 @@ pub mod instantiate {
                 // form cw-headstash instantiate msg
                 let init_headstash_msg = instantiate_headstash_msg(
                     code_id,
-                    crate::state::headstash::InstantiateMsg {
+                    InstantiateMsg {
                         claim_msg_plaintext: hs_params.headstash_init_config.claim_msg_plaintxt,
                         end_date: Some(
                             hs_params
@@ -420,10 +421,8 @@ pub mod instantiate {
 
 mod headstash {
     use cosmwasm_std::coin;
-    use state::{
-        headstash::{Headstash, HeadstashParams},
-        DeploymentSeq,
-    };
+    use headstash_public::state::Headstash;
+    use state::DeploymentSeq;
 
     use super::*;
     use crate::msg::HeadstashCallback;
@@ -774,6 +773,7 @@ pub mod ica {
         cosmos::authz::v1beta1::{GenericAuthorization, Grant, MsgGrant},
         prost, Any,
     };
+    use headstash_public::state::{Headstash, HeadstashTokenParams};
     use prost::Message;
     // use cosmrs::{
     //     proto::cosmos::authz::v1beta1::{GenericAuthorization, Grant, MsgGrant},
@@ -785,7 +785,7 @@ pub mod ica {
         ibc::types::packet::acknowledgement::Data,
         types::state::{ChannelState, ChannelStatus},
     };
-    use state::{headstash::Headstash, DeploymentSeq};
+    use state::DeploymentSeq;
 
     use crate::msg::constants::*;
 
@@ -1051,7 +1051,7 @@ pub mod ica {
             config: None,
             supported_denoms: Some(vec![coin.ibc.clone()]),
         };
-        
+
         Ok(
             #[allow(deprecated)]
             // proto ref: https://github.com/scrtlabs/SecretNetwork/blob/master/proto/secret/compute/v1beta1/msg.proto
@@ -1070,7 +1070,7 @@ pub mod ica {
             },
         )
     }
-    
+
     pub fn form_authorize_minter(
         sender: String,
         headstash: String,
@@ -1117,11 +1117,11 @@ pub mod ica {
         to_add: Vec<Headstash>,
     ) -> Result<CosmosMsg, ContractError> {
         // proto ref: https://github.com/scrtlabs/SecretNetwork/blob/master/proto/secret/compute/v1beta1/msg.proto
-        let msg = crate::state::headstash::ExecuteMsg::AddEligibleHeadStash { headstash: to_add };
+        let msg = headstash_public::state::ExecuteMsg::AddEligibleHeadStash { headstash: to_add };
         Ok(
             #[allow(deprecated)]
             CosmosMsg::Stargate {
-                type_url: "/secret.compute.v1beta1.MsgExecuteContract".into(),
+                type_url: SECRET_COMPUTE_EXECUTE.into(),
                 value: anybuf::Anybuf::new()
                     .append_string(1, sender.to_string()) // sender (DAO)
                     .append_string(2, &headstash.to_string()) // contract
@@ -1198,7 +1198,7 @@ pub mod helpers {
     /// Defines the msg to instantiate the headstash contract
     pub fn instantiate_headstash_msg(
         code_id: u64,
-        scrt_headstash_msg: crate::state::headstash::InstantiateMsg,
+        scrt_headstash_msg: headstash_public::state::InstantiateMsg,
     ) -> Result<CosmosMsg, ContractError> {
         Ok(CosmosMsg::<Empty>::Wasm(
             cosmwasm_std::WasmMsg::Instantiate {
@@ -1225,17 +1225,11 @@ pub mod helpers {
 
 #[cfg(test)]
 mod tests {
-    use std::error::Error;
-
     use crate::{
         contract::{execute, instantiate},
         msg::{ExecuteMsg, InstantiateMsg},
         state::{
-            self,
-            headstash::{
-                BloomConfig, HeadstashInitConfig, HeadstashParams, HeadstashTokenParams, Snip120u,
-            },
-            snip120u, ContractState, DeploymentSeq, IcaContractState, IcaState, ICA_CREATED,
+            self, snip120u, ContractState, DeploymentSeq, IcaContractState, IcaState, ICA_CREATED,
             ICA_STATES, UPLOAD_REPLY_ID,
         },
         ContractError,
@@ -1255,6 +1249,10 @@ mod tests {
         },
     };
     use cw_ownable::OwnershipError;
+    use headstash_public::state::{
+        BloomConfig, HeadstashInitConfig, HeadstashParams, HeadstashTokenParams, Snip120u,
+    };
+    use std::error::Error;
 
     // init test
 
@@ -1283,6 +1281,7 @@ mod tests {
                 ibc: "ibc/snip120u1".into(),
                 snip_addr: None,
                 total: 420u128.into(),
+                source_channel: "eretskeret".into(),
             },
             HeadstashTokenParams {
                 name: "snip120u2-name".into(),
@@ -1291,6 +1290,7 @@ mod tests {
                 ibc: "ibc/snip120u2".into(),
                 snip_addr: None,
                 total: 710u128.into(),
+                source_channel: "jeretbleret".into(),
             },
         ];
 
@@ -1357,7 +1357,7 @@ mod tests {
                 min_cadance: 0u64,
                 max_granularity: 5,
             }),
-            cw_glob: None,
+            cw_glob: Addr::unchecked("cw-glob"),
             headstash_init_config: HeadstashInitConfig {
                 claim_msg_plaintxt: "HREAM ~ {wallet} ~ {secondary_addr} ~ {expiration}".into(),
                 end_date: None,
@@ -1808,7 +1808,7 @@ mod tests {
         // form headstash_init_messaage
         let init_headstash_msg = super::helpers::instantiate_headstash_msg(
             hs_params.headstash_code_id.expect("duhh"),
-            crate::state::headstash::InstantiateMsg {
+            headstash_public::state::InstantiateMsg {
                 claim_msg_plaintext: "{wallet}".into(),
                 end_date: Some(env.block.time.plus_days(365u64).nanos()),
                 start_date: None,

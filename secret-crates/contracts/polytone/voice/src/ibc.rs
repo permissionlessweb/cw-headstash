@@ -162,41 +162,40 @@ pub fn reply(deps: DepsMut, _env: Env, msg: Reply) -> Result<Response, ContractE
         REPLY_INIT_PROXY => {
             match msg.result {
                 SubMsgResult::Ok(sub_msg_response) => {
-                    let events = sub_msg_response.events;
-                    let proxy_addr = &events
-                        .iter()
-                        .find(|e| e.ty == "wasm")
-                        .expect("should exist")
+                    let mut wasm_event = None;
+                    let mut headstash_event = None;
+
+                    for event in &sub_msg_response.events {
+                        match event.ty.as_str() {
+                            "wasm" => {
+                                if wasm_event.is_none() {
+                                    wasm_event = Some(event);
+                                }
+                            }
+                            "headstash" => {
+                                if headstash_event.is_none() {
+                                    headstash_event = Some(event);
+                                }
+                            }
+                            _ => {}
+                        }
+                    }
+
+                    let wasm_event = wasm_event.expect("Expected wasm event, but not found");
+                    let headstash_event =
+                        headstash_event.expect("Expected headstash event, but not found");
+
+                    let proxy_addr = wasm_event
                         .attributes
                         .iter()
                         .find(|a| a.key == "contract_address")
-                        .expect("should have the proxy addr ")
-                        .value;
+                        .expect("contract_address attribute not found in wasm event")
+                        .value
+                        .clone();
 
-                    let proxy_event = events
-                        .iter()
-                        .find(|e| e.ty == "headstash")
-                        .map(|a| a)
-                        .expect("should always have custom headstash event replied here");
-
-                    let connection_id = &proxy_event
-                        .attributes
-                        .iter()
-                        .find(|a| a.key == "connection-id".to_string())
-                        .expect("should never be empty")
-                        .value;
-                    let counterparty_port = &proxy_event
-                        .attributes
-                        .iter()
-                        .find(|a| a.key == "counterparty-port".to_string())
-                        .expect("should never be empty")
-                        .value;
-                    let sender = &proxy_event
-                        .attributes
-                        .iter()
-                        .find(|a| a.key == "sender".to_string())
-                        .expect("should never be empty")
-                        .value;
+                    let connection_id = &headstash_event.attributes[0].value;
+                    let counterparty_port = &headstash_event.attributes[1].value;
+                    let sender = &headstash_event.attributes[2].value;
 
                     SENDER_TO_PROXY.insert(
                         deps.storage,
@@ -205,19 +204,18 @@ pub fn reply(deps: DepsMut, _env: Env, msg: Reply) -> Result<Response, ContractE
                             counterparty_port.clone(),
                             sender.clone(),
                         ),
-                        &Addr::unchecked(proxy_addr),
+                        &Addr::unchecked(&proxy_addr),
                     )?;
 
                     PROXY_TO_SENDER.insert(
                         deps.storage,
-                        &Addr::unchecked(proxy_addr),
+                        &Addr::unchecked(&proxy_addr),
                         &SenderInfo {
                             connection_id: connection_id.to_string(),
                             remote_port: counterparty_port.to_string(),
                             remote_sender: sender.clone(),
                         },
                     )?;
-                    let sequence = msg.id;
 
                     // load tx to process now that we have the proxy addr
                     let pending: Vec<CosmosMsg> =

@@ -2,7 +2,7 @@
 name         = "polytone-note"
 authors      = ["ekez <ekez@withoutdoing.com>"]
 description  = "Sends messages to be executed on other chains over IBC."
-edition      = { workspace = true }
+edition = "2021"
 license      = { workspace = true }
 rust-version = { workspace = true }
 repository   = { workspace = true }
@@ -30,6 +30,7 @@ panic            = 'abort'
 rpath            = false
 
 [dependencies]
+headstash-public = { workspace = true }
 cosmwasm-schema  = { workspace = true }
 anybuf           = { workspace = true }
 cosmwasm-std     = { workspace = true }

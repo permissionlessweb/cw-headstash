@@ -71,4 +71,7 @@ pub enum ContractError {
     #[error("not a valid feegranter address")]
     NotValidFeegranter {},
 
+    #[error("Unauthorized")]
+    Unauthorized {},
+
 }

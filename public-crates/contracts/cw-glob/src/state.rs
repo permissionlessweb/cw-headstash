@@ -1,6 +1,11 @@
 use cosmwasm_schema::cw_serde;
-use cosmwasm_std::Binary;
+use cosmwasm_std::{
+    from_json,
+    testing::{mock_dependencies, MockQuerier},
+    to_json_binary, Binary, Empty, Querier, QueryRequest, WasmQuery,
+};
 use cw_storage_plus::{Item, Map};
+use hex::ToHex;
 
 pub const OWNER: Item<Vec<String>> = Item::new("o");
 pub const GLOBMAP: Map<String, Binary> = Map::new("g");
@@ -20,4 +25,19 @@ pub struct GlobHash {
     pub key: String,
     /// The hash of the wasm blob
     pub hash: String,
+}
+
+#[test]
+fn test_raw_query() {
+    let mut deps = mock_dependencies();
+    let mut storage = deps.storage;
+    let key = "headstash".to_string();
+
+    HASHMAP
+        .save(&mut storage, key.to_string(), &"babberitus".into())
+        .unwrap();
+
+    let storage_key = HASHMAP.key(key).to_vec();
+    println!("Raw key bytes: {:?}", storage_key);
+    println!("Hex: {}", Binary::new(storage_key).to_base64());
 }

@@ -1,7 +1,8 @@
 use crate::error::ContractError;
 use crate::msg::{ExecuteMsg, InstantiateMsg, MigrateMsg, QueryAnswer, QueryMsg};
 use crate::state::{
-    Config, Headstash, CONFIG, DECAY_CLAIMED, PROCESSING_BLOOM_MEMPOOL, SNIP_COUNT, TOTAL_CLAIMED,
+    Config, Headstash, CONFIG, DECAY_CLAIMED, PROCESSING_BLOOM_MEMPOOL, RANDOM_STRING, SNIP_COUNT,
+    TOTAL_CLAIMED,
 };
 
 #[cfg(not(feature = "library"))]
@@ -61,7 +62,6 @@ pub fn instantiate(
         end_date: msg.end_date,
         snip120us: msg.snips,
         start_date,
-        random_key: msg.random_key,
         snip_hash: msg.snip120u_code_hash,
         bloom: msg.bloom_config,
         multiplier: msg.multiplier,
@@ -69,6 +69,7 @@ pub fn instantiate(
 
     CONFIG.save(deps.storage, &state)?;
     DECAY_CLAIMED.save(deps.storage, &false)?;
+    RANDOM_STRING.save(deps.storage, &msg.random_key)?;
 
     Ok(Response::default())
 }
@@ -89,7 +90,6 @@ pub fn execute(
             self::headstash::try_claim(deps, env, info, &mut rng, sig_addr, sig)
         }
         ExecuteMsg::Clawback {} => self::headstash::try_clawback(deps, env, info),
-        // ExecuteMsg::Redeem {} => todo!(),
         ExecuteMsg::RegisterBloom { bloom_msg } => {
             self::ibc_bloom::try_ibc_bloom(deps, env, info, bloom_msg)
         }
@@ -104,6 +104,7 @@ pub fn query(deps: Deps, _env: Env, msg: QueryMsg) -> StdResult<Binary> {
         QueryMsg::Config {} => to_binary(&queries::query_config(deps)?),
         QueryMsg::Dates {} => to_binary(&queries::dates(deps)?),
         QueryMsg::Clawback {} => to_binary(&queries::clawback(deps)?),
+        QueryMsg::Allocation { addr } => to_binary(&queries::allocation(deps, addr)?),
     }
 }
 
@@ -127,13 +128,12 @@ pub fn migrate(_deps: DepsMut, _env: Env, msg: MigrateMsg) -> StdResult<Response
 
 pub mod headstash {
 
-    use cosmwasm_std::{Attribute, Event, Fraction, Uint128};
+    use cosmwasm_std::{Attribute, Event, Fraction};
 
     use super::*;
     use crate::state::{
-        snip::{AllowanceAction, Snip120u},
-        HeadstashSig, CLAIMED_HEADSTASH, DECAY_CLAIMED, HEADSTASH_OWNERS, HEADSTASH_SIGS,
-        SNIP_COUNT, TOTAL_CLAIMED,
+        snip::Snip120u, HeadstashSig, CLAIMED_HEADSTASH, DECAY_CLAIMED, HEADSTASH_OWNERS,
+        HEADSTASH_SIGS, SNIP_COUNT, TOTAL_CLAIMED,
     };
 
     pub fn try_add_headstash(
@@ -157,7 +157,7 @@ pub mod headstash {
         // randomly select point in headstash array to start from.
         let hsl = headstash.len();
 
-        let rsp = utils::random_starting_point(rng, hsl.clone(), config.random_key);
+        let rsp = utils::random_starting_point(rng, hsl.clone(), RANDOM_STRING.load(deps.storage)?);
         add_headstash_to_state(deps, hsl, rsp, headstash.clone(), config.snip120us)?;
 
         Ok(Response::default())
@@ -259,24 +259,27 @@ pub mod headstash {
             if let Some(amnt) = l2.may_load(deps.storage)? {
                 let headstash_amount =
                     amnt.checked_multiply_ratio(bonus.numerator(), bonus.denominator())?;
-                // mint headstash amount to message signer. set allowance for this contract
-                let mint_msg = crate::msg::snip::mint_msg(
+                // mint headstash amount to message signer.
+                let mint_msg = secret_toolkit::snip20::mint_msg(
                     info.sender.to_string(), // mint to the throwaway key
                     headstash_amount,
-                    vec![AllowanceAction {
-                        spender: env.contract.address.to_string(),
-                        amount: headstash_amount,
-                        expiration: config.end_date,
-                        memo: None,
-                        decoys: None,
-                    }],
                     None,
                     None,
                     1usize,
                     config.snip_hash.clone(),
                     snip.addr.to_string(),
                 )?;
-                msgs.push(mint_msg);
+                // set allowance for this contract
+                let allowance = secret_toolkit::snip20::increase_allowance_msg(
+                    env.contract.address.to_string(),
+                    headstash_amount,
+                    config.end_date,
+                    Some("padding".into()),
+                    1usize,
+                    config.snip_hash.clone(),
+                    snip.addr.to_string(),
+                )?;
+                msgs.extend(vec![mint_msg, allowance]);
 
                 // update total claimed for specific snip120u, disregard bonus to avoid overflow ariithmetics in clawback.
                 let tc = TOTAL_CLAIMED.add_suffix(snip.addr.as_str().as_bytes());
@@ -367,7 +370,9 @@ pub mod headstash {
 }
 
 pub mod queries {
-    use crate::state::DECAY_CLAIMED;
+    use cosmwasm_std::coin;
+
+    use crate::state::{DECAY_CLAIMED, HEADSTASH_OWNERS};
 
     use super::*;
 
@@ -391,6 +396,20 @@ pub mod queries {
         Ok(QueryAnswer::ClawbackResponse {
             bool: DECAY_CLAIMED.load(deps.storage)?,
         })
+    }
+
+    pub fn allocation(deps: Deps, addr: String) -> StdResult<QueryAnswer> {
+        let cfg = CONFIG.load(deps.storage)?;
+        let mut amount = Vec::new();
+
+        let l1 = HEADSTASH_OWNERS.add_suffix(addr.as_bytes());
+        for snip in cfg.snip120us {
+            let l2 = l1.add_suffix(snip.addr.as_bytes());
+            if let Some(amnt) = l2.may_load(deps.storage)? {
+                amount.push(coin(amnt.u128(), snip.native_token));
+            }
+        }
+        Ok(QueryAnswer::AllocationResponse { amount })
     }
 
     pub fn query_config(deps: Deps) -> StdResult<QueryAnswer> {
@@ -1061,7 +1080,7 @@ mod tests {
             ]
         );
         assert_eq!(constants.snip_hash.as_str(), "HASH");
-        assert_eq!(constants.random_key.as_str(), "random_key");
+        assert_eq!(RANDOM_STRING.load(&deps.storage).unwrap(), "random_key");
     }
 
     #[test]
@@ -1553,8 +1572,7 @@ mod tests {
             process_bloom_msg.clone(),
         )
         .unwrap();
-
-        // ensure native denom is used in msg
+        // ensure native denom is used in process msg
         assert_eq!(
             res.messages[0].msg,
             BankMsg::Send {
@@ -1751,7 +1769,7 @@ mod tests {
         let mut env = mock_env();
         env.block.random = Some(Binary::from(&[0u8; 32]));
         let constants = CONFIG.load(&deps.storage).unwrap();
-        let owner = Addr::unchecked("admin");
+        // let owner = Addr::unchecked("admin");
         assert!(
             init_result.is_ok(),
             "Init failed: {}",

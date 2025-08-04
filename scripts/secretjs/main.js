@@ -29,8 +29,8 @@ export const snip120uNative2 = "ibc/7477828AC3E19352BA2D63352EA6D0680E3F29C126B8
 
 export const counterpartyChannelId = "channel-165"
 export const chain_id = "secret-4";
-export const cw_headstash_blob = fs.readFileSync("../../public-crates/contracts/cw-glob/src/globs/cw_headstash.wasm.gz");
-export const snip120u_blob = fs.readFileSync("../../public-crates/contracts/cw-glob/src/globs/snip120u_impl.wasm.gz");
+export const cw_headstash_blob = fs.readFileSync("../../public-crates/contracts/cw-glob/src/globs/cw_headstash.wasm");
+// export const snip120u_blob = fs.readFileSync("../../public-crates/contracts/cw-glob/src/globs/snip120u_impl.wasm.gz");
 export const entropy = "eretskeretjableret";
 export const permitKey = entropy;
 export const txEncryptionSeed = EncryptionUtilsImpl.GenerateNewSeed();
@@ -50,7 +50,7 @@ export const snip120us = [
 // signing client 
 export const secretjs = new SecretNetworkClient({
   chainId: chain_id,
-  url: "https://lcd.mainnet.secretsaturn.net",
+  url: "https://rest.lavenderfive.com:443/secretnetwork",
   wallet: wallet,
   walletAddress: wallet.address,
   txEncryptionSeed: txEncryptionSeed
@@ -61,7 +61,7 @@ const args = process.argv.slice(2);
 if (args.length < 1) {
   console.error('Invalid option.');
 } else if (args[0] === '-1') {
-  upload_snip120u(snip120u_blob);
+  // upload_snip120u(snip120u_blob);
 } else if (args[0] === '-2') {
   upload_headstash_contract(cw_headstash_blob);
 } else if (args[0] === '-3a') {

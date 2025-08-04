@@ -8,7 +8,8 @@ rust-version = { workspace = true }
 version = { workspace = true }
 
 [dependencies]
-cosmwasm-schema = { workspace = true }
-cosmwasm-std = { workspace = true }
-cw-storage-plus = { workspace = true }
-thiserror = { workspace = true }
+cosmwasm-schema = "2.2.2"
+cw-storage-plus = "2.0.0"
+cosmwasm-std = { version = "2.2.2", features = ["staking"] }
+thiserror = { version = "2.0.12" }
+headstash-public = { path = "../headstash-public" }

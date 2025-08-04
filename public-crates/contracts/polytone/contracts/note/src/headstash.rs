@@ -1,35 +1,18 @@
 use anybuf::Anybuf;
 use cosmwasm_std::{
-    to_json_binary, Addr, Api, Binary, CosmosMsg, Deps, DepsMut, Env, MessageInfo, Reply, Response,
-    StdError, StdResult, Storage, Uint128,
+    to_json_binary, Addr, Binary, Coin, CosmosMsg, Env, MessageInfo, QuerierWrapper, Response,
+    StdError, Storage, Timestamp, Uint128,
 };
-use polytone::handshake::voice;
+use headstash_public::state::{
+    Headstash, HeadstashParams, InstantiateMsg as HsInstantiateMsg, Snip120u, GLOB_HEADSTASH_KEY,
+};
+
+use polytone::headstash::{constants::*, HEADSTASH_PARAMS, HEADSTASH_SEQUENCE};
 
 use crate::{
     error::ContractError,
-    msg::{HeadstashParams, HeadstashTokenParams},
-    state::{
-        headstash::{Headstash, Snip120u},
-        HeadstashSeq, CW_GLOB, GRANTEE, HEADSTASH_PARAMS, HEADSTASH_SEQUENCE,
-    },
+    state::{HeadstashSeq, GRANTEE},
 };
-
-pub mod constants {
-    // Stargate (Any) type definitions
-    pub const COSMWASM_STORE_CODE: &str = "/cosmwasm.wasm.v1.MsgStoreCode";
-    pub const COSMWASM_INSTANTIATE: &str = "/cosmwasm.wasm.v1.MsgInstantiateContract";
-    pub const COSMWASM_EXECUTE: &str = "/cosmwasm.wasm.v1.MsgExecuteContract";
-    pub const COSMOS_GENERIC_AUTHZ: &str = "/cosmos.authz.v1beta1.GenericAuthorization";
-    pub const COSMOS_AUTHZ_GRANT: &str = "/cosmos.authz.v1beta1.MsgGrant";
-    pub const SECRET_COMPUTE_STORE_CODE: &str = "/secret.compute.v1beta1.MsgStoreCode";
-    pub const SECRET_COMPUTE_INSTANTIATE: &str = "/secret.compute.v1beta1.MsgInstantiateContract";
-    pub const SECRET_COMPUTE_EXECUTE: &str = "/secret.compute.v1beta1.MsgExecuteContract";
-    pub const COSMOS_GENERIC_FEEGRANT_ALLOWANCE: &str = "/cosmos.feegrant.v1beta1.BasicAllowance";
-    pub const COSMOS_GENERIC_FEEGRANT_MSG: &str = "/cosmos.feegrant.v1beta1.MsgGrantAllowance";
-
-    pub const DEFAULT_TIMEOUT: u64 = 10000u64;
-}
-use constants::*;
 
 use cosmos_sdk_proto::{
     cosmos::authz::v1beta1::{GenericAuthorization, Grant, MsgGrant},
@@ -37,79 +20,41 @@ use cosmos_sdk_proto::{
 };
 use prost::Message;
 
-pub fn set_cw_glob(
-    storage: &mut dyn Storage,
-    api: &dyn Api,
-    info: &MessageInfo,
-    cw_glob: &String,
-) -> Result<Response, ContractError> {
-    // cw_ownable::assert_owner(deps.storage, &info.sender)?;
-    if let Some(_) = polytone::accounts::query_account(storage, info.sender.clone())? {
-        HEADSTASH_PARAMS.update(storage, |mut a| {
-            if a.cw_glob.is_none() {
-                a.cw_glob = Some(api.addr_validate(&cw_glob)?)
-            } else {
-                return Err(ContractError::CwGlobExists {});
-            }
-            Ok(a)
-        })?;
-    } else {
-        return Err(ContractError::NoPair {});
-    };
-    Ok(Response::new())
-}
-
 pub fn upload_contract_on_secret(
+    querier: QuerierWrapper,
     storage: &mut dyn Storage,
-    api: &dyn Api,
     info: &MessageInfo,
-    key: &String,
-    cw_glob: &Option<String>,
-) -> Result<Response, ContractError> {
+) -> Result<CosmosMsg, ContractError> {
     if let Some(remote_addr) = polytone::accounts::query_account(storage, info.sender.clone())? {
-        let glob = match cw_glob.clone() {
-            Some(a) => api.addr_validate(&a)?,
-            None => HEADSTASH_PARAMS
-                .load(storage)?
-                .cw_glob
-                .expect("no cw-glob. Either set one, or provide one."),
+        let glob = HEADSTASH_PARAMS.load(storage)?.cw_glob;
+        if !HEADSTASH_SEQUENCE.load(storage, HeadstashSeq::UploadSnip.into())? {
+            return Err(ContractError::Std(StdError::generic_err(
+                "must upload snip120u first",
+            )));
+        } else if HEADSTASH_SEQUENCE.load(storage, HeadstashSeq::UploadHeadstash.into())? {
+            return Err(ContractError::Std(StdError::generic_err(
+                "already have set headstash code-id",
+            )));
         };
 
-        match key.as_str() {
-            "snip120u" => {
-                if HEADSTASH_SEQUENCE.load(storage, HeadstashSeq::UploadSnip.into())? {
-                    return Err(ContractError::Std(StdError::generic_err(
-                        "already have set snip120u code-id",
-                    )));
-                }
-            }
-            "cw-headstash" => {
-                if !HEADSTASH_SEQUENCE.load(storage, HeadstashSeq::UploadSnip.into())? {
-                    return Err(ContractError::Std(StdError::generic_err(
-                        "must upload snip120u first",
-                    )));
-                } else if HEADSTASH_SEQUENCE.load(storage, HeadstashSeq::UploadHeadstash.into())? {
-                    return Err(ContractError::Std(StdError::generic_err(
-                        "already have set headstash code-id",
-                    )));
-                };
-            }
+        // headstash key
+        let storage_key = Binary::from_base64(&GLOB_HEADSTASH_KEY)?;
+        let wasm_blob = match querier.query_wasm_raw(glob, storage_key)? {
+            Some(b) => Binary::new(b),
+            None => return Err(ContractError::NoPair {}),
+        };
 
-            _ => return Err(ContractError::BadContractId {}),
-        }
-
-        let wasm_blob = Binary(vec![]);
-        // msg to trigger ica-controller grabbing the wasm blob
-        let upload_msg = headstash_anybuf::form_upload_contract_on_secret(remote_addr, wasm_blob)?;
+        Ok(headstash_anybuf::form_upload_contract_on_secret(
+            remote_addr,
+            wasm_blob,
+        )?)
     } else {
         return Err(ContractError::NoPair {});
     }
-    Ok(Response::new())
 }
 
 pub fn set_snip120u_code_id_on_secret(
     storage: &mut dyn Storage,
-    api: &dyn Api,
     info: &MessageInfo,
     code_id: u64,
 ) -> Result<Response, ContractError> {
@@ -133,7 +78,6 @@ pub fn set_snip120u_code_id_on_secret(
 
 pub fn set_headstash_code_id_on_secret(
     storage: &mut dyn Storage,
-    api: &dyn Api,
     info: &MessageInfo,
     code_id: u64,
 ) -> Result<Response, ContractError> {
@@ -159,7 +103,6 @@ pub fn set_headstash_code_id_on_secret(
 
 pub fn set_headstash_addr(
     storage: &mut dyn Storage,
-    api: &dyn Api,
     info: &MessageInfo,
     to_add: String,
 ) -> Result<Response, ContractError> {
@@ -188,7 +131,6 @@ pub fn set_headstash_addr(
 
 pub fn set_snip120u_addr(
     storage: &mut dyn Storage,
-    api: &dyn Api,
     token: String,
     contract_addr: String,
 ) -> Result<Response, ContractError> {
@@ -223,12 +165,11 @@ pub fn set_snip120u_addr(
 
 pub fn create_snip120u_contract(
     storage: &mut dyn Storage,
-    api: &dyn Api,
     info: &MessageInfo,
-) -> Result<Response, ContractError> {
+) -> Result<Vec<CosmosMsg>, ContractError> {
     let mut msgs = vec![];
     if let Some(remote_account) = polytone::accounts::query_account(storage, info.sender.clone())? {
-        let mut hp = HEADSTASH_PARAMS.load(storage)?;
+        let hp = HEADSTASH_PARAMS.load(storage)?;
 
         // if headstash or snip120u is not set, we cannot instantiate snips
         if !HEADSTASH_SEQUENCE.load(storage, HeadstashSeq::UploadSnip.into())?
@@ -243,7 +184,11 @@ pub fn create_snip120u_contract(
         // define CosmosMsg for each snip120u
         for token in &hp.token_params {
             if hp.token_params.len() != 0 {
-                if let Some(t) = hp.token_params.iter().find(|t| t.native == token.native) {
+                if let Some(t) = hp
+                    .token_params
+                    .iter()
+                    .find(|t| t.native == token.native && t.snip_addr.is_none())
+                {
                     let msg = headstash_anybuf::form_instantiate_snip120u(
                         remote_account.to_string(),
                         token.clone(),
@@ -261,18 +206,17 @@ pub fn create_snip120u_contract(
     } else {
         return Err(ContractError::NoPair {});
     }
-    Ok(Response::new().add_messages(msgs))
+    Ok(msgs)
 }
 
 pub fn create_headstash_contract(
     env: &Env,
     storage: &mut dyn Storage,
-    api: &dyn Api,
     info: &MessageInfo,
-) -> Result<Response, ContractError> {
+) -> Result<Vec<CosmosMsg>, ContractError> {
     let mut msgs = vec![];
     if let Some(remote_account) = polytone::accounts::query_account(storage, info.sender.clone())? {
-        let mut hp = HEADSTASH_PARAMS.load(storage)?;
+        let hp = HEADSTASH_PARAMS.load(storage)?;
 
         // iterate and enumerate for each snip in snip params, if they deployment sequence is not met, and there is addr for each snip, error.
         for (i, hstp) in hp.token_params.iter().enumerate() {
@@ -306,7 +250,7 @@ pub fn create_headstash_contract(
             let init_headstash_msg = headstash_anybuf::form_instantiate_headstash_msg(
                 code_id,
                 &remote_account,
-                crate::state::headstash::InstantiateMsg {
+                HsInstantiateMsg {
                     claim_msg_plaintext: hp.headstash_init_config.claim_msg_plaintxt,
                     end_date: Some(
                         hp.headstash_init_config
@@ -331,14 +275,13 @@ pub fn create_headstash_contract(
         return Err(ContractError::NoPair {});
     }
 
-    Ok(Response::new().add_messages(msgs))
+    Ok(msgs)
 }
 
 pub fn authorize_headstash_as_snip_minter(
     storage: &mut dyn Storage,
-    api: &dyn Api,
     info: &MessageInfo,
-) -> Result<Response, ContractError> {
+) -> Result<Vec<CosmosMsg>, ContractError> {
     let mut msgs = vec![];
     if let Some(remote_account) = polytone::accounts::query_account(storage, info.sender.clone())? {
         let hp = HEADSTASH_PARAMS.load(storage)?;
@@ -364,18 +307,17 @@ pub fn authorize_headstash_as_snip_minter(
     } else {
         return Err(ContractError::NoPair {});
     }
-    Ok(Response::new())
+    Ok(msgs)
 }
 
 pub fn add_headstash_claimers(
     storage: &mut dyn Storage,
-    api: &dyn Api,
     to_add: &Vec<Headstash>,
     info: &MessageInfo,
-) -> Result<Response, ContractError> {
+) -> Result<Vec<CosmosMsg>, ContractError> {
     let mut msgs = vec![];
     if let Some(remote_account) = polytone::accounts::query_account(storage, info.sender.clone())? {
-        let mut hp = HEADSTASH_PARAMS.load(storage)?;
+        let hp = HEADSTASH_PARAMS.load(storage)?;
         if let Some(hs_addr) = hp.headstash_addr {
             // add headstash claimers msg
             let msg = headstash_anybuf::form_add_headstashes_msgs(
@@ -390,18 +332,17 @@ pub fn add_headstash_claimers(
     } else {
         return Err(ContractError::NoPair {});
     }
-    Ok(Response::new())
+    Ok(msgs)
 }
 
 pub fn authorize_feegrants(
     storage: &mut dyn Storage,
-    api: &dyn Api,
     info: &MessageInfo,
     to_grant: &Vec<String>,
-) -> Result<Response, ContractError> {
+) -> Result<Vec<CosmosMsg>, ContractError> {
     let mut msgs = vec![];
     if let Some(remote_account) = polytone::accounts::query_account(storage, info.sender.clone())? {
-        let mut hp = HEADSTASH_PARAMS.load(storage)?;
+        let hp = HEADSTASH_PARAMS.load(storage)?;
         if let Some(b) = hp.fee_granter {
             if info.sender.to_string() != b {
                 return Err(ContractError::NotValidFeegranter {});
@@ -416,22 +357,21 @@ pub fn authorize_feegrants(
     } else {
         return Err(ContractError::NoPair {});
     }
-    Ok(Response::new().add_messages(msgs))
+    Ok(msgs)
 }
 
 pub fn grant_authz_for_deployer(
     storage: &mut dyn Storage,
-    api: &dyn Api,
     info: &MessageInfo,
     grantee: &String,
-) -> Result<Response, ContractError> {
+) -> Result<Vec<CosmosMsg>, ContractError> {
     let mut msgs = vec![];
     if let Some(remote_account) = polytone::accounts::query_account(storage, info.sender.clone())? {
         if GRANTEE.may_load(storage)?.is_some() {
             return Err(ContractError::AuthzGranteeExists {});
         }
 
-        let mut hp = HEADSTASH_PARAMS.load(storage)?;
+        // let hp = HEADSTASH_PARAMS.load(storage)?;
 
         let grant_msgs: Vec<MsgGrant> = vec![
             SECRET_COMPUTE_STORE_CODE,
@@ -462,20 +402,58 @@ pub fn grant_authz_for_deployer(
     } else {
         return Err(ContractError::NoPair {});
     }
-    Ok(Response::new().add_messages(msgs))
+    Ok(msgs)
 }
 
-pub fn fund_headstash(storage: &mut dyn Storage, api: &dyn Api) -> Result<Response, ContractError> {
-    Ok(Response::new())
+pub fn fund_headstash(
+    storage: &mut dyn Storage,
+    sender: &Addr,
+    funds: Vec<Coin>,
+    timestamp: Timestamp,
+) -> Result<Vec<CosmosMsg>, ContractError> {
+    // Short-circuit if no polytone account
+    if polytone::accounts::query_account(storage, sender.clone())?.is_none() {
+        return Ok(vec![]);
+    }
+
+    let hp = HEADSTASH_PARAMS.load(storage)?;
+    let headstash_addr = &hp
+        .headstash_addr
+        .expect("we expect a headsatsh contract address to have been saved to the notes state.");
+
+    let funds_map: std::collections::HashMap<&str, &Coin> = funds
+        .iter()
+        .map(|coin| (coin.denom.as_str(), coin))
+        .collect();
+
+    let msgs: Result<Vec<_>, _> = hp
+        .token_params
+        .into_iter()
+        .filter_map(|stash| {
+            // Only proceed if we have a matching fund
+            funds_map.get(stash.native.as_str()).map(|amount| {
+                headstash_anybuf::form_fund_headstash_msg(
+                    sender.to_string(),
+                    headstash_addr,
+                    stash.source_channel,
+                    amount,
+                    timestamp.plus_minutes(10),
+                )
+            })
+        })
+        .collect();
+
+    msgs.map_err(Into::into)
 }
 
-pub mod callbacks {
-
-    use super::*;
-}
 pub mod headstash_anybuf {
+    use cosmwasm_std::{Timestamp, Uint64};
+    use headstash_public::{
+        snip::AddMintersMsg,
+        state::{Headstash, HeadstashTokenParams},
+    };
+
     use super::*;
-    use crate::state::{headstash::Headstash, CW_GLOB};
 
     pub fn form_upload_contract_on_secret(
         remote_addr: String,
@@ -504,13 +482,13 @@ pub mod headstash_anybuf {
         headstash: Option<String>,
         symbol: String,
     ) -> Result<CosmosMsg, ContractError> {
-        let init_msg = crate::state::snip120u::InstantiateMsg {
+        let init_msg = headstash_public::snip::InstantiateMsg {
             name: "Terp Network SNIP120U - ".to_owned() + coin.name.as_str(),
             admin: headstash,
             symbol,
             decimals: 6u8,
             initial_balances: None,
-            prng_seed: Binary(
+            prng_seed: Binary::new(
                 "eretjeretskeretjablereteretjeretskeretjableret"
                     .to_string()
                     .into_bytes(),
@@ -541,7 +519,7 @@ pub mod headstash_anybuf {
     pub fn form_instantiate_headstash_msg(
         code_id: u64,
         remote_account: &String,
-        scrt_headstash_msg: crate::state::headstash::InstantiateMsg,
+        scrt_headstash_msg: HsInstantiateMsg,
     ) -> Result<CosmosMsg, ContractError> {
         Ok(
             #[allow(deprecated)]
@@ -575,8 +553,8 @@ pub mod headstash_anybuf {
                     .append_string(1, grant.granter.clone()) // granter
                     .append_string(2, grant.grantee.clone()) // grantee
                     .append_bytes(
-                        3,                                                       // grant
-                        Binary(grant.grant.expect("grant set").encode_to_vec()), // cw-ica SendCosmosMsgs
+                        3,                                                            // grant
+                        Binary::new(grant.grant.expect("grant set").encode_to_vec()), // cw-ica SendCosmosMsgs
                     )
                     .append_repeated_bytes::<Vec<u8>>(5, &[]) // funds
                     .into_vec()
@@ -619,7 +597,7 @@ pub mod headstash_anybuf {
         headstash: String,
         snip120u: String,
     ) -> Result<CosmosMsg, ContractError> {
-        let set_minter_msg = crate::state::snip120u::AddMintersMsg {
+        let set_minter_msg = AddMintersMsg {
             minters: vec![headstash.clone()],
             padding: None,
         };
@@ -645,7 +623,7 @@ pub mod headstash_anybuf {
         // proto ref: https://github.com/cosmos/cosmos-sdk/blob/main/x/feegrant/proto/cosmos/feegrant/v1beta1/feegrant.proto
         let token = Anybuf::new()
             .append_string(1, "uscrt")
-            .append_string(2, Uint128::one().to_string());
+            .append_string(2, Uint128::new(1_000_000u128).to_string());
         // basic feegrant
         let basic_allowance = Anybuf::new().append_repeated_message(1, &[token]);
         // FeeAllowanceI implementation
@@ -653,7 +631,7 @@ pub mod headstash_anybuf {
             .append_string(1, COSMOS_GENERIC_FEEGRANT_ALLOWANCE)
             .append_message(2, &basic_allowance);
         Ok(
-            // proto ref: https://github.com/cosmos/cosmos-sdk/blob/main/x/feegrant/proto/cosmos/feegrant/v1beta1/tx.proto
+            // proto ref: https://github.com/cosmos/cosmos-sdk/blob/main/proto/cosmos/feegrant/v1beta1/feegrant.proto
             #[allow(deprecated)]
             CosmosMsg::Stargate {
                 type_url: COSMOS_GENERIC_FEEGRANT_MSG.into(),
@@ -661,6 +639,39 @@ pub mod headstash_anybuf {
                     .append_string(1, sender.to_string()) // granter (DAO)
                     .append_string(2, &grantee.to_string()) // grantee
                     .append_message(3, &allowance)
+                    .into_vec()
+                    .into(),
+            },
+        )
+    }
+
+    pub fn form_fund_headstash_msg(
+        sender: String,
+        headstash_addr: &String,
+        channel_id: String,
+        coin: &Coin,
+        timeout_timestamp: Timestamp,
+    ) -> Result<CosmosMsg, ContractError> {
+        let token = Anybuf::new()
+            .append_string(1, coin.denom.to_string())
+            .append_string(2, coin.amount.to_string());
+        // https://github.com/cosmos/ibc-go/blob/main/proto/ibc/core/client/v1/client.proto#L50
+        let timeout_height = Anybuf::new()
+            .append_string(1, Uint64::zero().to_string())
+            .append_string(2, Uint64::zero().to_string());
+        Ok(
+            // proto ref: https://github.com/cosmos/ibc-go/blob/main/proto/ibc/applications/transfer/v1/tx.proto#L28
+            #[allow(deprecated)]
+            CosmosMsg::Stargate {
+                type_url: COSMOS_GENERIC_IBC_TRANSFER.into(),
+                value: Anybuf::new()
+                    .append_string(1, "transfer") // source_port
+                    .append_string(2, channel_id) // source_channel
+                    .append_message(3, &token)
+                    .append_string(4, sender) // sender
+                    .append_string(5, &headstash_addr) // reciever
+                    .append_message(6, &timeout_height)
+                    .append_string(7, timeout_timestamp.to_string()) // timeout_timestamp
                     .into_vec()
                     .into(),
             },
