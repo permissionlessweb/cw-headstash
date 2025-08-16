@@ -163,16 +163,16 @@ pub fn reply(deps: DepsMut, env: Env, msg: Reply) -> Result<Response, ContractEr
                 let send_packet_msg = ica_packet.to_ibc_msg(
                     &env,
                     ica_info.channel_id,
-                    Some(u64::from_str_radix(&timeout_seconds, 10)?),
+                    Some(u64::from_str_radix(timeout_seconds, 10)?),
                 )?;
 
                 // respond with submessage
-                return Ok(Response::new().add_submessage(SubMsg::new(send_packet_msg)));
+                Ok(Response::new().add_submessage(SubMsg::new(send_packet_msg)))
             }
             _ => Err(ContractError::UnknownReplyId(msg.id)),
         },
         cosmwasm_std::SubMsgResult::Err(a) => {
-            return Err(ContractError::SubMsgError(a.to_string()))
+            Err(ContractError::SubMsgError(a.to_string()))
         }
     }
 }
@@ -229,9 +229,8 @@ mod execute {
 
         if CW_GLOB.may_load(deps.storage)?.is_some() {
             return Err(ContractError::GlobAlreadySet {});
-        } else {
-            CW_GLOB.save(deps.storage, &deps.api.addr_validate(&cw_glob)?)?;
         }
+        CW_GLOB.save(deps.storage, &deps.api.addr_validate(&cw_glob)?)?;
         Ok(Response::new())
     }
 
@@ -258,7 +257,7 @@ mod execute {
         let upload_msg = super::helpers::cw_glob_execute(
             glob,
             cw_glob::msg::ExecuteMsg::TakeGlob {
-                sender: ica_info.ica_address.clone(),
+                sender: ica_info.ica_address,
                 key: wasm,
                 memo,
                 timeout,
@@ -372,7 +371,7 @@ mod execute {
     ) -> Result<Response, ContractError> {
         if action == cw_ownable::Action::RenounceOwnership {
             return Err(ContractError::OwnershipCannotBeRenounced);
-        };
+        }
 
         cw_ownable::update_ownership(deps, &env.block, &info.sender, action)?;
 
@@ -432,7 +431,7 @@ mod reply_helper {
 }
 
 mod helpers {
-    use super::*;
+    use super::{Addr, Binary, ContractError, to_json_binary};
     use anybuf::Anybuf;
     use cosmwasm_std::{CosmosMsg, Empty, StdError};
 
@@ -458,8 +457,8 @@ mod helpers {
             CosmosMsg::Stargate {
                 type_url: "/secret.compute.v1beta1.MsgStoreCode".into(),
                 value: Anybuf::new()
-                    .append_string(1, sender.clone()) // sender (DAO)
-                    .append_bytes(2, &wasm) // updated binary of transfer msg.
+                    .append_string(1, sender) // sender (DAO)
+                    .append_bytes(2, wasm) // updated binary of transfer msg.
                     .into_vec()
                     .into(),
             },
@@ -621,7 +620,7 @@ mod tests {
         let _res = instantiate(
             deps.as_mut(),
             env.clone(),
-            info_creator.clone(),
+            info_creator,
             InstantiateMsg {
                 owner: Some(owner.to_string()),
                 channel_open_init_options,
@@ -664,7 +663,7 @@ mod tests {
         #[allow(deprecated)]
         let msg = Reply {
             id: res.messages[0].id,
-            payload: Binary::from("none".as_bytes()),
+            payload: Binary::from(b"none"),
             gas_used: 6969696u64,
             result: cosmwasm_std::SubMsgResult::Ok(cosmwasm_std::SubMsgResponse {
                 events: vec![
@@ -680,12 +679,12 @@ mod tests {
         // println!("simulated reply from cw-glob: {:#?}", msg);
 
         // simulate response from cw-glob
-        let res = reply(deps.as_mut(), env.clone(), msg).unwrap();
+        let res = reply(deps.as_mut(), env, msg).unwrap();
         // println!("{:#?}", res);
         assert_eq!(
             res.messages[0].msg.type_id(),
             CosmosMsg::<Empty>::Ibc(cosmwasm_std::IbcMsg::SendPacket {
-                channel_id: "".into(),
+                channel_id: String::new(),
                 data: Binary::new(vec![]),
                 timeout: IbcTimeout::with_block(IbcTimeoutBlock {
                     revision: 0,
@@ -693,7 +692,7 @@ mod tests {
                 })
             })
             .type_id()
-        )
+        );
         // simulate upload headstash reply
     }
     #[test]

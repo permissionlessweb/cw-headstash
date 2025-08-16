@@ -11,7 +11,7 @@ test:
 lint:
   #!/bin/sh
     cd public-crates && cargo clippy --fix --tests -- -D warnings 
-    cd ../secret=crates && cargo clippy --fix --tests -- -D warnings
+    cd ../secret-crates && cargo clippy --fix --tests -- -D warnings
    
 
 build:

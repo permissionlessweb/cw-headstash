@@ -1,11 +1,6 @@
 use cosmwasm_schema::cw_serde;
-use cosmwasm_std::{
-    from_json,
-    testing::{mock_dependencies, MockQuerier},
-    to_json_binary, Binary, Empty, Querier, QueryRequest, WasmQuery,
-};
+use cosmwasm_std::Binary;
 use cw_storage_plus::{Item, Map};
-use hex::ToHex;
 
 pub const OWNER: Item<Vec<String>> = Item::new("o");
 pub const GLOBMAP: Map<String, Binary> = Map::new("g");

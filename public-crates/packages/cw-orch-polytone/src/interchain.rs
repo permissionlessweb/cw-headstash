@@ -1,7 +1,7 @@
 use cosmwasm_std::Uint64;
 use cw_orch::{
     core::serde_json::Value,
-    daemon::{senders::CosmosSender, TxSender, Wallet},
+    daemon::TxSender,
     prelude::*,
 };
 use cw_orch_interchain::core::IbcQueryHandler;

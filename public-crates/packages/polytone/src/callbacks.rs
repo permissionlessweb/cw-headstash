@@ -4,11 +4,10 @@ use cosmwasm_std::{
     StdResult, Storage, SubMsgResponse, Uint64, WasmMsg,
 };
 use cw_storage_plus::Map;
-use headstash_public::state::HeadstashParams;
 
 use crate::{
     ack::unmarshal_ack,
-    headstash::{HeadstashCallback, HEADSTASH_PARAMS},
+    headstash::HeadstashCallback,
 };
 
 /// Executed on the callback receiver upon message completion. When
@@ -212,7 +211,7 @@ fn callback_message(request: PendingCallback, result: Callback) -> CosmosMsg {
 
                         to_json_binary(&C::HeadstashCallback(
                             HeadstashCallback::UploadedHeadstashCodeId {
-                                code_id: u64::from_str_radix(&code_id, 10u32)
+                                code_id: u64::from_str_radix(code_id, 10u32)
                                     .expect("failed from_str_radix"),
                             },
                         ))

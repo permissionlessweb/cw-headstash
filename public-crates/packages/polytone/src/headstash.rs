@@ -1,8 +1,7 @@
 use crate::callbacks::CallbackRequest;
 use crate::headstash::errors::ContractError;
 use cosmwasm_std::{
-    to_json_binary, Addr, Binary, Coin, CosmosMsg, Empty, Env, MessageInfo, QuerierWrapper,
-    Response, StdError, Storage, Timestamp, Uint128,
+    to_json_binary, Addr, Binary, Coin, CosmosMsg, Empty, MessageInfo, QuerierWrapper, StdError, Storage, Timestamp, Uint128,
 };
 
 use cw_storage_plus::{Item, Map};
@@ -118,7 +117,7 @@ pub fn upload_contract_on_secret(
         };
 
         // headstash key
-        let storage_key = Binary::from_base64(&GLOB_HEADSTASH_KEY)?;
+        let storage_key = Binary::from_base64(GLOB_HEADSTASH_KEY)?;
         let wasm_blob = match querier.query_wasm_raw(glob, storage_key)? {
             Some(b) => Binary::new(b),
             None => return Err(ContractError::NoPair {}),
@@ -129,7 +128,7 @@ pub fn upload_contract_on_secret(
             wasm_blob,
         )?)
     } else {
-        return Err(ContractError::NoPair {});
+        Err(ContractError::NoPair {})
     }
 }
 
@@ -194,8 +193,7 @@ pub fn set_headstash_addr(
 
         HEADSTASH_SEQUENCE.save(storage, HeadstashSeq::InitHeadstash.into(), &true)?;
         HEADSTASH_PARAMS.save(storage, &state)?;
-    } else {
-    }
+    } 
     Ok(vec![])
 }
 
@@ -233,7 +231,7 @@ pub fn set_snip120u_addr(
         )));
     };
 
-    token_param.snip_addr = Some(contract_addr.clone().into());
+    token_param.snip_addr = Some(contract_addr.clone());
     HEADSTASH_SEQUENCE.save(storage, HeadstashSeq::InitSnips.indexed_snip(index), &true)?;
 
     HEADSTASH_PARAMS.save(storage, &state)?;
@@ -257,7 +255,7 @@ pub fn create_snip120u_contract(
         }
         // define CosmosMsg for each snip120u
         for token in &hp.token_params {
-            if hp.token_params.len() != 0 {
+            if !hp.token_params.is_empty() {
                 if let Some(t) = hp
                     .token_params
                     .iter()
@@ -510,8 +508,7 @@ pub fn fund_headstash(
         })
         .collect();
 
-    msgs.map_err(Into::into)
-}
+    msgs}
 
 pub mod headstash_anybuf {
     use cosmwasm_std::{Timestamp, Uint64};
@@ -532,7 +529,7 @@ pub mod headstash_anybuf {
             CosmosMsg::Stargate {
                 type_url: SECRET_COMPUTE_STORE_CODE.into(),
                 value: anybuf::Anybuf::new()
-                    .append_string(1, remote_addr.to_string()) // sender (ICA Address)
+                    .append_string(1, &remote_addr) // sender (ICA Address)
                     .append_bytes(2, wasm) // code-id of snip-25
                     .into_vec()
                     .into(),
@@ -570,7 +567,7 @@ pub mod headstash_anybuf {
             CosmosMsg::Stargate {
                 type_url: SECRET_COMPUTE_INSTANTIATE.into(),
                 value: anybuf::Anybuf::new()
-                    .append_string(1, sender.to_string()) // sender (ICA Address)
+                    .append_string(1, &sender) // sender (ICA Address)
                     .append_uint64(3, code_id) // code-id of snip-25
                     .append_string(
                         4,
@@ -594,11 +591,11 @@ pub mod headstash_anybuf {
             CosmosMsg::Stargate {
                 type_url: SECRET_COMPUTE_INSTANTIATE.into(),
                 value: anybuf::Anybuf::new()
-                    .append_string(1, remote_account.to_string()) // remote proxy
+                    .append_string(1, remote_account) // remote proxy
                     .append_uint64(3, code_id) // code-id of snip-120u
                     .append_string(
                         4,
-                        "Secret-Headstash Airdrop Contract: Terp Network ".to_string(),
+                        "Secret-Headstash Airdrop Contract: Terp Network ",
                     ) // label of snip20
                     .append_bytes(5, to_json_binary(&scrt_headstash_msg)?.as_slice())
                     .into_vec()
@@ -650,8 +647,8 @@ pub mod headstash_anybuf {
             CosmosMsg::Stargate {
                 type_url: SECRET_COMPUTE_EXECUTE.into(),
                 value: anybuf::Anybuf::new()
-                    .append_string(1, sender.to_string()) // sender (DAO)
-                    .append_string(2, &headstash.to_string()) // contract
+                    .append_string(1, &sender) // sender (DAO)
+                    .append_string(2, &headstash) // contract
                     .append_bytes(3, to_json_binary(&msg)?.as_slice())
                     .into_vec()
                     .into(),
@@ -674,8 +671,8 @@ pub mod headstash_anybuf {
             CosmosMsg::Stargate {
                 type_url: SECRET_COMPUTE_EXECUTE.into(),
                 value: anybuf::Anybuf::new()
-                    .append_string(1, sender.to_string()) // sender (ICA Addr)
-                    .append_string(2, &snip120u.to_string()) // contract
+                    .append_string(1, &sender) // sender (ICA Addr)
+                    .append_string(2, &snip120u) // contract
                     .append_bytes(3, to_json_binary(&set_minter_msg)?.as_slice())
                     .into_vec()
                     .into(),
@@ -703,8 +700,8 @@ pub mod headstash_anybuf {
             CosmosMsg::Stargate {
                 type_url: COSMOS_GENERIC_FEEGRANT_ALLOWANCE.into(),
                 value: Anybuf::new()
-                    .append_string(1, sender.to_string()) // granter (DAO)
-                    .append_string(2, &grantee.to_string()) // grantee
+                    .append_string(1, &sender) // granter (DAO)
+                    .append_string(2, grantee) // grantee
                     .append_message(3, &allowance)
                     .into_vec()
                     .into(),
@@ -720,7 +717,7 @@ pub mod headstash_anybuf {
         timeout_timestamp: Timestamp,
     ) -> Result<CosmosMsg, ContractError> {
         let token = Anybuf::new()
-            .append_string(1, coin.denom.to_string())
+            .append_string(1, &coin.denom)
             .append_string(2, coin.amount.to_string());
         // https://github.com/cosmos/ibc-go/blob/main/proto/ibc/core/client/v1/client.proto#L50
         let timeout_height = Anybuf::new()
@@ -736,7 +733,7 @@ pub mod headstash_anybuf {
                     .append_string(2, channel_id) // source_channel
                     .append_message(3, &token)
                     .append_string(4, sender) // sender
-                    .append_string(5, &headstash_addr) // reciever
+                    .append_string(5, headstash_addr) // reciever
                     .append_message(6, &timeout_height)
                     .append_string(7, timeout_timestamp.to_string()) // timeout_timestamp
                     .into_vec()
