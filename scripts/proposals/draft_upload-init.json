@@ -1,0 +1,22 @@
+{
+ "messages": [
+  {
+   "@type": "/cosmwasm.wasm.v1.MsgStoreAndInstantiateContract",
+   "authority": "terp10d07y265gmmuvt4z0w9aw880jnsr700jag6fuq",
+   "wasm_byte_code": null,
+   "instantiate_permission": null,
+   "unpin_code": false,
+   "admin": null,
+   "label": "label",
+   "msg": null,
+   "funds": [],
+   "source": "null",
+   "builder": "null",
+   "code_hash": null
+  }
+ ],
+ "metadata": "ipfs://CID",
+ "deposit": "",
+ "title": "Store and Instantiate: Cw-Headstash",
+ "summary": "test"
+}

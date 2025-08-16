@@ -1,7 +1,7 @@
 [
   {
-    "address": "ENzA8i7qTrXsgthkZeig7BMrdy5B6ozNq9yYf9jJWToA",
-    "headstash": [
+    "addr": "ENzA8i7qTrXsgthkZeig7BMrdy5B6ozNq9yYf9jJWToA",
+    "snips": [
       {
         "contract": "a",
         "amount": "1"
@@ -13,8 +13,8 @@
     ]
   },
   {
-    "address": "ENzA8i7qTrXsgthkZeig7BMrdy5B6ozNq9yYf9jJWToA",
-    "headstash": [
+    "addr": "ENzA8i7qTrXsgthkZeig7BMrdy5B6ozNq9yYf9jJWToA",
+    "snips": [
       {
         "contract": "a",
         "amount": "3"
@@ -26,8 +26,8 @@
     ]
   },
   {
-    "address": "ENzA8i7qTrXsgthkZeig7BMrdy5B6ozNq9yYf9jJWToA",
-    "headstash": [
+    "addr": "ENzA8i7qTrXsgthkZeig7BMrdy5B6ozNq9yYf9jJWToA",
+    "snips": [
       {
         "contract": "a",
         "amount": "5"
@@ -39,8 +39,8 @@
     ]
   },
   {
-    "address": "0xee601d679574A820ceDf2a062e20AF40ffC478e9",
-    "headstash": [
+    "addr": "0xee601d679574A820ceDf2a062e20AF40ffC478e9",
+    "snips": [
       {
         "contract": "a",
         "amount": "130"
@@ -52,8 +52,8 @@
     ]
   },
   {
-    "address": "0xee601d679574A820ceDf2a062e20AF40ffC478e9",
-    "headstash": [
+    "addr": "0xee601d679574A820ceDf2a062e20AF40ffC478e9",
+    "snips": [
       {
         "contract": "a",
         "amount": "140"
@@ -65,8 +65,8 @@
     ]
   },
   {
-    "address": "0x390d9a73A316960574611dBe64F42567016ae050",
-    "headstash": [
+    "addr": "0x390d9a73A316960574611dBe64F42567016ae050",
+    "snips": [
       {
         "contract": "a",
         "amount": "150"
@@ -78,8 +78,8 @@
     ]
   },
   {
-    "address": "0xE0837AFfc124bfDe1362cE75F442A6774A559868",
-    "headstash": [
+    "addr": "0xE0837AFfc124bfDe1362cE75F442A6774A559868",
+    "snips": [
       {
         "contract": "a",
         "amount": "160"
@@ -91,8 +91,8 @@
     ]
   },
   {
-    "address": "0xc5159763e33B70806515F2D30E9ed53C37220Bb7",
-    "headstash": [
+    "addr": "0xc5159763e33B70806515F2D30E9ed53C37220Bb7",
+    "snips": [
       {
         "contract": "a",
         "amount": "170"
@@ -104,8 +104,8 @@
     ]
   },
   {
-    "address": "0xA55f2b55F43E9dBE7Db3Eb3eE61F39A6865686eA",
-    "headstash": [
+    "addr": "0xA55f2b55F43E9dBE7Db3Eb3eE61F39A6865686eA",
+    "snips": [
       {
         "contract": "a",
         "amount": "180"
@@ -117,8 +117,8 @@
     ]
   },
   {
-    "address": "0x58dc363aCF0b5f37A5E67D0EfB893e7B3A1Cfc15",
-    "headstash": [
+    "addr": "0x58dc363aCF0b5f37A5E67D0EfB893e7B3A1Cfc15",
+    "snips": [
       {
         "contract": "a",
         "amount": "190"
@@ -130,8 +130,8 @@
     ]
   },
   {
-    "address": "0x4e9f9742aB6001cf4213f12B3c76d2f39A3cC213",
-    "headstash": [
+    "addr": "0x4e9f9742aB6001cf4213f12B3c76d2f39A3cC213",
+    "snips": [
       {
         "contract": "a",
         "amount": "200"

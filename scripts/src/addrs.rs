@@ -1,15 +1,14 @@
 use std::fs;
 
-use cw_headstash::state::{Headstash, Snip};
+use cw_headstash::state::{snip::Snip, Headstash};
 use serde_json::Value;
 
 /// retrives the list of eligible pubkey and their headstash allocations
 pub fn get_addrs_from_json() {
-    let data = fs::read_to_string("../../tools/example-data/distribution.json")
+    let data = fs::read_to_string("../data/distribution.json")
         .expect("Something went wrong reading the file");
 
     let json_value: Vec<Value> = serde_json::from_str(&data).unwrap();
-
     let mut addrs: Vec<Headstash> = vec![];
 
     for value in json_value {
@@ -22,14 +21,9 @@ pub fn get_addrs_from_json() {
             let amount = headstash["amount"].as_u64().unwrap();
 
             headstash_vec.push(Snip {
-                addr,
                 amount: amount.into(),
+                contract: addr,
             });
         }
-
-        addrs.push(Headstash {
-            pubkey: address,
-            snip: headstash_vec,
-        });
     }
 }

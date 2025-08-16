@@ -1,0 +1,191 @@
+{
+  "contract_name": "polytone-voice",
+  "contract_version": "1.1.0",
+  "idl_version": "1.0.0",
+  "instantiate": {
+    "$schema": "http://json-schema.org/draft-07/schema#",
+    "title": "InstantiateMsg",
+    "type": "object",
+    "required": [
+      "block_max_gas",
+      "proxy_code_id"
+    ],
+    "properties": {
+      "block_max_gas": {
+        "description": "The max gas allowed in a single block.",
+        "allOf": [
+          {
+            "$ref": "#/definitions/Uint64"
+          }
+        ]
+      },
+      "contract_addr_len": {
+        "description": "The contract address length used by the chain. Defaults to 32. Some chains use other lengths, such as Injective which uses 20.",
+        "type": [
+          "integer",
+          "null"
+        ],
+        "format": "uint8",
+        "minimum": 0.0
+      },
+      "proxy_code_id": {
+        "description": "Code ID to use for instantiating proxy contracts.",
+        "allOf": [
+          {
+            "$ref": "#/definitions/Uint64"
+          }
+        ]
+      }
+    },
+    "additionalProperties": false,
+    "definitions": {
+      "Uint64": {
+        "description": "A thin wrapper around u64 that is using strings for JSON encoding/decoding, such that the full u64 range can be used for clients that convert JSON numbers to floats, like JavaScript and jq.\n\n# Examples\n\nUse `from` to create instances of this and `u64` to get the value out:\n\n``` # use secret_cosmwasm_std::Uint64; let a = Uint64::from(42u64); assert_eq!(a.u64(), 42);\n\nlet b = Uint64::from(70u32); assert_eq!(b.u64(), 70); ```",
+        "type": "string"
+      }
+    }
+  },
+  "execute": {
+    "$schema": "http://json-schema.org/draft-07/schema#",
+    "title": "ExecuteMsg",
+    "oneOf": [
+      {
+        "description": "Receives and handles an incoming packet.",
+        "type": "object",
+        "required": [
+          "rx"
+        ],
+        "properties": {
+          "rx": {
+            "type": "object",
+            "required": [
+              "connection_id",
+              "counterparty_port",
+              "data"
+            ],
+            "properties": {
+              "connection_id": {
+                "description": "The local connection id the packet arrived on.",
+                "type": "string"
+              },
+              "counterparty_port": {
+                "description": "The port of the counterparty module.",
+                "type": "string"
+              },
+              "data": {
+                "description": "The packet data.",
+                "allOf": [
+                  {
+                    "$ref": "#/definitions/Binary"
+                  }
+                ]
+              }
+            },
+            "additionalProperties": false
+          }
+        },
+        "additionalProperties": false
+      }
+    ],
+    "definitions": {
+      "Binary": {
+        "description": "Binary is a wrapper around Vec<u8> to add base64 de/serialization with serde. It also adds some helper methods to help encode inline.\n\nThis is only needed as serde-json-{core,wasm} has a horrible encoding for Vec<u8>. See also <https://github.com/CosmWasm/cosmwasm/blob/main/docs/MESSAGE_TYPES.md>.",
+        "type": "string"
+      }
+    }
+  },
+  "query": {
+    "$schema": "http://json-schema.org/draft-07/schema#",
+    "title": "QueryMsg",
+    "oneOf": [
+      {
+        "description": "Queries the configured block max gas. Serialized as `\"block_max_gas\"`.",
+        "type": "string",
+        "enum": [
+          "block_max_gas"
+        ]
+      },
+      {
+        "description": "Queries the configured proxy code ID. Serialized as `\"proxy_code_id\"`.",
+        "type": "string",
+        "enum": [
+          "proxy_code_id"
+        ]
+      },
+      {
+        "description": "Queries the configured contract address length.",
+        "type": "string",
+        "enum": [
+          "contract_addr_len"
+        ]
+      },
+      {
+        "description": "Queries the sender information for a given proxy.",
+        "type": "object",
+        "required": [
+          "sender_info_for_proxy"
+        ],
+        "properties": {
+          "sender_info_for_proxy": {
+            "type": "object",
+            "required": [
+              "proxy"
+            ],
+            "properties": {
+              "proxy": {
+                "type": "string"
+              }
+            },
+            "additionalProperties": false
+          }
+        },
+        "additionalProperties": false
+      }
+    ]
+  },
+  "migrate": null,
+  "sudo": null,
+  "responses": {
+    "block_max_gas": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "title": "Uint64",
+      "description": "A thin wrapper around u64 that is using strings for JSON encoding/decoding, such that the full u64 range can be used for clients that convert JSON numbers to floats, like JavaScript and jq.\n\n# Examples\n\nUse `from` to create instances of this and `u64` to get the value out:\n\n``` # use secret_cosmwasm_std::Uint64; let a = Uint64::from(42u64); assert_eq!(a.u64(), 42);\n\nlet b = Uint64::from(70u32); assert_eq!(b.u64(), 70); ```",
+      "type": "string"
+    },
+    "contract_addr_len": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "title": "uint8",
+      "type": "integer",
+      "format": "uint8",
+      "minimum": 0.0
+    },
+    "proxy_code_id": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "title": "Uint64",
+      "description": "A thin wrapper around u64 that is using strings for JSON encoding/decoding, such that the full u64 range can be used for clients that convert JSON numbers to floats, like JavaScript and jq.\n\n# Examples\n\nUse `from` to create instances of this and `u64` to get the value out:\n\n``` # use secret_cosmwasm_std::Uint64; let a = Uint64::from(42u64); assert_eq!(a.u64(), 42);\n\nlet b = Uint64::from(70u32); assert_eq!(b.u64(), 70); ```",
+      "type": "string"
+    },
+    "sender_info_for_proxy": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "title": "SenderInfo",
+      "type": "object",
+      "required": [
+        "connection_id",
+        "remote_port",
+        "remote_sender"
+      ],
+      "properties": {
+        "connection_id": {
+          "type": "string"
+        },
+        "remote_port": {
+          "type": "string"
+        },
+        "remote_sender": {
+          "type": "string"
+        }
+      },
+      "additionalProperties": false
+    }
+  }
+}

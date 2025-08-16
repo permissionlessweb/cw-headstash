@@ -21,3 +21,22 @@ pub struct GlobHash {
     /// The hash of the wasm blob
     pub hash: String,
 }
+
+mod test {
+    use super::*;
+
+    #[test]
+    fn test_raw_query() {
+        let mut deps = cosmwasm_std::testing::mock_dependencies();
+        let mut storage = deps.storage;
+        let key = "headstash".to_string();
+
+        HASHMAP
+            .save(&mut storage, key.to_string(), &"babberitus".into())
+            .unwrap();
+
+        let storage_key = HASHMAP.key(key).to_vec();
+        println!("Raw key bytes: {:?}", storage_key);
+        println!("Hex: {}", Binary::new(storage_key).to_base64());
+    }
+}

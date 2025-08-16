@@ -1,0 +1,23 @@
+[package]
+name = "cw-orch-polytone"
+edition = "2021"
+license = "BSD-3-Clause"
+repository = "https://https://github.com/permissionlessweb/cw-headstash/public-crates"
+rust-version = "1.67"
+version = "1.1.0"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+cosmwasm-std = { workspace = true, features = ["stargate"] }
+cw-orch = { workspace = true, features=["daemon"] }
+cw-orch-interchain = { workspace = true, features = ["daemon"] }
+
+headstash-public = { workspace = true}
+polytone-note = {    workspace = true, features=["interface"] }
+polytone-proxy = {   workspace = true,  features=["interface"] }
+polytone-voice  = {  workspace = true,  features=["interface"] }
+cw-glob = { workspace = true, features=["library"] }
+
+[dev-dependencies]
+anyhow = { version = "1.0.51" }

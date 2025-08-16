@@ -1,0 +1,29 @@
+{
+  "token_params": [
+    {
+      "name": "Token Name 1",
+      "symbol": "TN1",
+      "native": "Native Token 1",
+      "ibc": "ibc_string_1",
+      "snip_addr": "secret1...",
+      "total": "1000000",
+      "source_channel": "channel-1"
+    },
+    {
+      "name": "Token Name 2",
+      "symbol": "TN2",
+      "native": "Native Token 2",
+      "ibc": "ibc_string_2",
+      "snip_addr": null,
+      "total": "500000",
+      "source_channel": "channel-2"
+    }
+  ],
+  "bloom_config": {},
+  "headstash_init_config": {
+    "claim_msg_plaintxt": "claim message",
+    "end_date": "2025-01-01T00:00:00Z",
+    "start_date": "2024-01-01T00:00:00Z",
+    "random_key": "random_key_here"
+  }
+}

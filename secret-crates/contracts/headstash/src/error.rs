@@ -1,4 +1,4 @@
-use cosmwasm_std::{CheckedFromRatioError, StdError};
+use cosmwasm_std::{CheckedFromRatioError, CheckedMultiplyRatioError, StdError};
 use thiserror::Error;
 
 #[derive(Error, Debug, PartialEq)]
@@ -8,6 +8,8 @@ pub enum ContractError {
 
     #[error("{0}")]
     CheckedFromRatioError(#[from] CheckedFromRatioError),
+    #[error("{0}")]
+    CheckedMultiplyRatioError(#[from] CheckedMultiplyRatioError),
 
     #[error("This headstash contract has not been set as an eligible minter yet.")]
     HeadstashNotSnip120uMinter {},
@@ -19,7 +21,7 @@ pub enum ContractError {
     AlreadyClaimed {},
 
     #[error("you cannot clawback the headstash, silly!")]
-    ClawbackError {},
+    ClawbackError {  },
 
     #[error("Clawback was not setup for this one, playa!")]
     ClawbackUnavailable {},

@@ -213,7 +213,7 @@ mod ibc_channel_close {
             .unwrap_or_default()
         {
             return Err(ContractError::ChannelCloseInitNotAllowed);
-        };
+        }
 
         state::ALLOW_CHANNEL_CLOSE_INIT.save(deps.storage, &false)?;
 

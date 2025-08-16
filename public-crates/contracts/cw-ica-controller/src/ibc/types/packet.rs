@@ -47,7 +47,7 @@ pub struct IcaPacketData {
 impl IcaPacketData {
     /// Creates a new [`IcaPacketData`]
     #[must_use]
-    pub fn new(data: Vec<u8>, memo: Option<String>) -> Self {
+    pub const fn new(data: Vec<u8>, memo: Option<String>) -> Self {
         Self {
             r#type: 1,
             data,

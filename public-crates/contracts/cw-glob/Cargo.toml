@@ -37,6 +37,7 @@ optimize = """docker run --rm -v "$(pwd)":/code \
 
 [dependencies]
 anybuf = "0.5.0"
+headstash-public = {path = "../../packages/headstash-public"}
 cosmwasm-schema = "2.1.0"
 cosmwasm-std = { version = "2.1.0", features = [
   "cosmwasm_1_4",
@@ -44,6 +45,8 @@ cosmwasm-std = { version = "2.1.0", features = [
   # "cosmwasm_2_0",
   "stargate",
 ] }
+cw-utils = "2.0.0"
+cw-orch = { version = "0.28.0" }
 cw-ownable = "2.0"
 cw-storage-plus = "2.0.0"
 cw2 = "2.0.0"
@@ -51,7 +54,8 @@ sha2 = "0.10.8"
 hex = "^0.4"
 schemars = "0.8.16"
 serde = { version = "1.0.197", default-features = false, features = ["derive"] }
-thiserror = { version = "1.0.58" }
+thiserror = { version = "2.0.12" }
+
 
 [dev-dependencies]
 cw-multi-test = "2.0.0"

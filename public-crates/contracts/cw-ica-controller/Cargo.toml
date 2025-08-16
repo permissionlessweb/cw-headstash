@@ -40,7 +40,7 @@ optimize = """docker run --rm -v "$(pwd)":/code \
 """
 
 [dependencies]
-cw-orch                      = "0.24.1"
+cw-orch  = "0.28.0"
 cosmwasm-schema = "2.1"
 cosmwasm-std = { version = "2.1", features = [
     "cosmwasm_1_4",
@@ -63,7 +63,6 @@ anybuf = "0.5"
 serde_with = "3.8"
 
 # headstash dependencies
-secret-cosmwasm-std = { package = "cosmwasm-std", default-features = false, version = "1.1.11" }
 sha2 = { version = "0.10.6", default-features = false }
 
 [dev-dependencies]

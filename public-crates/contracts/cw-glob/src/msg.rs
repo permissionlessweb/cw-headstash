@@ -8,6 +8,7 @@ pub struct InstantiateMsg {
 }
 
 #[cw_serde]
+#[derive(cw_orch::ExecuteFns)]
 pub enum ExecuteMsg {
     AddGlob {
         globs: Vec<Glob>,
@@ -30,10 +31,23 @@ pub enum ExecuteMsg {
     },
 }
 
-#[derive(QueryResponses)]
+#[derive(QueryResponses,cw_orch::QueryFns)]
 #[cw_serde]
 pub enum QueryMsg {
     /// Retrieves the sha256sum hash of stored globs
     #[returns(GlobHash)]
     GlobHash { keys: Vec<String> },
+}
+
+#[cw_serde]
+pub enum MigrateMsg {
+    /// Removes the blob from the store
+    IsoNail {
+        keys: Vec<String>,
+    },
+    /// Updates the glob with the given key
+    ReHeat {
+        globs: Vec<Glob>,
+    },
+    Normal {},
 }

@@ -2,8 +2,7 @@ use cosmwasm_schema::{cw_serde, QueryResponses};
 use cw_ica_controller::{
     helpers::ica_callback_execute, types::msg::options::ChannelOpenInitOptions,
 };
-
-use crate::state::headstash::{Headstash, HeadstashParams};
+use headstash_public::state::{Headstash, HeadstashParams};
 
 #[cw_serde]
 pub struct InstantiateMsg {
@@ -29,10 +28,10 @@ pub enum ExecuteMsg {
         headstash_params: Option<HeadstashParams>,
     },
     /// Sets the cw-glob contract address to GLOBAL_CONTRACT_STATE
-    SetCwGlob {
-        /// The storage key set in cw-glob. defaults enabled are either `snip120u` or `cw-headstash`
-        cw_glob: String,
-    },
+    // SetCwGlob {
+    //     /// The storage key set in cw-glob. defaults enabled are either `snip120u` or `cw-headstash`
+    //     cw_glob: String,
+    // },
     /// 1. Upload the following contracts in the expected sequence:
     /// a. snip120u
     /// b. cw-headstash
@@ -65,15 +64,19 @@ pub enum ExecuteMsg {
     AuthzDeployer {
         grantee: String,
     },
+    // Admin feature to manually set code-id for cw-headstash on Secret.
     SetHeadstashCodeId {
         code_id: u64,
     },
+    // Admin feature to manually set code-id for snip120u on Secret.
     SetSnip120uCodeId {
         code_id: u64,
     },
+    // Admin feature to manually set contract-addr for cw-headstash on Secret.
     SetHeadstashAddr {
         addr: String,
     },
+    // Admin feature to manually set contract-addr for snip120u on Secret.
     SetSnip120uAddr {
         /// token denomination representing snip
         denom: String,
@@ -81,6 +84,7 @@ pub enum ExecuteMsg {
         addr: String,
     },
 }
+
 #[cw_serde]
 pub enum SudoMsg {
     HandleIbcBloom {},
@@ -93,9 +97,11 @@ pub enum QueryMsg {
     /// GetContractState returns the contact's state.
     #[returns(crate::state::ContractState)]
     GetContractState {},
+    #[returns(String)]
+    GetDeploymentState {},
     /// GetIcaState returns the ICA state for the given ICA ID.
     #[returns(crate::state::IcaContractState)]
-    GetIcaContractState {  },
+    GetIcaContractState {},
     #[returns(String)]
     AuthzGrantee {},
 }

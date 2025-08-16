@@ -12,46 +12,42 @@ crate-type = ["cdylib", "rlib"]
 
 
 [dependencies]
+cw-orch = {version = "0.28.0", features = ["daemon"]}
+cw-orch-interchain = {version = "0.9.0", features = ["daemon"]}
+cw-orch-polytone = {path = "../public-crates/packages/cw-orch-polytone"}
+
+polytone = {path = "../public-crates/packages/polytone"}
+polytone-note  = {path = "../public-crates/contracts/polytone/note", features=["interface"] }
+polytone-proxy = {path = "../public-crates/contracts/polytone/proxy", features=["interface"] }
+polytone-voice = {path = "../public-crates/contracts/polytone/voice", features=["interface"] }
+cw-glob = {path = "../public-crates/contracts/cw-glob", features=["library"] }
+
+cw-headstash = {path = "../secret-crates/contracts/headstash"}
+headstash-public = {path = "../public-crates/packages/headstash-public"}
+
+# cw-ica-controller = { git = "https://github.com/permissionlessweb/cw-ica-controller" , default-features = false }
+
+secret-cosmwasm-std = { version = "1.1.11", default-features = false,features = ["stargate"] }
+cosmwasm-std = { version = "2.2.2", default-features = false,features = [
+  "stargate",
+] }
+cosmrs = {version = "0.19.0", features = ["cosmwasm"]}
+cosmwasm-schema = "2.2.2"
+
+
 tokio = "1.40.0"
+dotenv = "0.15.0"
+protobuf = "3.1.0"
 serde_json = "1.0.128"
 anybuf =  "0.5.0"
 anyhow =  "1.0.87"
-cw-headstash = {path = "../secret-crates/contracts/headstash"}
 reqwest = "0.12.7"
 clap = { version = "4.5.0", features = ["derive"] }
 log = "0.4.22"
-# snip120u-impl = { version = "1.0.0", path = "../secret-crates/contracts/snip120u"}
-# cosmos specific deps
-cw-ica-controller = { git = "https://github.com/permissionlessweb/cw-ica-controller" , default-features = false }
-cw-orch-interchain = {version = "0.4.0", features = ["daemon"]}
-cw-orch = {version = "0.25.0", features = ["daemon"]}
-cosmrs = {version = "0.19.0", features = ["cosmwasm"]}
-cosmwasm-std = { version = "2.1.3", default-features = false,features = [
-  "stargate",
-] }
-secret-cosmwasm-std = { version = "1.1.11", default-features = false,features = [
-  "stargate",
-] }
-cosmwasm-schema = "1.1.8"
 
-[[bin]]
-name = "deploy-cw-ica"
-path = "src/bin/1_create_ica_account_on_secret.rs"
-[[bin]]
-name = "grant-authz-as-ica"
-path = "src/bin/2_authz_secret_ica_w_uploads.rs"
-[[bin]]
-name = "upload-headstash-infra"
-path = "src/bin/3_a_upload_headstash_infra.rs"
 [[bin]]
 name = "create-snip120u"
 path = "src/bin/3_b_init_snip120u.rs"
 [[bin]]
 name = "create-headstash"
 path = "src/bin/3_c_init_headstash.rs"
-[[bin]]
-name = "authorize-headstash-as-minter"
-path = "src/bin/3_d_authorize_minters.rs"
-[[bin]]
-name = "add-eligible-addrs"
-path = "src/bin/3_d_authorize_minters.rs"

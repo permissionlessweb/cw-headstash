@@ -6,18 +6,18 @@ check:
 clippy:
 	cargo clippy
 
-PHONY: test
+.PHONY: test
 test: unit-test
 
 .PHONY: unit-test
 unit-test:
-	cargo unit-test
+	cargo test
 
 # This is a local build with debug-prints activated. Debug prints only show up
 # in the local development chain (see the `start-server` command below)
 # and mainnet won't accept contracts built with the feature enabled.
 .PHONY: build _build
-build: _build compress-headstash-wasm
+build: _build compress-wasm
 _build:
 	RUSTFLAGS='-C link-arg=-s' cargo build --release --target wasm32-unknown-unknown
 
@@ -34,42 +34,33 @@ build-mainnet-reproducible:
 	docker run --rm -v "$$(pwd)":/contract \
 		--mount type=volume,source="$$(basename "$$(pwd)")_cache",target=/contract/target \
 		--mount type=volume,source=registry_cache,target=/usr/local/cargo/registry \
-		ghcr.io/scrtlabs/localsecret:v1.6.0-rc.3
+		ghcr.io/scrtlabs/secret-contract-optimizer:1.0.13
 
-.PHONY: compress-headstash-wasm
-compress-headstash-wasm:
-	mv ./target/wasm32-unknown-unknown/release/cw_headstash.wasm ./artifacts/cw_headstash.wasm
+.PHONY: compress-wasm
+compress-wasm:
+	cp ./target/wasm32-unknown-unknown/release/*.wasm ./contract.wasm
 	@## The following line is not necessary, may work only on linux (extra size optimization)
 	@# wasm-opt -Os ./contract.wasm -o ./contract.wasm
-	cat ./artifacts/cw_headstash.wasm | gzip -9 > ./artifacts/cw_headstash.wasm.gz
-	
-.PHONY: compress-snip120u-wasm
-compress-snip120u-wasm:
-	mv ./contract/snip120u/target/wasm32-unknown-unknown/debug/snip20_reference_impl.wasm ./artifacts/snip120u.wasm
-	@## The following line is not necessary, may work only on linux (extra size optimization)
-	@# wasm-opt -Os ./contract.wasm -o ./contract.wasm
-	cat ./artifacts/snip120u.wasm | gzip -9 > ./artifacts/snip120u.wasm.gz
-	contract.wasm:
-
+	cat ./contract.wasm | gzip -9 > ./contract.wasm.gz
 
 .PHONY: schema
 schema:
 	cargo run --example schema
 
 # Run local development chain with four funded accounts (named a, b, c, and d)
-.PHONY: start-server
-start-server: # CTRL+C to stop
+.PHONY: localsecret
+localsecret: # CTRL+C to stop
 	docker run -it --rm \
-		-p 9091:9091 -p 26657:26657 -p 26656:26656 -p 1317:1317 -p 5000:5000 \
+		-p 26657:26657 -p 1317:1317 -p 5000:5000 -p 9090:9090 -p 9091:9091 \
 		-v $$(pwd):/root/code \
-		--name secretdev ghcr.io/scrtlabs/localsecret:v1.6.0-rc.3
+		--name localsecret ghcr.io/scrtlabs/localsecret:v1.8.0
 
 # This relies on running `start-server` in another console
 # You can run other commands on the secretcli inside the dev image
 # by using `docker exec secretdev secretcli`.
 .PHONY: store-contract-local
 store-contract-local:
-	docker exec secretdev secretcli tx compute store -y --from a --gas 1000000 /root/code/contract.wasm.gz
+	docker exec localsecret secretcli tx compute store -y --from a --gas 1000000 /root/code/contract.wasm.gz
 
 .PHONY: clean
 clean:
