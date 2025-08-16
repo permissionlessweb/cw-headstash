@@ -4,8 +4,7 @@ use cw_orch::{
     daemon::{senders::CosmosSender, TxSender, Wallet},
     prelude::*,
 };
-use cw_orch_interchain::core::{IbcQueryHandler, InterchainEnv, InterchainError};
-use headstash_public::state::HeadstashParams;
+use cw_orch_interchain::core::IbcQueryHandler;
 use polytone_note::msg::HeadstashNote;
 
 use crate::{

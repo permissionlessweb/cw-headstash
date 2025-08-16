@@ -1,20 +1,10 @@
+#!/bin/sh
 
-# create ibc configuration
-## Terp -> Scrt Connection ID: 
-## Scrt -> Terp Connection ID:
-## TERP ibc hash 
-## SCRT ibc hash 
 
-# upload contracts to controller chain 
+## compile contracts 
 
-# instantiate custom cw-ica-controller-owner
 
-# upload headstash
 
-# instantiate snip25s 
+## call cargo command to perform integration test
 
-# authorize headstash as minter 
-
-# fund headstash via ibc 
-
-# add headstashers
+ 

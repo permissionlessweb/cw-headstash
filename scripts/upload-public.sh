@@ -1,3 +1,5 @@
+#!/bin/sh
+
 # set env variables
 CLI=junod
 CHAIN_ID=juno-1

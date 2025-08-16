@@ -10,6 +10,7 @@ pub const SUPPORTED_CHAINS: &[ChainInfo] = &[TERP_MAINNET];
 pub const TERP_SUPPORTED_NETWORKS: &[ChainInfo] = &SUPPORTED_CHAINS;
 
 pub const GAS_TO_DEPLOY: u64 = 60_000_000;
+pub const CONTRACT_COMPILER: &str = "ghcr.io/scrtlabs/secret-contract-optimizer:1.0.13";
 
 /// A helper function to retrieve a [`ChainInfo`] struct for a given chain-id.
 /// supported chains are defined by the `SUPPORTED_CHAINS` variable

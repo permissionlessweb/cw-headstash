@@ -20,6 +20,7 @@ polytone = {path = "../public-crates/packages/polytone"}
 polytone-note  = {path = "../public-crates/contracts/polytone/contracts/note", features=["interface"] }
 polytone-proxy = {path = "../public-crates/contracts/polytone/contracts/proxy", features=["interface"] }
 polytone-voice = {path = "../public-crates/contracts/polytone/contracts/voice", features=["interface"] }
+cw-glob = {path = "../public-crates/contracts/cw-glob", features=["library"] }
 
 cw-headstash = {path = "../secret-crates/contracts/headstash"}
 headstash-public = {path = "../public-crates/packages/headstash-public"}
@@ -44,15 +45,6 @@ reqwest = "0.12.7"
 clap = { version = "4.5.0", features = ["derive"] }
 log = "0.4.22"
 
-[[bin]]
-name = "deploy-cw-ica"
-path = "src/bin/1_create_ica_account_on_secret.rs"
-[[bin]]
-name = "grant-authz-as-ica"
-path = "src/bin/2_authz_secret_ica_w_uploads.rs"
-[[bin]]
-name = "upload-headstash-infra"
-path = "src/bin/3_a_upload_headstash_infra.rs"
 [[bin]]
 name = "create-snip120u"
 path = "src/bin/3_b_init_snip120u.rs"

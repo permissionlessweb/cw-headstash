@@ -50,11 +50,6 @@ pub fn instantiate(
         ..
     } = msg.headstash_params.clone();
 
-    if snip120u_code_id.is_some() {
-        DEPLOYMENT_SEQUENCE.save(deps.storage, DeploymentSeq::UploadSnip.into(), &true)?;
-    } else {
-        DEPLOYMENT_SEQUENCE.save(deps.storage, DeploymentSeq::UploadSnip.into(), &false)?;
-    }
     if headstash_code_id.is_some() {
         DEPLOYMENT_SEQUENCE.save(deps.storage, DeploymentSeq::UploadHeadstash.into(), &true)?;
     } else {
@@ -252,21 +247,8 @@ pub mod upload {
         };
 
         match key.as_str() {
-            "snip120u" => {
-                if DEPLOYMENT_SEQUENCE.load(deps.storage, DeploymentSeq::UploadSnip.into())? {
-                    return Err(ContractError::Std(StdError::generic_err(
-                        "already have set snip120u code-id",
-                    )));
-                }
-            }
-            "cw-headstash" => {
-                if !DEPLOYMENT_SEQUENCE.load(deps.storage, DeploymentSeq::UploadSnip.into())? {
-                    return Err(ContractError::Std(StdError::generic_err(
-                        "must upload snip120u first",
-                    )));
-                } else if DEPLOYMENT_SEQUENCE
-                    .load(deps.storage, DeploymentSeq::UploadHeadstash.into())?
-                {
+            "headstash" => {
+                if DEPLOYMENT_SEQUENCE.load(deps.storage, DeploymentSeq::UploadHeadstash.into())? {
                     return Err(ContractError::Std(StdError::generic_err(
                         "already have set headstash code-id",
                     )));
@@ -310,11 +292,7 @@ pub mod instantiate {
         let hp = state.headstash_params;
 
         // if headstash or snip120u is not set, we cannot instantiate snips
-        if !DEPLOYMENT_SEQUENCE.load(deps.storage, DeploymentSeq::UploadSnip.into())?
-            && hp.snip120u_code_id.is_none()
-        {
-            return Err(ContractError::NoSnipCodeId {});
-        } else if !DEPLOYMENT_SEQUENCE.load(deps.storage, DeploymentSeq::UploadHeadstash.into())?
+        if !DEPLOYMENT_SEQUENCE.load(deps.storage, DeploymentSeq::UploadHeadstash.into())?
             && hp.headstash_code_id.is_none()
         {
             return Err(ContractError::NoHeadstashCodeId {});
@@ -327,7 +305,7 @@ pub mod instantiate {
                         cw_ica_contract.addr().to_string(),
                         token.clone(),
                         hp.snip120u_code_hash.clone(),
-                        hp.snip120u_code_id.unwrap(),
+                        hp.snip120u_code_id,
                         hp.headstash_addr.clone(),
                         t.symbol.clone(),
                     )?;
@@ -645,16 +623,11 @@ mod headstash {
     ) -> Result<Response, ContractError> {
         cw_ownable::assert_owner(deps.storage, &info.sender)?;
         let mut state = ICA_STATES.load(deps.storage)?;
-        let HeadstashParams {
-            snip120u_code_id, ..
-        } = state.headstash_params;
-        if snip120u_code_id.is_some() {
-            return Err(ContractError::SetSnip120uCodeError {});
-        } else {
-            state.headstash_params.snip120u_code_id = Some(code_id);
-            DEPLOYMENT_SEQUENCE.save(deps.storage, DeploymentSeq::UploadSnip.into(), &true)?;
-            ICA_STATES.save(deps.storage, &state)?;
-        }
+        let HeadstashParams { .. } = state.headstash_params;
+
+        state.headstash_params.snip120u_code_id = code_id;
+        ICA_STATES.save(deps.storage, &state)?;
+
         Ok(Response::new())
     }
 
@@ -667,12 +640,10 @@ mod headstash {
 
         let mut state = ICA_STATES.load(deps.storage)?;
         let HeadstashParams {
-            headstash_code_id,
-            snip120u_code_id,
-            ..
+            headstash_code_id, ..
         } = state.headstash_params;
 
-        if headstash_code_id.is_some() || snip120u_code_id.is_none() {
+        if headstash_code_id.is_some() {
             return Err(ContractError::SetHeadstashCodeError {});
         } else {
             state.headstash_params.headstash_code_id = Some(code_id);
@@ -693,11 +664,10 @@ mod headstash {
         let HeadstashParams {
             headstash_addr,
             headstash_code_id,
-            snip120u_code_id,
             ..
         } = state.headstash_params;
 
-        if headstash_code_id.is_none() || snip120u_code_id.is_none() || headstash_addr.is_some() {
+        if headstash_code_id.is_none() || headstash_addr.is_some() {
             return Err(ContractError::SetHeadstashAddrError {});
         } else {
             state.headstash_params.headstash_addr = Some(addr_to_set);
@@ -723,7 +693,7 @@ mod headstash {
             ..
         } = state.headstash_params;
 
-        if headstash_code_id.is_none() || snip120u_code_id.is_none() {
+        if headstash_code_id.is_none() {
             return Err(ContractError::SetInitSnip120uError {});
         } else {
             if let Some((i, a)) = state
@@ -812,32 +782,31 @@ pub mod ica {
             } => match ica_acknowledgement {
                 Data::Result(res) => {
                     let response: Response<Empty> = from_json(&res)?;
-                    // 1. if snip has not been uploaded, this is a snip upload callback.
-                    // This deployment sequence step will be set to true, if snip code-id provided during ica-owner contract init.
-                    if !DEPLOYMENT_SEQUENCE.load(deps.storage, DeploymentSeq::UploadSnip.into())? {
-                        if let Some(event) = response.events.iter().find(|e| e.ty == "store_code") {
-                            let code_id = event.attributes[0].value.clone();
-                            // get code-hash from cw-glob (via query?)
-                            // set code-id for snip120u to state
-                            ica_state.headstash_params.snip120u_code_id =
-                                Some(u64::from_str_radix(&code_id, 10)?);
-                            ICA_STATES.save(deps.storage, &ica_state)?;
-                            DEPLOYMENT_SEQUENCE.save(
-                                deps.storage,
-                                DeploymentSeq::UploadSnip.into(),
-                                &true,
-                            )?;
-                        } else {
-                            return Err(ContractError::BadStoreSnip120uCodeResponse {});
-                        }
-                        Ok(Response::default().add_attribute("sequence", "upload_snip120u"))
-                    // 2. if headstash has not been uploaded, this is a headstash upload callback
-                    // This deployment sequence step will be set to true, if headstash code-id provided during ica-owner contract init.
-                    } else if !DEPLOYMENT_SEQUENCE
+                    // // 1. if snip has not been uploaded, this is a snip upload callback.
+                    // // This deployment sequence step will be set to true, if snip code-id provided during ica-owner contract init.
+                    // if !DEPLOYMENT_SEQUENCE.load(deps.storage, DeploymentSeq::UploadSnip.into())? {
+                    //     if let Some(event) = response.events.iter().find(|e| e.ty == "store_code") {
+                    //         let code_id = event.attributes[0].value.clone();
+                    //         // get code-hash from cw-glob (via query?)
+                    //         // set code-id for snip120u to state
+                    //         ica_state.headstash_params.snip120u_code_id =
+                    //             u64::from_str_radix(&code_id, 10)?;
+                    //         ICA_STATES.save(deps.storage, &ica_state)?;
+                    //         DEPLOYMENT_SEQUENCE.save(
+                    //             deps.storage,
+                    //             DeploymentSeq::UploadSnip.into(),
+                    //             &true,
+                    //         )?;
+                    //     } else {
+                    //         return Err(ContractError::BadStoreSnip120uCodeResponse {});
+                    //     }
+                    //     Ok(Response::default().add_attribute("sequence", "upload_snip120u"))
+                    // // 2. if headstash has not been uploaded, this is a headstash upload callback
+                    // // This deployment sequence step will be set to true, if headstash code-id provided during ica-owner contract init.
+                    // } else
+                    if !DEPLOYMENT_SEQUENCE
                         .load(deps.storage, DeploymentSeq::UploadHeadstash.into())?
                     {
-                        // TODO: if snip120u code-id is still not set, something must have errored
-                        if ica_state.headstash_params.snip120u_code_id.is_none() {}
                         if let Some(event) = response.events.iter().find(|e| e.ty == "store_code") {
                             let code_id = event.attributes[0].value.clone();
                             // set code-id for headstash to state
@@ -1312,10 +1281,10 @@ mod tests {
         // simulated messages
         let msg_init_headstash = ExecuteMsg::InitHeadstash {};
         let msg_init_snip120u = ExecuteMsg::InitSnip120u {};
-        let msg_upload_snip120u = ExecuteMsg::UploadContractOnSecret {
-            wasm: DeploymentSeq::UploadSnip.into(),
-            cw_glob: Some(cw_glob.to_string()),
-        };
+        // let msg_upload_snip120u = ExecuteMsg::UploadContractOnSecret {
+        //     wasm: DeploymentSeq::UploadSnip.into(),
+        //     cw_glob: Some(cw_glob.to_string()),
+        // };
         let msg_upload_headstash = ExecuteMsg::UploadContractOnSecret {
             wasm: DeploymentSeq::UploadHeadstash.into(),
             cw_glob: Some(cw_glob.to_string()),
@@ -1345,7 +1314,7 @@ mod tests {
             .collect();
 
         let headstash_params = HeadstashParams {
-            snip120u_code_id: None,
+            snip120u_code_id: 369,
             headstash_code_id: None,
             headstash_addr: None,
             snip120u_code_hash: "SNIP120U_CODE_HASH".into(),
@@ -1527,13 +1496,13 @@ mod tests {
         );
 
         // UPLOAD SNIP120u
-        execute(
-            deps.as_mut(),
-            env.clone(),
-            info_owner.clone(),
-            msg_upload_snip120u,
-        )
-        .unwrap();
+        // execute(
+        //     deps.as_mut(),
+        //     env.clone(),
+        //     info_owner.clone(),
+        //     msg_upload_snip120u,
+        // )
+        // .unwrap();
         // assert correct contract value is passed in attribute
 
         // simulate ica-callback for storing the wasm blobs.
@@ -1549,51 +1518,51 @@ mod tests {
 
         let submsg = SubMsg::reply_always(msg_store_code.clone(), UPLOAD_REPLY_ID);
 
-        // simulated ibcPacketData for snip120u upload
-        let original_ica_upload_data = Response::new().add_submessage(submsg.clone());
+        // // simulated ibcPacketData for snip120u upload
+        // let original_ica_upload_data = Response::new().add_submessage(submsg.clone());
 
-        // simulated response w/ event from secret cosmwasm vm
-        let ica_upload_wasm_result = Response::<Empty>::new()
-            .add_event(Event::new("store_code").add_attribute("code_id", "369"));
+        // // simulated response w/ event from secret cosmwasm vm
+        // let ica_upload_wasm_result = Response::<Empty>::new()
+        //     .add_event(Event::new("store_code").add_attribute("code_id", "369"));
 
-        // simulate ibc-callback storing headstash code-id
-        let receive_ica_callback = ExecuteMsg::ReceiveIcaCallback(
-            IcaControllerCallbackMsg::OnAcknowledgementPacketCallback {
-                ica_acknowledgement: Data::Result(to_json_binary(&ica_upload_wasm_result).unwrap()),
-                original_packet: IbcPacket::new(
-                    to_json_binary(&original_ica_upload_data).unwrap(),
-                    ibc_endpoint_source.clone(),
-                    ibc_endpoint_counterparty.clone(),
-                    0,
-                    IbcTimeout::with_block(IbcTimeoutBlock {
-                        revision: 0,
-                        height: env.block.height.clone(),
-                    }),
-                ),
-                relayer: Addr::unchecked("based-relayer"),
-                query_result: None,
-            },
-        );
-        // println!("receive_ica_callback: {:#?}", receive_ica_callback);
+        // // simulate ibc-callback storing headstash code-id
+        // let receive_ica_callback = ExecuteMsg::ReceiveIcaCallback(
+        //     IcaControllerCallbackMsg::OnAcknowledgementPacketCallback {
+        //         ica_acknowledgement: Data::Result(to_json_binary(&ica_upload_wasm_result).unwrap()),
+        //         original_packet: IbcPacket::new(
+        //             to_json_binary(&original_ica_upload_data).unwrap(),
+        //             ibc_endpoint_source.clone(),
+        //             ibc_endpoint_counterparty.clone(),
+        //             0,
+        //             IbcTimeout::with_block(IbcTimeoutBlock {
+        //                 revision: 0,
+        //                 height: env.block.height.clone(),
+        //             }),
+        //         ),
+        //         relayer: Addr::unchecked("based-relayer"),
+        //         query_result: None,
+        //     },
+        // );
+        // // println!("receive_ica_callback: {:#?}", receive_ica_callback);
 
-        // simulate reply from cw-ica-controller
-        execute(
-            deps.as_mut(),
-            env.clone(),
-            info_ica_controller.clone(),
-            receive_ica_callback.clone(),
-        )
-        .unwrap();
+        // // simulate reply from cw-ica-controller
+        // execute(
+        //     deps.as_mut(),
+        //     env.clone(),
+        //     info_ica_controller.clone(),
+        //     receive_ica_callback.clone(),
+        // )
+        // .unwrap();
 
-        // assert correct code-id is set
-        assert_eq!(
-            ICA_STATES
-                .load(&deps.storage)
-                .unwrap()
-                .headstash_params
-                .snip120u_code_id,
-            Some(369)
-        );
+        // // assert correct code-id is set
+        // assert_eq!(
+        //     ICA_STATES
+        //         .load(&deps.storage)
+        //         .unwrap()
+        //         .headstash_params
+        //         .snip120u_code_id,
+        //     369,
+        // );
 
         let err = execute(
             deps.as_mut(),

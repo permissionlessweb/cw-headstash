@@ -55,3 +55,6 @@ Public crates are specifically built for secretVM.
 	- creates snip20 contracts for all tokens
 - create snip20s
 - connect polytone (creates headstash instance)
+
+## TODO: 
+Generic polytone callback extension

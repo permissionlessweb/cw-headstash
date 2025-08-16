@@ -2172,6 +2172,7 @@ dependencies = [
  "cosmwasm-schema",
  "cosmwasm-std",
  "cw-multi-test",
+ "cw-orch",
  "cw-ownable",
  "cw-storage-plus",
  "cw-utils",
@@ -2476,6 +2477,7 @@ version = "1.1.0"
 dependencies = [
  "anyhow",
  "cosmwasm-std",
+ "cw-glob",
  "cw-orch",
  "cw-orch-interchain",
  "headstash-public",
@@ -4413,6 +4415,7 @@ version = "1.0.0"
 dependencies = [
  "cosmwasm-schema",
  "cosmwasm-std",
+ "cw-orch",
  "cw-storage-plus",
  "thiserror 2.0.12",
 ]
@@ -9391,6 +9394,8 @@ dependencies = [
 name = "polytone"
 version = "1.0.0"
 dependencies = [
+ "anybuf",
+ "cosmos-sdk-proto 0.27.0",
  "cosmwasm-schema",
  "cosmwasm-std",
  "cw-storage-plus",

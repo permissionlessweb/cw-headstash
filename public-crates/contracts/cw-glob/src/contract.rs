@@ -9,7 +9,7 @@ use headstash_public::state::GLOB_HEADSTASH_KEY;
 use sha2::{Digest, Sha256};
 
 use crate::error::ContractError;
-use crate::msg::{ExecuteMsg, InstantiateMsg, QueryMsg};
+use crate::msg::{ExecuteMsg, InstantiateMsg, MigrateMsg, QueryMsg};
 use crate::state::{Glob, GlobHash, GLOBMAP, HASHMAP, OWNER};
 
 // version info for migration info
@@ -36,6 +36,16 @@ pub fn instantiate(
 
     Ok(res)
 }
+
+#[cfg_attr(not(feature = "library"), entry_point)]
+pub fn migrate(
+    _deps: DepsMut,
+    _env: Env,
+    msg: MigrateMsg,
+) -> Result<Response, ContractError> {
+      Ok(Response::new())
+}
+
 
 #[cfg_attr(not(feature = "library"), entry_point)]
 pub fn execute(

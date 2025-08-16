@@ -6,10 +6,9 @@ use cosmwasm_std::{
 use headstash_public::state::{Headstash, HeadstashParams, Lhsm};
 use polytone::{
     callbacks::{CallbackMessage, CallbackRequest},
-    headstash::HeadstashCallback,
+    headstash::{errors::ContractError, HeadstashCallback},
 };
 
-use crate::error::ContractError;
 #[cw_serde]
 pub struct InstantiateMsg {
     /// This contract pairs with the first voice module that a relayer
@@ -153,37 +152,37 @@ impl HeadstashNote {
         Ok(match self {
             HeadstashNote::UploadHeadstashOnSecret {} => (
                 Lhsm::Ibc,
-                vec![crate::headstash::upload_contract_on_secret(
+                vec![polytone::headstash::upload_contract_on_secret(
                     querier, storage, &info,
                 )?],
             ),
             HeadstashNote::CreateSnips {} => (
                 Lhsm::Ibc,
-                crate::headstash::create_snip120u_contract(storage, &info)?,
+                polytone::headstash::create_snip120u_contract(storage, &info)?,
             ),
             HeadstashNote::CreateHeadstash {} => (
                 Lhsm::Ibc,
-                crate::headstash::create_headstash_contract(env, storage, &info)?,
+                polytone::headstash::create_headstash_contract(storage, &info)?,
             ),
             HeadstashNote::ConfigureSnip120uMinter {} => (
                 Lhsm::Ibc,
-                crate::headstash::authorize_headstash_as_snip_minter(storage, &info)?,
+                polytone::headstash::authorize_headstash_as_snip_minter(storage, &info)?,
             ),
             HeadstashNote::AddHeadstashes { to_add } => (
                 Lhsm::Ibc,
-                crate::headstash::add_headstash_claimers(storage, to_add, &info)?,
+                polytone::headstash::add_headstash_claimers(storage, to_add, &info)?,
             ),
             HeadstashNote::AuthorizeFeeGrants { to_grant, .. } => (
                 Lhsm::Ibc,
-                crate::headstash::authorize_feegrants(storage, &info, to_grant)?,
+                polytone::headstash::authorize_feegrants(storage, &info, to_grant)?,
             ),
             HeadstashNote::AuthzDeployer { grantee } => (
                 Lhsm::Ibc,
-                crate::headstash::grant_authz_for_deployer(storage, &info, grantee)?,
+                polytone::headstash::grant_authz_for_deployer(storage, &info, grantee)?,
             ),
             HeadstashNote::FundHeadstash {} => (
                 Lhsm::Local,
-                crate::headstash::fund_headstash(
+                polytone::headstash::fund_headstash(
                     storage,
                     &env.contract.address,
                     info.funds,

@@ -1,12 +1,9 @@
 use cosmwasm_std::Storage;
 use cw_storage_plus::{Item, Map};
-use polytone::callbacks::CallbackMessage;
-
-use crate::error::ContractError;
+use polytone::{callbacks::CallbackMessage, headstash::errors::ContractError};
 
 /// (initiator, initiator_msg) -> callback
 pub(crate) const RESULTS: Map<(String, String), CallbackMessage> = Map::new("results");
-pub const GRANTEE: Item<String> = Item::new("grantee");
 
 /// (Connection-ID, Remote port) of this contract's pair.
 pub const CONNECTION_REMOTE_PORT: Item<(String, String)> = Item::new("a");
@@ -36,40 +33,4 @@ pub(crate) fn increment_sequence_number(
         .ok_or(ContractError::SequenceOverflow)?;
     SEQUENCE_NUMBER.save(storage, channel_id, &seq)?;
     Ok(seq)
-}
-
-#[cosmwasm_schema::cw_serde]
-pub enum HeadstashSeq {
-    UploadSnip,
-    UploadHeadstash,
-    InitSnips,
-    InitHeadstash,
-}
-
-impl From<HeadstashSeq> for String {
-    fn from(ds: HeadstashSeq) -> Self {
-        match ds {
-            HeadstashSeq::UploadSnip => "snip120u".to_string(),
-            HeadstashSeq::UploadHeadstash => "cw-headstash".to_string(),
-            HeadstashSeq::InitSnips => "snip120u-init-".to_string(),
-            HeadstashSeq::InitHeadstash => "cw-headstash-init".to_string(),
-        }
-    }
-}
-impl HeadstashSeq {
-    pub fn indexed_snip(&self, i: usize) -> String {
-        match self {
-            HeadstashSeq::InitSnips => format!("snip120u-init-{}", i),
-            _ => panic!("Invalid HeadstashSequence formatted_str value"),
-        }
-    }
-}
-
-pub mod headstash {
-    use headstash_public::state::Headstash;
-
-    #[cosmwasm_schema::cw_serde]
-    pub enum ExecuteMsg {
-        AddEligibleHeadStash { headstash: Vec<Headstash> },
-    }
 }

@@ -31,7 +31,6 @@ pub const GRANTEE: Item<String> = Item::new("grantee");
 
 #[cw_serde]
 pub enum DeploymentSeq {
-    UploadSnip,
     UploadHeadstash,
     InitSnips,
     InitHeadstash,
@@ -40,7 +39,6 @@ pub enum DeploymentSeq {
 impl From<DeploymentSeq> for String {
     fn from(ds: DeploymentSeq) -> Self {
         match ds {
-            DeploymentSeq::UploadSnip => "snip120u".to_string(),
             DeploymentSeq::UploadHeadstash => "cw-headstash".to_string(),
             DeploymentSeq::InitSnips => "snip120u-init-".to_string(),
             DeploymentSeq::InitHeadstash => "cw-headstash-init".to_string(),

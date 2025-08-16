@@ -1,15 +1,13 @@
 use std::path::PathBuf;
 
-use crate::{PolytoneConnection, PolytoneNote, PolytoneProxy, PolytoneVoice};
-use cosmwasm_std::{Addr, IbcOrder};
+use crate::{HeadstashGlob, PolytoneNote, PolytoneProxy, PolytoneVoice};
+use cosmwasm_std::Addr;
 use cw_orch::{
     contract::Deploy,
     prelude::{
         ConditionalUpload, ContractInstance, CwEnv, CwOrchError, CwOrchInstantiate, CwOrchUpload,
-        Environment,
     },
 };
-use cw_orch_interchain::core::{IbcQueryHandler, InterchainEnv, InterchainError};
 use headstash_public::state::HeadstashParams;
 
 use crate::Polytone;
@@ -17,6 +15,7 @@ use crate::Polytone;
 pub const POLYTONE_NOTE: &str = "polytone:note";
 pub const POLYTONE_VOICE: &str = "polytone:voice";
 pub const POLYTONE_PROXY: &str = "polytone:proxy";
+pub const HEADSTASH_GLOB: &str = "headstash:glob";
 
 pub const MAX_BLOCK_GAS: u64 = 100_000_000;
 
@@ -86,8 +85,14 @@ impl<Chain: CwEnv> Polytone<Chain> {
         let note = PolytoneNote::new(POLYTONE_NOTE, chain.clone());
         let voice = PolytoneVoice::new(POLYTONE_VOICE, chain.clone());
         let proxy = PolytoneProxy::new(POLYTONE_PROXY, chain.clone());
+        let glob = HeadstashGlob::new(HEADSTASH_GLOB, chain.clone());
 
-        Polytone { note, voice, proxy }
+        Polytone {
+            note,
+            voice,
+            proxy,
+            glob,
+        }
     }
 
     pub fn deployed_state_file_path() -> Option<String> {
@@ -148,6 +153,7 @@ impl<Chain: CwEnv> Polytone<Chain> {
         )
     }
 
+    /// ONLY USE ON NON SECRET-VM INSTANCES
     pub(crate) fn instantiate_voice(
         &self,
         admin: Option<String>,

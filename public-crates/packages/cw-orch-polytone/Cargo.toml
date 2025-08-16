@@ -18,6 +18,6 @@ cosmwasm-std = { version = "2.2.2", features = ["stargate"] }
 polytone-note = {  version = "1.1.0", path = "../../contracts/polytone/contracts/note", features=["interface"] }
 polytone-proxy = { version = "1.1.0", path = "../../contracts/polytone/contracts/proxy", features=["interface"] }
 polytone-voice  = { version = "1.1.0", path =  "../../contracts/polytone/contracts/voice", features=["interface"] }
-
+cw-glob = { path = "../../contracts/cw-glob", features=["library"] }
 [dev-dependencies]
 anyhow = { version = "1.0.51" }

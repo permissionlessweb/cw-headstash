@@ -113,7 +113,7 @@ pub struct HeadstashParams {
     /// The contract addr for cw-glob on the native chain.
     pub cw_glob: Addr,
     /// The code ID of the snip120u contract, on Secret Network.
-    pub snip120u_code_id: Option<u64>,
+    pub snip120u_code_id: u64,
     /// The code hash of the snip120u contract, on Secret Network. Not optional for pre-deployment verification
     pub snip120u_code_hash: String,
     /// Code id of Headstash contract on Secret Network
@@ -137,7 +137,7 @@ impl HeadstashParams {
     /// creates new headstash param instance
     pub fn new(
         cw_glob: Addr,
-        snip120u_code_id: Option<u64>,
+        snip120u_code_id: u64,
         headstash_code_id: Option<u64>,
         headstash_init_config: HeadstashInitConfig,
         snip120u_code_hash: String,

@@ -4,8 +4,12 @@ use cosmwasm_std::{
     StdResult, Storage, SubMsgResponse, Uint64, WasmMsg,
 };
 use cw_storage_plus::Map;
+use headstash_public::state::HeadstashParams;
 
-use crate::{ack::unmarshal_ack, headstash::HeadstashCallback};
+use crate::{
+    ack::unmarshal_ack,
+    headstash::{HeadstashCallback, HEADSTASH_PARAMS},
+};
 
 /// Executed on the callback receiver upon message completion. When
 /// being executed, the message will be tagged with "callback":
@@ -175,6 +179,7 @@ pub fn on_timeout(
     Some(callback_message(request, result))
 }
 
+// TODO: implement generic callback request structure,
 fn callback_message(request: PendingCallback, result: Callback) -> CosmosMsg {
     /// Gives the executed message a "callback" tag:
     /// `{ "callback": CallbackMsg }`.
@@ -214,7 +219,7 @@ fn callback_message(request: PendingCallback, result: Callback) -> CosmosMsg {
                     }
                     202 => {
                         let mut snip20_addrs = Vec::new();
-                        //
+                        // only one smart contract is expected to be instantiated at a time?
                         for res in &cb_res.result {
                             snip20_addrs.push(res
                             .events
@@ -229,8 +234,8 @@ fn callback_message(request: PendingCallback, result: Callback) -> CosmosMsg {
                         }
 
                         to_json_binary(&C::HeadstashCallback(
-                            HeadstashCallback::CreatedSnip20ContractAddrs {
-                                addrs: snip20_addrs,
+                            HeadstashCallback::CreatedSnip20ContractAddr {
+                                addr: snip20_addrs[0].clone(),
                             },
                         ))
                     }

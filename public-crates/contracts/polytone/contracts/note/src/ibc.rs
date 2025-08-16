@@ -5,12 +5,9 @@ use cosmwasm_std::{
     IbcChannelOpenResponse, IbcPacketAckMsg, IbcPacketReceiveMsg, IbcPacketTimeoutMsg,
     IbcReceiveResponse, Never, Reply, Response, SubMsg,
 };
-use polytone::{accounts, callbacks, handshake::note};
+use polytone::{accounts, callbacks, handshake::note, headstash::errors::ContractError};
 
-use crate::{
-    error::ContractError,
-    state::{BLOCK_MAX_GAS, CHANNEL, CONNECTION_REMOTE_PORT},
-};
+use crate::state::{BLOCK_MAX_GAS, CHANNEL, CONNECTION_REMOTE_PORT};
 
 /// The amount of gas that needs to be reserved for handling a
 /// callback error in the reply method. See `TestNoteOutOfGas` in the

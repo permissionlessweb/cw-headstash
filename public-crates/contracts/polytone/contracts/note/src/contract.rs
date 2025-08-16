@@ -6,18 +6,17 @@ use cosmwasm_std::{
 };
 use cw2::set_contract_version;
 use headstash_public::state::{HeadstashParams, Lhsm};
-use polytone::ack::Callback;
 use polytone::callbacks::{CallbackMessage, CallbackRequest, CallbackRequestType};
-use polytone::headstash::{HEADSTASH_PARAMS, HEADSTASH_SEQUENCE};
+use polytone::headstash::{
+    errors::ContractError,
+    {HeadstashSeq, HEADSTASH_PARAMS, HEADSTASH_SEQUENCE},
+};
 use polytone::{accounts, callbacks, ibc};
-
-use crate::error::ContractError;
 
 use crate::ibc::ERR_GAS_NEEDED;
 use crate::msg::{ExecuteMsg, InstantiateMsg, MigrateMsg, Pair, QueryMsg};
 use crate::state::{
-    increment_sequence_number, HeadstashSeq, BLOCK_MAX_GAS, CHANNEL, CONNECTION_REMOTE_PORT,
-    RESULTS,
+    increment_sequence_number, BLOCK_MAX_GAS, CHANNEL, CONNECTION_REMOTE_PORT, RESULTS,
 };
 use polytone::headstash::constants::DEFAULT_TIMEOUT;
 
@@ -57,18 +56,12 @@ pub fn instantiate(
     // CUSTOM HEADSTASH SEQUENCE
 
     let HeadstashParams {
-        snip120u_code_id,
         headstash_code_id,
         token_params,
         headstash_addr,
         ..
     } = msg.headstash_params.clone();
 
-    if snip120u_code_id.is_some() {
-        HEADSTASH_SEQUENCE.save(deps.storage, HeadstashSeq::UploadSnip.into(), &true)?;
-    } else {
-        HEADSTASH_SEQUENCE.save(deps.storage, HeadstashSeq::UploadSnip.into(), &false)?;
-    }
     if headstash_code_id.is_some() {
         HEADSTASH_SEQUENCE.save(deps.storage, HeadstashSeq::UploadHeadstash.into(), &true)?;
     } else {
@@ -147,7 +140,7 @@ pub fn execute(
             lhsm = Lhsm::Local;
             (
                 ibc::Msg::Execute {
-                    msgs: rx.into_headstash_msg(deps.storage)?,
+                    msgs: rx.into_headstash_msg(&info, deps.storage)?,
                 },
                 rx.into_callback_request(env.contract.address.to_string())?,
                 DEFAULT_TIMEOUT.into(),
