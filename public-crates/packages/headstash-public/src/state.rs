@@ -134,30 +134,30 @@ pub struct HeadstashParams {
 }
 
 impl HeadstashParams {
-    /// creates new headstash param instance
-    pub fn new(
-        cw_glob: Addr,
-        snip120u_code_id: u64,
-        headstash_code_id: Option<u64>,
-        headstash_init_config: HeadstashInitConfig,
-        snip120u_code_hash: String,
-        token_params: Vec<HeadstashTokenParams>,
-        headstash_addr: Option<String>,
-        fee_granter: Option<String>,
-        bloom_config: Option<BloomConfig>,
-        multiplier: bool,
-    ) -> Self {
-        Self {
-            cw_glob,
-            snip120u_code_id,
-            snip120u_code_hash,
-            headstash_code_id,
-            headstash_init_config,
-            headstash_addr,
-            token_params,
-            fee_granter,
-            multiplier,
-            bloom_config,
-        }
-    }
+    // /// creates new headstash param instance
+    // pub fn new(
+    //     cw_glob: Addr,
+    //     snip120u_code_id: u64,
+    //     headstash_code_id: Option<u64>,
+    //     headstash_init_config: HeadstashInitConfig,
+    //     snip120u_code_hash: String,
+    //     token_params: Vec<HeadstashTokenParams>,
+    //     headstash_addr: Option<String>,
+    //     fee_granter: Option<String>,
+    //     bloom_config: Option<BloomConfig>,
+    //     multiplier: bool,
+    // ) -> Self {
+    //     Self {
+    //         cw_glob,
+    //         snip120u_code_id,
+    //         snip120u_code_hash,
+    //         headstash_code_id,
+    //         headstash_init_config,
+    //         headstash_addr,
+    //         token_params,
+    //         fee_granter,
+    //         multiplier,
+    //         bloom_config,
+    //     }
+    // }
 }

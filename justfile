@@ -1,16 +1,18 @@
- 
 
 fmt:
-    cargo fmt --all --check
-
-fmt-fix:
-    cargo fmt --all
+  #!/bin/sh
+  cd public-crates && cargo fmt --all --check
+  cd ../secret-crates && cargo fmt --all --check
+  #  cd ../scripts && cargo fmt --all --check
 
 test:
     cargo test --locked
 
 lint:
-    cargo clippy --tests -- -D warnings
+  #!/bin/sh
+    cd public-crates && cargo clippy --fix --tests -- -D warnings 
+    cd ../secret=crates && cargo clippy --fix --tests -- -D warnings
+   
 
 build:
     cargo build --release --locked --target wasm32-unknown-unknown

@@ -224,7 +224,7 @@ pub async fn deploy_polytone(networks: Vec<ChainInfoOwned>) -> anyhow::Result<()
 
 
     // give cw-glob the secret headstash contract
-    terp_polytone.glob.
+    // terp_polytone.glob.
     // upload headstash on secret network via our polytone headstash note
 
     Ok(())
