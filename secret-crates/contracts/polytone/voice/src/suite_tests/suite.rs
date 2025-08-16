@@ -127,7 +127,7 @@ impl Suite {
                 block_max_gas: block_max_gas.into(),
                 contract_addr_len,
             },
-            self.voice_code.code_id.clone(),
+            self.voice_code.code_id,
         )
     }
 }

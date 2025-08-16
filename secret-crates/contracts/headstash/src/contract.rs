@@ -24,13 +24,13 @@ pub fn instantiate(
 ) -> StdResult<Response> {
     let start_date = match msg.start_date {
         None => env.block.time.seconds(),
-        Some(date) => date.into(),
+        Some(date) => date,
     };
 
     validation::validate_plaintext_msg(msg.claim_msg_plaintext.clone())?;
     let mut unique_snips: Vec<crate::state::snip::Snip120u> = Vec::new();
 
-    if msg.snips.len() == 0 {
+    if msg.snips.is_empty() {
         return Err(StdError::generic_err("must provide atleast 1 snip120u"));
     }
     for snip in msg.snips.clone() {
@@ -110,20 +110,14 @@ pub fn query(deps: Deps, _env: Env, msg: QueryMsg) -> StdResult<Binary> {
 
 #[cfg_attr(not(feature = "library"), entry_point)]
 pub fn reply(_deps: DepsMut, _env: Env, reply: Reply) -> StdResult<Response> {
-    match reply.id {
-        _ => {
-            return Err(StdError::GenericErr {
-                msg: "bad reply".into(),
-            })
-        }
-    }
+    Err(StdError::GenericErr {
+        msg: "bad reply".into(),
+    })
 }
 
 #[cfg_attr(not(feature = "library"), entry_point)]
 pub fn migrate(_deps: DepsMut, _env: Env, msg: MigrateMsg) -> StdResult<Response> {
-    match msg {
-        _ => Err(StdError::generic_err("unimplemented")),
-    }
+    Err(StdError::generic_err("unimplemented"))
 }
 
 pub mod headstash {
@@ -157,7 +151,7 @@ pub mod headstash {
         // randomly select point in headstash array to start from.
         let hsl = headstash.len();
 
-        let rsp = utils::random_starting_point(rng, hsl.clone(), RANDOM_STRING.load(deps.storage)?);
+        let rsp = utils::random_starting_point(rng, hsl, RANDOM_STRING.load(deps.storage)?);
         add_headstash_to_state(deps, hsl, rsp, headstash.clone(), config.snip120us)?;
 
         Ok(Response::default())
@@ -187,7 +181,7 @@ pub mod headstash {
                     // match current snip with one in eligible to get the total_amount
                     let matching_snip = eligible
                         .iter()
-                        .find(|es| es.addr.to_string() == snip.contract)
+                        .find(|es| es.addr == snip.contract)
                         .ok_or_else(|| StdError::generic_err("No matching snip found"))?;
 
                     SNIP_COUNT
@@ -363,9 +357,9 @@ pub mod headstash {
             return Err(ContractError::ClawbackUnavailable {});
         }
 
-        return Ok(Response::default()
+        Ok(Response::default()
             .add_messages(msgs)
-            .add_event(Event::new("clawback").add_attributes(attrs)));
+            .add_event(Event::new("clawback").add_attributes(attrs)))
     }
 }
 
@@ -518,7 +512,7 @@ pub mod validation {
         match hex::decode(offline_sig.clone()) {
             Ok(eth_sig_hex) => verify_ethereum_text(api, &plaintext_msg, &eth_sig_hex, &signer),
             Err(_) => Err(StdError::InvalidHex {
-                msg: format!("Could not decode the eth signature"),
+                msg: "Could not decode the eth signature".to_string(),
             }),
         }
     }
@@ -555,9 +549,9 @@ pub mod ibc_bloom {
             .add_suffix(sig_addr.as_bytes())
             .update(storage, |a| {
                 if a < bloom_total {
-                    return Err(StdError::generic_err(
+                    Err(StdError::generic_err(
                         "You are trying to bloom more than eligible for this snip120u",
-                    ));
+                    ))
                 } else {
                     let new = a - bloom_total;
                     Ok(new)
@@ -620,7 +614,7 @@ pub mod ibc_bloom {
                 return Err(ContractError::BloomTotalError {});
             }
 
-            let key = msg.entropy_key.clamp(1, 10) as u64;
+            let key = msg.entropy_key.clamp(1, 10);
 
             // add default cadance to user defined cadance
             let cadance = match msg.cadance > 0u64 {
@@ -758,7 +752,6 @@ pub mod ibc_bloom {
                             .snip120us
                             .iter()
                             .find(|f| f.addr == token_addr)
-                            .map(|f| f)
                             .unwrap_or_else(|| panic!("No matching contract address found"));
                         // form redeem msg for this contract to redeem on behalf of bloomer
                         let msg = crate::msg::snip::ExecuteMsg::RedeemFrom {
@@ -881,7 +874,7 @@ pub mod utils {
         let r = prng.rand_bytes();
         if let Some(x) = r.get(10) {
             if x % 3 == 0 {
-                bonus = bonus + Decimal::percent(25) // 1.25%
+                bonus += Decimal::percent(25) // 1.25%
             }
         }
         bonus
@@ -921,7 +914,7 @@ pub mod utils {
 
         let missing = block_size - surplus;
         message.reserve(missing);
-        message.extend(std::iter::repeat(b' ').take(missing));
+        message.extend(std::iter::repeat_n(b' ', missing));
         message
     }
 }
@@ -1538,7 +1531,7 @@ mod tests {
 
         // move forward minimum cadance, hs1 still should not process
 
-        env.block.height = env.block.height + constants.bloom.unwrap().default_cadance;
+        env.block.height += constants.bloom.unwrap().default_cadance;
         let res = execute(
             deps.as_mut(),
             env.clone(),
@@ -1549,7 +1542,7 @@ mod tests {
         assert_eq!(res.messages.len(), 0);
 
         // now process bloom msg
-        env.block.height = env.block.height + 3;
+        env.block.height += 3;
         let res = execute(
             deps.as_mut(),
             env.clone(),
@@ -1811,7 +1804,7 @@ mod tests {
         .expect_err("you cannot clawback the headstash, silly");
 
         //cannot clawback until its over
-        let info = mock_info(&constants.owner.to_string(), &[]);
+        let info = mock_info(constants.owner.as_ref(), &[]);
         execute(
             deps.as_mut(),
             env.clone(),

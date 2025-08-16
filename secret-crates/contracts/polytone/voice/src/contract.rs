@@ -243,11 +243,11 @@ fn proxy_submessage_helper(
             },
             REPLY_FORWARD_DATA,
         );
-        return Ok((submsg, vec![]));
+        Ok((submsg, vec![]))
     } else if let Some(init_msg) = instantate_msg {
         // pass instantiate msg first, save msgs to pass to proxy once instantiated to state
         let submsg: SubMsg<Empty> = SubMsg::reply_always(init_msg, REPLY_INIT_PROXY);
-        if msgs.len() != 0 {
+        if !msgs.is_empty() {
             PENDING_PROXY_TXS.save(storage, &to_binary(&msgs)?)?;
         }
         return Ok((

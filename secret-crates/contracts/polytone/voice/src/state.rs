@@ -1,4 +1,4 @@
-use cosmwasm_std::{Addr, Binary, SubMsgResponse};
+use cosmwasm_std::{Addr, Binary};
 use secret_toolkit::storage::{Item, Keymap};
 
 // SENDER_TO_PROXY

@@ -1,5 +1,5 @@
 use cosmwasm_schema::{cw_serde, QueryResponses};
-use cosmwasm_std::{Addr, Binary, Uint64};
+use cosmwasm_std::{Binary, Uint64};
 
 use crate::state::SenderInfo;
 
