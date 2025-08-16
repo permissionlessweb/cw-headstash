@@ -1,0 +1,18 @@
+#!/bin/bash
+ 
+schema:
+    sh ../scripts/tools/secret-crates.sh
+
+publish:
+    #!/usr/bin/env bash
+    crates=(
+      bs721
+      bs721-base
+    )
+
+    for crate in "${crates[@]}"; do
+      cargo publish -p "$crate"
+      echo "Sleeping before publishing the next crate..."
+      sleep 30
+    done
+

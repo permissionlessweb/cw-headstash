@@ -12,8 +12,6 @@ version      = { workspace = true }
 crate-type = ["cdylib", "rlib"]
 
 [features]
-# for more explicit tests, cargo test --features=backtraces
-backtraces = ["cosmwasm-std/backtraces"]
 # disables #[entry_point] (i.e. instantiate/execute/query) export
 library = []
 interface = ["dep:cw-orch"]
@@ -39,7 +37,7 @@ cw-storage-plus = { workspace = true }
 cw-utils        = { workspace = true }
 cw2             = { workspace = true }
 polytone        = { workspace = true }
-polytone-proxy  = { workspace = true }
+polytone-proxy  = { workspace = true , features = ["library"] }
 sha2            = { workspace = true }
 thiserror       = { workspace = true }
 

@@ -3,10 +3,9 @@ name         = "polytone-note"
 authors      = ["ekez <ekez@withoutdoing.com>"]
 description  = "Sends messages to be executed on other chains over IBC."
 edition = "2021"
-license      = { workspace = true }
-rust-version = { workspace = true }
-repository   = { workspace = true }
-version      = { workspace = true }
+# repository   = { workspace = true }
+# license      = { workspace = true }
+# version      = { workspace = true }
 
 [lib]
 crate-type = ["cdylib", "rlib"]

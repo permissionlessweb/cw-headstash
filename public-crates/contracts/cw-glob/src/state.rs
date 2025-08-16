@@ -22,17 +22,21 @@ pub struct GlobHash {
     pub hash: String,
 }
 
-#[test]
-fn test_raw_query() {
-    let mut deps = mock_dependencies();
-    let mut storage = deps.storage;
-    let key = "headstash".to_string();
+mod test {
+    use super::*;
 
-    HASHMAP
-        .save(&mut storage, key.to_string(), &"babberitus".into())
-        .unwrap();
+    #[test]
+    fn test_raw_query() {
+        let mut deps = cosmwasm_std::testing::mock_dependencies();
+        let mut storage = deps.storage;
+        let key = "headstash".to_string();
 
-    let storage_key = HASHMAP.key(key).to_vec();
-    println!("Raw key bytes: {:?}", storage_key);
-    println!("Hex: {}", Binary::new(storage_key).to_base64());
+        HASHMAP
+            .save(&mut storage, key.to_string(), &"babberitus".into())
+            .unwrap();
+
+        let storage_key = HASHMAP.key(key).to_vec();
+        println!("Raw key bytes: {:?}", storage_key);
+        println!("Hex: {}", Binary::new(storage_key).to_base64());
+    }
 }

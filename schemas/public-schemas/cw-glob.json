@@ -1,0 +1,203 @@
+{
+  "contract_name": "cw-glob",
+  "contract_version": "0.1.0",
+  "idl_version": "1.0.0",
+  "instantiate": {
+    "$schema": "http://json-schema.org/draft-07/schema#",
+    "title": "InstantiateMsg",
+    "type": "object",
+    "required": [
+      "owners"
+    ],
+    "properties": {
+      "owners": {
+        "type": "array",
+        "items": {
+          "type": "string"
+        }
+      }
+    },
+    "additionalProperties": false
+  },
+  "execute": {
+    "$schema": "http://json-schema.org/draft-07/schema#",
+    "title": "ExecuteMsg",
+    "oneOf": [
+      {
+        "type": "object",
+        "required": [
+          "add_glob"
+        ],
+        "properties": {
+          "add_glob": {
+            "type": "object",
+            "required": [
+              "globs"
+            ],
+            "properties": {
+              "globs": {
+                "type": "array",
+                "items": {
+                  "$ref": "#/definitions/Glob"
+                }
+              }
+            },
+            "additionalProperties": false
+          }
+        },
+        "additionalProperties": false
+      },
+      {
+        "type": "object",
+        "required": [
+          "hash_glob"
+        ],
+        "properties": {
+          "hash_glob": {
+            "type": "object",
+            "required": [
+              "keys"
+            ],
+            "properties": {
+              "keys": {
+                "description": "glob to generate hash of.",
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              }
+            },
+            "additionalProperties": false
+          }
+        },
+        "additionalProperties": false
+      },
+      {
+        "type": "object",
+        "required": [
+          "take_glob"
+        ],
+        "properties": {
+          "take_glob": {
+            "type": "object",
+            "required": [
+              "key",
+              "sender"
+            ],
+            "properties": {
+              "key": {
+                "description": "The wasm blob key to upload.",
+                "type": "string"
+              },
+              "memo": {
+                "description": "Optional memo to pass in ica-account",
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "sender": {
+                "description": "Address to include in the CosmosMsg with the wasm blob. For cw-headstash, this will be the ica account on the host chain.",
+                "type": "string"
+              },
+              "timeout": {
+                "description": "Optional timeout in seconds to include with the ibc packet. If not specified, the [default timeout](crate::ibc::types::packet::DEFAULT_TIMEOUT_SECONDS) is used.",
+                "type": [
+                  "integer",
+                  "null"
+                ],
+                "format": "uint64",
+                "minimum": 0.0
+              }
+            },
+            "additionalProperties": false
+          }
+        },
+        "additionalProperties": false
+      }
+    ],
+    "definitions": {
+      "Binary": {
+        "description": "Binary is a wrapper around Vec<u8> to add base64 de/serialization with serde. It also adds some helper methods to help encode inline.\n\nThis is only needed as serde-json-{core,wasm} has a horrible encoding for Vec<u8>. See also <https://github.com/CosmWasm/cosmwasm/blob/main/docs/MESSAGE_TYPES.md>.",
+        "type": "string"
+      },
+      "Glob": {
+        "type": "object",
+        "required": [
+          "blob",
+          "key"
+        ],
+        "properties": {
+          "blob": {
+            "description": "The wasm",
+            "allOf": [
+              {
+                "$ref": "#/definitions/Binary"
+              }
+            ]
+          },
+          "key": {
+            "description": "The key used to store the blob",
+            "type": "string"
+          }
+        },
+        "additionalProperties": false
+      }
+    }
+  },
+  "query": {
+    "$schema": "http://json-schema.org/draft-07/schema#",
+    "title": "QueryMsg",
+    "oneOf": [
+      {
+        "description": "Retrieves the sha256sum hash of stored globs",
+        "type": "object",
+        "required": [
+          "glob_hash"
+        ],
+        "properties": {
+          "glob_hash": {
+            "type": "object",
+            "required": [
+              "keys"
+            ],
+            "properties": {
+              "keys": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              }
+            },
+            "additionalProperties": false
+          }
+        },
+        "additionalProperties": false
+      }
+    ]
+  },
+  "migrate": null,
+  "sudo": null,
+  "responses": {
+    "glob_hash": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "title": "GlobHash",
+      "type": "object",
+      "required": [
+        "hash",
+        "key"
+      ],
+      "properties": {
+        "hash": {
+          "description": "The hash of the wasm blob",
+          "type": "string"
+        },
+        "key": {
+          "description": "The key used to store the blob",
+          "type": "string"
+        }
+      },
+      "additionalProperties": false
+    }
+  }
+}

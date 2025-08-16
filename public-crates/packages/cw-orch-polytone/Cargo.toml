@@ -9,15 +9,15 @@ version = "1.1.0"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-cw-orch = { version = "0.28.0", features=["daemon"] }
-cw-orch-interchain = { version = "0.9.0", features = ["daemon"] }
+cosmwasm-std = { workspace = true, features = ["stargate"] }
+cw-orch = { workspace = true, features=["daemon"] }
+cw-orch-interchain = { workspace = true, features = ["daemon"] }
 
+headstash-public = { workspace = true}
+polytone-note = {    workspace = true, features=["interface"] }
+polytone-proxy = {   workspace = true,  features=["interface"] }
+polytone-voice  = {  workspace = true,  features=["interface"] }
+cw-glob = { workspace = true, features=["library"] }
 
-headstash-public = { path = "../headstash-public"}
-cosmwasm-std = { version = "2.2.2", features = ["stargate"] }
-polytone-note = {  version = "1.1.0", path = "../../contracts/polytone/contracts/note", features=["interface"] }
-polytone-proxy = { version = "1.1.0", path = "../../contracts/polytone/contracts/proxy", features=["interface"] }
-polytone-voice  = { version = "1.1.0", path =  "../../contracts/polytone/contracts/voice", features=["interface"] }
-cw-glob = { path = "../../contracts/cw-glob", features=["library"] }
 [dev-dependencies]
 anyhow = { version = "1.0.51" }

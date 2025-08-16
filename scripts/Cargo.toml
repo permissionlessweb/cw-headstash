@@ -17,9 +17,9 @@ cw-orch-interchain = {version = "0.9.0", features = ["daemon"]}
 cw-orch-polytone = {path = "../public-crates/packages/cw-orch-polytone"}
 
 polytone = {path = "../public-crates/packages/polytone"}
-polytone-note  = {path = "../public-crates/contracts/polytone/contracts/note", features=["interface"] }
-polytone-proxy = {path = "../public-crates/contracts/polytone/contracts/proxy", features=["interface"] }
-polytone-voice = {path = "../public-crates/contracts/polytone/contracts/voice", features=["interface"] }
+polytone-note  = {path = "../public-crates/contracts/polytone/note", features=["interface"] }
+polytone-proxy = {path = "../public-crates/contracts/polytone/proxy", features=["interface"] }
+polytone-voice = {path = "../public-crates/contracts/polytone/voice", features=["interface"] }
 cw-glob = {path = "../public-crates/contracts/cw-glob", features=["library"] }
 
 cw-headstash = {path = "../secret-crates/contracts/headstash"}
@@ -51,9 +51,3 @@ path = "src/bin/3_b_init_snip120u.rs"
 [[bin]]
 name = "create-headstash"
 path = "src/bin/3_c_init_headstash.rs"
-[[bin]]
-name = "authorize-headstash-as-minter"
-path = "src/bin/3_d_authorize_minters.rs"
-[[bin]]
-name = "add-eligible-addrs"
-path = "src/bin/3_d_authorize_minters.rs"

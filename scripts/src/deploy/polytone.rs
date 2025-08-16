@@ -9,7 +9,7 @@ use cosmwasm_schema::cw_serde;
 use cosmwasm_std::{to_json_binary, Addr, IbcOrder};
 use cw_glob::msg::InstantiateMsg;
 use cw_orch_polytone::deploy::MAX_BLOCK_GAS;
-use cw_orch_polytone::{PolytoneConnection, PolytoneVoice};
+use cw_orch_polytone::PolytoneConnection;
 // use cw_ica_controller::types::msg::options::ChannelOpenInitOptions;
 use cw_orch::prelude::{ChainInfo, ChainInfoOwned, CwOrchInstantiate, Environment};
 use cw_orch::{daemon::TxSender, prelude::CwOrchUpload};
@@ -221,7 +221,6 @@ pub async fn deploy_polytone(networks: Vec<ChainInfoOwned>) -> anyhow::Result<()
 
     res.interchain_channel.port_a;
     res.interchain_channel.port_b;
-
 
     // give cw-glob the secret headstash contract
     // terp_polytone.glob.

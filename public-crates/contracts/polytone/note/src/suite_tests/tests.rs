@@ -1,6 +1,7 @@
 use cosmwasm_std::{Addr, Uint64};
+use polytone::headstash::errors::ContractError;
 
-use crate::{error::ContractError, msg::Pair};
+use crate::msg::Pair;
 
 use super::suite::{SuiteBuilder, CREATOR_ADDR};
 

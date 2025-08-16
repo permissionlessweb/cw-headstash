@@ -1,3 +1,4 @@
+#!/bin/bash
 
 fmt:
   #!/bin/sh
@@ -5,47 +6,36 @@ fmt:
   cd ../secret-crates && cargo fmt --all --check
   #  cd ../scripts && cargo fmt --all --check
 
-test:
-    cargo test --locked
+schema:
+    #!/usr/bin/env bash
+    sh scripts/tools/schema.sh
 
 lint:
   #!/bin/sh
     cd public-crates && cargo clippy --fix --tests -- -D warnings 
     cd ../secret-crates && cargo clippy --fix --tests -- -D warnings
    
-
 build:
-    cargo build --release --locked --target wasm32-unknown-unknown
+    #!/bin/sh
+    # a. build private crates first. use workspace optimizer
+    cd secret-crates && make build-mainnet-reproducible
+    # b. copy compiled binary into cw-glob path
+    mv ./optimized-wasm/cw_headstash.wasm.gz ../public-crates/contracts/cw-glob/src/globs/cw_headstash.wasm.gz &&
+    # build public crates
+    cd ../public-crates && just optimize
 
-optimize:
-    #!/usr/bin/env bash
-    if [[ $(arch) == "arm64" ]]; then
-      image="cosmwasm/workspace-optimizer-arm64"
-      platform="linux/arm64"
-    else
-      image="cosmwasm/workspace-optimizer"
-      platform="linux/amd64"
-    fi
+test:
+    cargo test --locked
 
-    docker run --rm -v "$(pwd)":/code \
-      --mount type=volume,source="$(basename "$(pwd)")_cache",target=/code/target \
-      --mount type=volume,source=registry_cache,target=/usr/local/cargo/registry \
-      --platform ${platform} \
-      ${image}:0.16.1
+# publish:
+#     #!/usr/bin/env bash
+#     crates=(
+ 
+#     )
 
-schema:
-    #!/usr/bin/env bash
-    sh scripts/schema-codegen.sh
+#     for crate in "${crates[@]}"; do
+#       cargo publish -p "$crate"
+#       echo "Sleeping before publishing the next crate..."
+#       sleep 30
+#     done
 
-publish:
-    #!/usr/bin/env bash
-    crates=(
-      bs721
-      bs721-base
-    )
-
-    for crate in "${crates[@]}"; do
-      cargo publish -p "$crate"
-      echo "Sleeping before publishing the next crate..."
-      sleep 30
-    done

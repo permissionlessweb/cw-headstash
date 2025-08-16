@@ -83,12 +83,16 @@ pub enum ExecuteMsg {
     // ReceiveIcaCallback(IcaControllerCallbackMsg),
 }
 
-#[derive(Serialize, Deserialize, Clone, Debug, Eq, PartialEq, JsonSchema)]
+#[derive(cosmwasm_schema::QueryResponses, Serialize, Deserialize, Clone, Debug, Eq, PartialEq, JsonSchema)]
 #[serde(rename_all = "snake_case")]
 pub enum QueryMsg {
+    #[returns(QueryAnswer)]
     Config {},
+    #[returns(QueryAnswer)]
     Dates {},
+    #[returns(QueryAnswer)]
     Clawback {},
+    #[returns(QueryAnswer)]
     Allocation { addr: String },
 }
 

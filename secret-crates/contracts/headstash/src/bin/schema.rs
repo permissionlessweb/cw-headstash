@@ -1,20 +1,20 @@
 use std::env::current_dir;
 use std::fs::create_dir_all;
 
-use cosmwasm_schema::{export_schema, remove_schemas, schema_for};
+use cosmwasm_schema::write_api;
 
-use secret_contract_example::msg::{CountResponse, ExecuteMsg, InstantiateMsg, QueryMsg};
-use secret_contract_example::state::State;
+use cw_headstash::msg::{ExecuteMsg, InstantiateMsg, MigrateMsg, QueryAnswer, QueryMsg, SudoMsg};
+use cw_headstash::state::Config;
 
 fn main() {
     let mut out_dir = current_dir().unwrap();
-    out_dir.push("../../schema");
-    create_dir_all(&out_dir).unwrap();
-    remove_schemas(&out_dir).unwrap();
 
-    export_schema(&schema_for!(InstantiateMsg), &out_dir);
-    export_schema(&schema_for!(ExecuteMsg), &out_dir);
-    export_schema(&schema_for!(QueryMsg), &out_dir);
-    export_schema(&schema_for!(State), &out_dir);
-    export_schema(&schema_for!(CountResponse), &out_dir);
+    write_api! {
+        instantiate: InstantiateMsg,
+        execute: ExecuteMsg,
+        query: QueryMsg,
+        migrate: MigrateMsg,
+        sudo: SudoMsg,
+    }
+ 
 }
