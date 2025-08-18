@@ -1,3 +1,6 @@
 [submodule "secret-crates/contracts/snip20-reference-impl"]
 	path = secret-crates/contracts/snip20-reference-impl
 	url = https://github.com/scrtlabs/snip20-reference-impl
+[submodule "scripts/tools/rly-docker"]
+	path = scripts/tools/rly-docker
+	url = https://github.com/noahsaso/rly-docker

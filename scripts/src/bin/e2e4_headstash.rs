@@ -14,6 +14,7 @@ use cw_orch_polytone::{Polytone, PolytoneNote};
 use headstash_scripts::deploy::polytone::deploy_polytone;
 use tokio::runtime::Runtime;
 
+/// Command‑line arguments for the e2e runner.
 #[derive(Parser, Debug)]
 #[clap(author, version, about, long_about = None)]
 struct Args {
@@ -30,7 +31,7 @@ pub fn main() -> anyhow::Result<()> {
 
     println!("Step 1: Upload and instantiate the contracts");
 
-    let (controller_chain, host_chain) = match args.network.as_str() {
+    let (mut controller_chain, host_chain) = match args.network.as_str() {
         "main" => (
             headstash_scripts::networks::TERP_MAINNET.to_owned(),
             headstash_scripts::networks::SECRET_MAINNET.to_owned(),
