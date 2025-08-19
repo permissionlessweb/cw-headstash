@@ -13,8 +13,8 @@ chains:
             key-directory: /home/relayer/.relayer/.keys/120u-1
             key: relayer_key
             chain-id: 120u-1
-            rpc-addr: https://$1:rpc_port
-            account-prefix: cosmos
+            rpc-addr: http://127.0.0.1:23657
+            account-prefix: terp
             keyring-backend: test
             gas-adjustment: 1.3
             gas-prices: 0.01uterp
@@ -38,11 +38,11 @@ chains:
             key-directory: /home/relayer/.relayer/.keys/secret-1
             key: relayer_key
             chain-id: devnet-1
-            rpc-addr: https://$2:rpc_port
+            rpc-addr: http://127.0.0.1:23657
             account-prefix: secret
             keyring-backend: test
             gas-adjustment: 1.3
-            gas-prices: 0.1uosmo
+            gas-prices: 0.1uscrt
             min-gas-amount: 0
             max-gas-amount: 0
             debug: false
