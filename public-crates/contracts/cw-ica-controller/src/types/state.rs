@@ -199,7 +199,6 @@ mod channel {
         pub const fn close(&mut self) {
             self.channel_status = ChannelStatus::Closed;
         }
-
         /// Checks if the channel is [`IbcOrder::Ordered`]
         #[must_use]
         pub const fn is_ordered(&self) -> bool {

@@ -41,13 +41,5 @@ protobuf = "3.1.0"
 serde_json = "1.0.128"
 anybuf =  "0.5.0"
 anyhow =  "1.0.87"
-reqwest = "0.12.7"
 clap = { version = "4.5.0", features = ["derive"] }
 log = "0.4.22"
-
-[[bin]]
-name = "create-snip120u"
-path = "src/bin/3_b_init_snip120u.rs"
-[[bin]]
-name = "create-headstash"
-path = "src/bin/3_c_init_headstash.rs"

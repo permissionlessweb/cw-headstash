@@ -2,8 +2,8 @@
 members = [
   # Secret Headstash Contract
   "contracts/cw-glob",
-  "contracts/cw-ica-controller",
-  "contracts/cw-ica-owner",
+  # "contracts/cw-ica-controller",
+  # "contracts/cw-ica-owner",
   "contracts/polytone/note",
   "contracts/polytone/proxy",
   "contracts/polytone/voice",
