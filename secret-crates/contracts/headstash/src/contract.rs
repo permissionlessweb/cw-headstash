@@ -420,6 +420,7 @@ pub mod queries {
         })
     }
 }
+
 // src: https://github.com/public-awesome/launchpad/blob/main/contracts/sg-eth-airdrop/src/claim_airdrop.rs#L85
 pub mod validation {
     use cosmwasm_std::{Addr, Api};

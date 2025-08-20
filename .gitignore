@@ -28,3 +28,5 @@ target*
 
 # e2e tests
 vendor
+
+secret-crates/quartz

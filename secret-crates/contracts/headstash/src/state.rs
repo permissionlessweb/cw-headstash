@@ -27,7 +27,6 @@ pub const KEY_SNIP_COUNT: &[u8] = b"snip-count";
 pub const KEY_MULTIPLIER: &[u8] = b"mp";
 
 pub const PREFIX_CONFIG: &[u8] = b"c";
-pub const PREFIX_HEADSTASH_SIGS: &[u8] = b"hs";
 pub const PREFIX_DECAY_CLAIMED: &[u8] = b"dc";
 pub const PREFIX_TOTAL_CLAIMED: &[u8] = b"tc";
 pub const PREFIX_CLAIMED_HEADSTASH: &[u8] = b"chs";
@@ -41,7 +40,7 @@ pub const PREFIX_BLOOM_CLAIMED_KEY: &[u8] = b"bck";
 pub static RANDOM_STRING: Item<String> = Item::new(KEY_RANDOM_STRING);
 pub static CONFIG: Item<Config> = Item::new(KEY_B_CONFIG);
 pub static HEADSTASH_OWNERS: Item<Uint128> = Item::new(KEY_HEADSTASH_OWNERS);
-pub static HEADSTASH_SIGS: Item<HeadstashSig> = Item::new(KEY_B_CONFIG);
+pub static HEADSTASH_SIGS: Item<HeadstashSig> = Item::new(KEY_HEADSTASH_SIGS);
 pub static DECAY_CLAIMED: Item<bool> = Item::new(KEY_DECAY_CLAIMED);
 pub static TOTAL_CLAIMED: Item<Uint128> = Item::new(KEY_TOTAL_CLAIMED);
 pub static CLAIMED_HEADSTASH: Item<Uint128> = Item::new(KEY_CLAIMED_HEADSTASH);
@@ -54,6 +53,7 @@ pub static PROCESSING_BLOOM_MEMPOOL: Item<Vec<bloom::ProcessingBloomMsg>> =
 pub static BLOOM_TX_COUNT_MAP: Item<bloom::BloomTxCountMap> = Item::new(KEY_BLOOM_TX_COUNT_MAP);
 pub static BLOOM_CLAIMED_KEY: Item<bool> = Item::new(KEY_BLOOM_CLAIMED_KEY);
 pub static STORED_BLOOMS: Keymap<String, bloom::StoredBlooms> = Keymap::new(b"sb");
+pub static INTERNAL_SECRET: Item<Vec<u8>> = Item::new(b"internal-secret");
 
 // IBC CONTRACT STATE
 // pub const STATE: Item<ibc::State> = Item::new(b"state");
@@ -231,5 +231,3 @@ pub fn safe_add_u64(balance: &mut u64, amount: u64) -> u64 {
     // Won't underflow as the minimal value possible is 0
     *balance - prev_balance
 }
-
-pub static INTERNAL_SECRET: Item<Vec<u8>> = Item::new(b"internal-secret");
