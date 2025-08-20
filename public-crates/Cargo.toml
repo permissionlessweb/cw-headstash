@@ -1,18 +1,12 @@
 [workspace]
 members = [
-  # Secret Headstash Contract
-  "contracts/cw-glob",
-  # "contracts/cw-ica-controller",
-  # "contracts/cw-ica-owner",
   "contracts/polytone/note",
   "contracts/polytone/proxy",
   "contracts/polytone/voice",
   "packages/cw-orch-polytone",
   "packages/polytone",
-  "packages/headstash-public",
-  # "scripts",
 ]
-exclude = ["scripts", "contracts/polytone"]
+exclude = [  "contracts/polytone"]
 
 [workspace.package]
 edition = "2021"
@@ -21,24 +15,10 @@ license = "BSD-3-Clause"
 repository = "https://https://github.com/permissionlessweb/cw-headstash/public-crates"
 version = "1.0.0"
 
-[profile.release]
-opt-level = 3
-debug = false
-rpath = false
-lto = true
-debug-assertions = false
-codegen-units = 1
-panic = 'abort'
-incremental = false
-overflow-checks = true
-
-
 [workspace.dependencies]
-cw-glob = { path = "contracts/cw-glob" }
 polytone-proxy = { path = "contracts/polytone/proxy" }
 polytone-voice = { path = "contracts/polytone/voice"}
 polytone-note = { path = "contracts/polytone/note"}
-headstash-public = {path = "packages/headstash-public"}
 polytone = { path = "packages/polytone" }
 
 
@@ -56,3 +36,15 @@ anyhow = { version = "1.0.51" }
 anybuf = "0.5.0"
 thiserror = { version = "2.0.12" }
 sha2 = "0.10.8"
+
+
+[profile.release]
+opt-level = 3
+debug = false
+rpath = false
+lto = true
+debug-assertions = false
+codegen-units = 1
+panic = 'abort'
+incremental = false
+overflow-checks = true

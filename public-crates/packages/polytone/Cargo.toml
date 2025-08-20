@@ -8,10 +8,9 @@ rust-version = { workspace = true }
 version = { workspace = true }
 
 [dependencies]
-cosmwasm-schema = "2.2.2"
-cw-storage-plus = "2.0.0"
+cosmwasm-schema = { workspace = true }
+cw-storage-plus = { workspace = true }
 anybuf = "0.5.0"
 cosmos-sdk-proto = { version = "0.27", default-features = false, features = ["cosmwasm", "std"] }
 cosmwasm-std = { version = "2.2.2", features = ["staking"] }
 thiserror = { version = "2.0.12" }
-headstash-public = { path = "../headstash-public" }

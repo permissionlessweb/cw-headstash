@@ -5,10 +5,7 @@ use cosmwasm_std::{
 };
 use cw_storage_plus::Map;
 
-use crate::{
-    ack::unmarshal_ack,
-    headstash::HeadstashCallback,
-};
+use crate::ack::unmarshal_ack;
 
 /// Executed on the callback receiver upon message completion. When
 /// being executed, the message will be tagged with "callback":
@@ -178,126 +175,26 @@ pub fn on_timeout(
     Some(callback_message(request, result))
 }
 
-// TODO: implement generic callback request structure,
 fn callback_message(request: PendingCallback, result: Callback) -> CosmosMsg {
     /// Gives the executed message a "callback" tag:
     /// `{ "callback": CallbackMsg }`.
     #[cw_serde]
     enum C {
         Callback(CallbackMessage),
-        HeadstashCallback(HeadstashCallback),
     }
-    let msg =
-        match &result {
-            Callback::Execute(ref execute_res) => {
-                let cb_res = execute_res
-                    .clone()
-                    .expect("unable to map callback, fatal error");
-
-                match &request.headstash_callback_id {
-                    // HeadstashCallback::UploadHeadstashOnSecret: find code id, call note to set code-id to state.
-                    101 => {
-                        //
-                        let code_id = &cb_res.result[0]
-                            .events
-                            .iter()
-                            .find(|e| e.ty == "wasm")
-                            .expect("wasm contract uploaded, event expected")
-                            .attributes
-                            .iter()
-                            .find(|a| a.key == "code_id")
-                            .expect("wasm contract uploaded, code_id attr expected")
-                            .value;
-
-                        to_json_binary(&C::HeadstashCallback(
-                            HeadstashCallback::UploadedHeadstashCodeId {
-                                code_id: u64::from_str_radix(code_id, 10u32)
-                                    .expect("failed from_str_radix"),
-                            },
-                        ))
-                    }
-                    202 => {
-                        let mut snip20_addrs = Vec::new();
-                        // only one smart contract is expected to be instantiated at a time?
-                        for res in &cb_res.result {
-                            snip20_addrs.push(res
-                            .events
-                            .iter()
-                            .find(|e| e.ty == "wasm")
-                            .expect("wasm contract instantiated, event expected")
-                            .attributes
-                            .iter()
-                            .find(|a| a.key == "contract_address")
-                            .expect("wasm contract instantiated, contract_address attr expected")
-                            .value.clone());
-                        }
-
-                        to_json_binary(&C::HeadstashCallback(
-                            HeadstashCallback::CreatedSnip20ContractAddr {
-                                addr: snip20_addrs[0].clone(),
-                            },
-                        ))
-                    }
-                    303 => {
-                        //
-                        let headstash_addr = &cb_res.result[0]
-                            .events
-                            .iter()
-                            .find(|e| e.ty == "wasm")
-                            .expect("wasm contract instantiated, event expected")
-                            .attributes
-                            .iter()
-                            .find(|a| a.key == "contract_address")
-                            .expect("wasm contract instantiated, contract_address attr expected")
-                            .value;
-
-                        to_json_binary(&C::HeadstashCallback(
-                            HeadstashCallback::CreatedHeadstashContractAddr {
-                                addr: headstash_addr.into(),
-                            },
-                        ))
-                    }
-                    404 => {
-                        let headstash_addr = &cb_res.result[0]
-                            .events
-                            .iter()
-                            .find(|e| e.ty == "wasm")
-                            .expect("wasm contract instantiated, event expected")
-                            .attributes
-                            .iter()
-                            .find(|a| a.key == "contract_address")
-                            .expect("wasm contract instantiated, contract_address attr expected")
-                            .value;
-
-                        to_json_binary(&C::HeadstashCallback(
-                            HeadstashCallback::CreatedHeadstashContractAddr {
-                                addr: headstash_addr.into(),
-                            },
-                        ))
-                    }
-                    // fallback to default callback if not headstash msg.
-                    _ => to_json_binary(&C::Callback(CallbackMessage {
-                        initiator: request.initiator,
-                        initiator_msg: request.initiator_msg,
-                        result,
-                    })),
-                }
-            }
-            _ => to_json_binary(&C::Callback(CallbackMessage {
-                initiator: request.initiator,
-                initiator_msg: request.initiator_msg,
-                result,
-            })),
-        }
-        .expect("fields are known to be serializable");
-
     WasmMsg::Execute {
         contract_addr: request.receiver.into_string(),
-        msg,
+        msg: to_json_binary(&C::Callback(CallbackMessage {
+            initiator: request.initiator,
+            initiator_msg: request.initiator_msg,
+            result,
+        }))
+        .expect("fields are known to be serializable"),
         funds: vec![],
     }
     .into()
 }
+
 
 fn dequeue_callback(
     storage: &mut dyn Storage,

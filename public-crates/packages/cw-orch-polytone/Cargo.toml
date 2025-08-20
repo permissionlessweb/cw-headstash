@@ -13,11 +13,9 @@ cosmwasm-std = { workspace = true, features = ["stargate"] }
 cw-orch = { workspace = true, features=["daemon"] }
 cw-orch-interchain = { workspace = true, features = ["daemon"] }
 
-headstash-public = { workspace = true}
 polytone-note = {    workspace = true, features=["interface"] }
 polytone-proxy = {   workspace = true,  features=["interface"] }
 polytone-voice  = {  workspace = true,  features=["interface"] }
-cw-glob = { workspace = true, features=["library"] }
 
 [dev-dependencies]
 anyhow = { version = "1.0.51" }

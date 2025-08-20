@@ -5,4 +5,3 @@ pub mod ibc;
 
 pub mod errors;
 pub mod handshake;
-pub mod headstash;

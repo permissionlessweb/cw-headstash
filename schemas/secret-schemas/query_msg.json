@@ -1,0 +1,49 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "QueryMsg",
+  "oneOf": [
+    {
+      "description": "Queries the configured block max gas. Serialized as `\"block_max_gas\"`.",
+      "type": "string",
+      "enum": [
+        "block_max_gas"
+      ]
+    },
+    {
+      "description": "Queries the configured proxy code ID. Serialized as `\"proxy_code_id\"`.",
+      "type": "string",
+      "enum": [
+        "proxy_code_id"
+      ]
+    },
+    {
+      "description": "Queries the configured contract address length.",
+      "type": "string",
+      "enum": [
+        "contract_addr_len"
+      ]
+    },
+    {
+      "description": "Queries the sender information for a given proxy.",
+      "type": "object",
+      "required": [
+        "sender_info_for_proxy"
+      ],
+      "properties": {
+        "sender_info_for_proxy": {
+          "type": "object",
+          "required": [
+            "proxy"
+          ],
+          "properties": {
+            "proxy": {
+              "type": "string"
+            }
+          },
+          "additionalProperties": false
+        }
+      },
+      "additionalProperties": false
+    }
+  ]
+}

@@ -15,21 +15,7 @@ crate-type = ["cdylib", "rlib"]
 library = []
 interface = ["dep:cw-orch"]
 
-# This is here inspite of the warnings to make sure it is not missed
-# if the contract is taken out of the workspace
-[profile.release]
-codegen-units    = 1
-debug            = false
-debug-assertions = false
-incremental      = false
-lto              = true
-opt-level        = 3
-overflow-checks  = true    # very important, do not turn these off.
-panic            = 'abort'
-rpath            = false
-
 [dependencies]
-headstash-public = { workspace = true }
 cosmwasm-schema  = { workspace = true }
 anybuf           = { workspace = true }
 cosmwasm-std     = { workspace = true }

@@ -1,9 +1,11 @@
 use cosmwasm_std::Storage;
 use cw_storage_plus::{Item, Map};
-use polytone::{callbacks::CallbackMessage, headstash::errors::ContractError};
 
+use crate::error::ContractError;
+
+// use polytone::callbacks::CallbackMessage;
 /// (initiator, initiator_msg) -> callback
-pub(crate) const RESULTS: Map<(String, String), CallbackMessage> = Map::new("results");
+// pub(crate) const RESULTS: Map<(String, String), CallbackMessage> = Map::new("results");
 
 /// (Connection-ID, Remote port) of this contract's pair.
 pub const CONNECTION_REMOTE_PORT: Item<(String, String)> = Item::new("a");

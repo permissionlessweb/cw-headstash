@@ -45,8 +45,12 @@ pub fn on_ack(
     }
 }
 
-pub fn on_timeout(storage: &mut dyn Storage, channel_id: String, sequence_number: u64) {
-    PENDING.remove(storage, &(channel_id, sequence_number));
+pub fn on_timeout(
+    storage: &mut dyn Storage,
+    channel_id: String,
+    sequence_number: u64,
+) -> StdResult<()> {
+    PENDING.remove(storage, &(channel_id, sequence_number))
 }
 
 pub fn query_account(storage: &dyn Storage, local_address: Addr) -> StdResult<Option<String>> {

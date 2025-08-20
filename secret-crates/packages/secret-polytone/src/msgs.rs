@@ -1,10 +1,7 @@
 use cosmwasm_schema::{cw_serde, QueryResponses};
-use cosmwasm_std::{Addr, CosmosMsg};
+use cosmwasm_std::{Addr, Binary, CosmosMsg, Uint64};
 pub mod voice {
     use super::*;
-
-    use cosmwasm_schema::{cw_serde, QueryResponses};
-    use cosmwasm_std::{Binary, Uint64};
 
     #[cw_serde]
     pub struct InstantiateMsg {

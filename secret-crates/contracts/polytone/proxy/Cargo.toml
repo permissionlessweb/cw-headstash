@@ -1,5 +1,5 @@
 [package]
-name         = "polytone-proxy"
+name         = "scrt-polytone-proxy"
 authors      = ["ekez <ekez@withoutdoing.com>"]
 description  = "An Interchain Account contract."
 edition      = { workspace = true }
@@ -39,5 +39,5 @@ polytone        = { workspace = true }
 
 
 [[bin]]
-name = "schema-proxy"
+name = "scrt-polytone-proxy"
 path = "src/bin/schema.rs"
