@@ -19,11 +19,15 @@
       "source_channel": "channel-2"
     }
   ],
-  "bloom_config": {},
+  "bloom_config": {
+    "default_cadance": 100,
+    "min_cadance": 100,
+    "max_granularity": 69
+  },
   "headstash_init_config": {
     "claim_msg_plaintxt": "claim message",
-    "end_date": "2025-01-01T00:00:00Z",
-    "start_date": "2024-01-01T00:00:00Z",
+    "end_date": null,
+    "start_date": null,
     "random_key": "random_key_here"
   }
 }

@@ -12,11 +12,11 @@ use polytone::ibc::{Msg, Packet};
 
 use crate::error::ContractError;
 use crate::ibc::{ACK_GAS_NEEDED, REPLY_FORWARD_DATA, REPLY_INIT_PROXY};
-use crate::msg::{ExecuteMsg, InstantiateMsg, MigrateMsg, QueryMsg};
 use crate::state::{
     BLOCK_MAX_GAS, CONTRACT_ADDR_LEN, PENDING_PROXY_TXS, PROXY_CODE_ID, PROXY_TO_SENDER,
     SENDER_TO_PROXY,
 };
+use polytone::msgs::voice::{ExecuteMsg, InstantiateMsg, MigrateMsg, QueryMsg};
 
 // const CONTRACT_NAME: &str = "crates.io:polytone-voice";
 // const CONTRACT_VERSION: &str = env!("CARGO_PKG_VERSION");
@@ -121,7 +121,7 @@ pub fn execute(
                                     admin: None,
                                     code_id,
                                     label: format!("polytone-proxy {sender}"),
-                                    msg: to_binary(&polytone_proxy::msg::InstantiateMsg {})?,
+                                    msg: to_binary(&polytone::msgs::proxy::InstantiateMsg {})?,
                                     funds: vec![],
                                     code_hash: "".to_string(),
                                 }),
@@ -237,7 +237,7 @@ fn proxy_submessage_helper(
         let submsg: SubMsg<Empty> = SubMsg::reply_always(
             WasmMsg::Execute {
                 contract_addr: proxy.into_string(),
-                msg: to_binary(&polytone_proxy::msg::ExecuteMsg::Proxy { msgs })?,
+                msg: to_binary(&polytone::msgs::proxy::ExecuteMsg::Proxy { msgs })?,
                 funds: vec![],
                 code_hash: "".to_string(),
             },

@@ -1,9 +1,11 @@
 use cosmwasm_std::{Addr, Binary};
+use polytone::msgs::voice::SenderInfo;
 use secret_toolkit::storage::{Item, Keymap};
 
 // SENDER_TO_PROXY
 pub const KEY_SENDER_TO_PROXY: &[u8] = b"sender_to_proxy";
-pub const SENDER_TO_PROXY: Keymap<(String, String, String), Addr> = Keymap::new(KEY_SENDER_TO_PROXY);
+pub const SENDER_TO_PROXY: Keymap<(String, String, String), Addr> =
+    Keymap::new(KEY_SENDER_TO_PROXY);
 
 // PROXY_TO_SENDER
 pub const KEY_PROXY_TO_SENDER: &[u8] = b"proxy_to_sender";
@@ -28,10 +30,3 @@ pub const CONTRACT_ADDR_LEN: Item<u8> = Item::new(KEY_CONTRACT_ADDR_LEN);
 // PENDING PROXY TX
 pub const KEY_PENDING_PROXY_TX: &[u8] = b"pending_proxy_tx";
 pub const PENDING_PROXY_TXS: Item<Binary> = Item::new(KEY_PENDING_PROXY_TX);
-
-#[cosmwasm_schema::cw_serde]
-pub struct SenderInfo {
-    pub connection_id: String,
-    pub remote_port: String,
-    pub remote_sender: String,
-}

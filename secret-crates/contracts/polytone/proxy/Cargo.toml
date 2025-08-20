@@ -36,7 +36,8 @@ cosmwasm-std    = { workspace = true }
 secret-toolkit = { git = "https://github.com/SolarRepublic/secret-toolkit.git", default-features = false, features = [ "storage", "viewing-key", "notification"] }
 thiserror       = { workspace = true }
 polytone        = { workspace = true }
-# cw-orch         = { workspace = true, optional = true }
 
-[dev-dependencies]
-# cw-multi-test = { workspace = true }
+
+[[bin]]
+name = "schema-proxy"
+path = "src/bin/schema.rs"

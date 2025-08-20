@@ -6,3 +6,4 @@ pub mod ibc;
 pub mod handshake;
 pub mod headstash;
 pub mod utils;
+pub mod msgs;

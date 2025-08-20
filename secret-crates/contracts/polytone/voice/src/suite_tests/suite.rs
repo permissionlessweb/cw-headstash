@@ -1,7 +1,7 @@
 use cosmwasm_std::{Addr, ContractInfo, Empty, Uint64};
 
-use crate::msg::QueryMsg::{BlockMaxGas, ContractAddrLen, ProxyCodeId};
-use crate::msg::{InstantiateMsg, MigrateMsg};
+use polytone::msgs::voice::QueryMsg::{BlockMaxGas, ContractAddrLen, ProxyCodeId};
+use polytone::msgs::voice::{InstantiateMsg, MigrateMsg};
 use shade_protocol::multi_test::{App, AppResponse, Contract, ContractInstantiationInfo, ContractWrapper, Executor};
 
 pub const CREATOR_ADDR: &str = "creator";

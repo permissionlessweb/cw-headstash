@@ -1,159 +1,383 @@
-import { Wallet, SecretNetworkClient, EncryptionUtilsImpl, MsgExecuteContract, fromUtf8, MsgExecuteContractResponse } from "secretjs";
-// import { claim, add_headstash } from './account.js'
-// import { printBatch } from './batch-add.js'
+import { Wallet, SecretNetworkClient } from "secretjs";
+import {
+  config, mnemonic, chainId, rpcUrl, txEncryptionSeed, entropy,
+  headstashCodeId, snip120uCodeId, snip120uCodeHash,
+  snip120uAddr1, snip120uAddr2,
+  snip120uNative1, snip120uNative2,
+  cw_headstash_blob, polytone_note_blob, polytone_proxy_blob, polytone_voice_blob
+} from './config.js';
+
 import { init_snip120u, query_contract_info, deposit_to_snip20, query_token_info, query_token_config, set_viewing_key, query_balance, fund_headstash, upload_snip120u } from './snip20.js'
-import * as fs from "fs";
-
 import { upload_headstash_contract, instantiate_headstash_contract } from "./headstash.js";
-// wallet
-export const wallet = new Wallet("amateur pond bubble move field brain base candy kind oxygen glow bread robot domain tongue agree jazz increase bronze staff kangaroo piano uncle power");
-
+import { upload_polytone_contracts } from "./polytone.js";
 import { generateEthKeyAndSignMessage, generateSolanaKeyAndSignMessage } from './testKeys.js';
 
-// headstash contract
-export const headstashCodeId = 2057;
-export const headstashCodeHash = "41cde6547e3e7cd2ff31f4365b707faa5d3026414c03664b903185d5538d90dc";
-export const headstashAddr = "";
+// Display current configuration on startup
+config.display();
 
-// snip-120u
-export const snip120uCodeId = 2056;
-export const snip120uCodeHash = "3884f72403e5308db76748244d606dd8bfa98eb560b1906d5825fc7dd72f867e";
+// Initialize wallet and client
+export const wallet = new Wallet(mnemonic);
 
-// snip-1u20 addrs
-export const snip120uAddr1 = "secret1d5d70hangvetxjtqdd5wrletwjr2s0864kx63l";
-export const snip120uAddr2 = "secret17wg7nl0jft3d3zv5gzrxxqm79k607wphghf9g9";
-"2000000"
-// token ONE & TWO denoms.
-export const snip120uNative1 = "ibc/AF840D44CC92103AD006850542368B888D29C4D4FFE24086E767F161FBDDCE76";
-export const snip120uNative2 = "ibc/7477828AC3E19352BA2D63352EA6D0680E3F29C126B87ACBDC27858CF7AF3A64";
-
-export const counterpartyChannelId = "channel-165"
-export const chain_id = "secret-4";
-export const cw_headstash_blob = fs.readFileSync("../../public-crates/contracts/cw-glob/src/globs/cw_headstash.wasm");
-// export const snip120u_blob = fs.readFileSync("../../public-crates/contracts/cw-glob/src/globs/snip120u_impl.wasm.gz");
-export const entropy = "eretskeretjableret";
-export const permitKey = entropy;
-export const txEncryptionSeed = EncryptionUtilsImpl.GenerateNewSeed();
-
-export const snip120us = [
-  {
-    native_token: "uterp",
-    addr: snip120uAddr1,
-    total_amount: "7100000"
-  },
-  {
-    native_token: "uthiol",
-    addr: snip120uAddr2,
-    total_amount: "7100000"
-  }];
-
-// signing client 
 export const secretjs = new SecretNetworkClient({
-  chainId: chain_id,
-  url: "https://rest.lavenderfive.com:443/secretnetwork",
+  chainId: chainId,
+  url: rpcUrl,
   wallet: wallet,
   walletAddress: wallet.address,
-  txEncryptionSeed: txEncryptionSeed
+  // txEncryptionSeed: txEncryptionSeed
 });
+
+// Helper functions for better error handling
+function requireArg(args, index, usage) {
+  if (args.length <= index) {
+    console.error(`❌ Missing required argument.`);
+    console.error(`Usage: ${usage}`);
+    process.exit(1);
+  }
+  return args[index];
+}
+
+async function handleAsyncCommand(promise, successMessage, errorPrefix = "Failed") {
+  try {
+    await promise;
+    console.log(`✅ ${successMessage}`);
+  } catch (error) {
+    console.error(`❌ ${errorPrefix}:`, error.message || error);
+    process.exit(1);
+  }
+}
+
+function validateContractAddress(address, contractName) {
+  if (!address || address === "") {
+    console.error(`❌ ${contractName} address is not configured.`);
+    console.error(`   Set it in your .env file or update the configuration.`);
+    process.exit(1);
+  }
+}
+
+// Command definitions for better organization and help
+const commands = {
+  // Upload commands
+  'upload-headstash': {
+    description: 'Upload headstash contract',
+    usage: 'upload-headstash',
+    go: () => {
+      if (!cw_headstash_blob) {
+        console.error('❌ Headstash WASM file not found. Check your configuration.');
+        process.exit(1);
+      }
+      return handleAsyncCommand(
+        upload_headstash_contract(cw_headstash_blob),
+        'Headstash contract uploaded successfully'
+      );
+    }
+  },
+  'upload-polytone-proxy': {
+    description: 'Upload polytone proxy contract on secret network',
+    usage: 'upload-polytone-proxy',
+    go: () => {
+      if (!polytone_proxy_blob) {
+        console.error('❌ Polytone proxy WASM not found. Check your configuration.');
+        process.exit(1);
+      }
+      return handleAsyncCommand(
+        upload_polytone_contracts(polytone_proxy_blob),
+        'Polytone proxy contract uploaded successfully'
+      );
+    }
+  },
+  'upload-polytone-voice': {
+    description: 'Upload polytone voice contract on secret network. ',
+    usage: 'upload-polytone',
+    go: () => {
+      console.log(`Current working directory: ${process.cwd()}`);
+      if (!polytone_voice_blob) {
+        console.error('❌ Polytone voice WASM not found. Check your configuration.');
+        process.exit(1);
+      }
+      return handleAsyncCommand(
+        upload_polytone_contracts(polytone_voice_blob),
+        'Polytone voice contract uploaded successfully'
+      );
+    }
+  },
+
+  // Instantiate commands
+  'init-snip20-terp': {
+    description: 'Initialize TERP SNIP20 token',
+    usage: 'init-snip20-terp',
+    go: () => handleAsyncCommand(
+      init_snip120u("secret terp test", "scrtTERP", snip120uNative1),
+      'TERP SNIP20 token created successfully'
+    )
+  },
+
+  'init-snip20-thiol': {
+    description: 'Initialize THIOL SNIP20 token',
+    usage: 'init-snip20-thiol',
+    go: () => handleAsyncCommand(
+      init_snip120u("secret thioool test", "scrtTHIOL", snip120uNative2),
+      'THIOL SNIP20 token created successfully'
+    )
+  },
+
+  'init-headstash': {
+    description: 'Instantiate headstash contract',
+    usage: 'init-headstash',
+    go: () => handleAsyncCommand(
+      instantiate_headstash_contract(),
+      'Headstash contract instantiated successfully'
+    )
+  },
+
+  // Token conversion commands
+  'convert-terp': {
+    description: 'Convert native TERP to secret TERP',
+    usage: 'convert-terp <amount>',
+    go: (args) => {
+      const amount = requireArg(args, 1, 'convert-terp <amount>');
+      validateContractAddress(snip120uAddr1, 'TERP SNIP20');
+      return handleAsyncCommand(
+        deposit_to_snip20(snip120uAddr1, amount, snip120uNative1),
+        `Converted ${amount} TERP to secret form`
+      );
+    }
+  },
+
+  'convert-thiol': {
+    description: 'Convert native THIOL to secret THIOL',
+    usage: 'convert-thiol <amount>',
+    go: (args) => {
+      const amount = requireArg(args, 1, 'convert-thiol <amount>');
+      validateContractAddress(snip120uAddr2, 'THIOL SNIP20');
+      return handleAsyncCommand(
+        deposit_to_snip20(snip120uAddr2, amount, snip120uNative2),
+        `Converted ${amount} THIOL to secret form`
+      );
+    }
+  },
+
+  // Viewing key commands
+  'set-viewing-key-terp': {
+    description: 'Set viewing key for TERP SNIP20',
+    usage: 'set-viewing-key-terp',
+    go: () => {
+      validateContractAddress(snip120uAddr1, 'TERP SNIP20');
+      return handleAsyncCommand(
+        set_viewing_key(snip120uAddr1, entropy),
+        'TERP viewing key created'
+      );
+    }
+  },
+
+  'set-viewing-key-thiol': {
+    description: 'Set viewing key for THIOL SNIP20',
+    usage: 'set-viewing-key-thiol',
+    go: () => {
+      validateContractAddress(snip120uAddr2, 'THIOL SNIP20');
+      return handleAsyncCommand(
+        set_viewing_key(snip120uAddr2, entropy),
+        'THIOL viewing key created'
+      );
+    }
+  },
+
+  // Fee grant command
+  'feegrant': {
+    description: 'Grant fee allowance to an address (not implemented)',
+    usage: 'feegrant <recipient-address>',
+    go: (args) => {
+      console.log('❌ Fee grant functionality not implemented yet.');
+      console.log('   Implement the broadcastFeeGrant function or import it from the appropriate module.');
+    }
+  },
+  // Query commands
+  'query-terp-info': {
+    description: 'Query TERP SNIP20 token info',
+    usage: 'query-terp-info',
+    go: () => {
+      validateContractAddress(snip120uAddr1, 'TERP SNIP20');
+      query_token_info(snip120uAddr1, snip120uCodeHash);
+    }
+  },
+
+  'query-thiol-info': {
+    description: 'Query THIOL SNIP20 token info',
+    usage: 'query-thiol-info',
+    go: () => {
+      validateContractAddress(snip120uAddr2, 'THIOL SNIP20');
+      query_token_info(snip120uAddr2, snip120uCodeHash);
+    }
+  },
+
+  'query-terp-config': {
+    description: 'Query TERP SNIP20 configuration',
+    usage: 'query-terp-config',
+    go: () => {
+      validateContractAddress(snip120uAddr1, 'TERP SNIP20');
+      query_token_config(snip120uAddr1, snip120uCodeHash);
+    }
+  },
+
+  'query-thiol-config': {
+    description: 'Query THIOL SNIP20 configuration',
+    usage: 'query-thiol-config',
+    go: () => {
+      validateContractAddress(snip120uAddr2, 'THIOL SNIP20');
+      query_token_config(snip120uAddr2, snip120uCodeHash);
+    }
+  },
+
+  'query-snip20-hash': {
+    description: 'Query SNIP20 contract code hash',
+    usage: 'query-snip20-hash',
+    go: () => query_contract_info(snip120uCodeId)
+  },
+
+  'query-headstash-hash': {
+    description: 'Query headstash contract code hash',
+    usage: 'query-headstash-hash',
+    go: () => query_contract_info(headstashCodeId)
+  },
+
+  'query-terp-balance': {
+    description: 'Query TERP SNIP20 balance',
+    usage: 'query-terp-balance',
+    go: () => {
+      validateContractAddress(snip120uAddr1, 'TERP SNIP20');
+      return handleAsyncCommand(
+        query_balance(snip120uAddr1, entropy),
+        'TERP balance queried successfully'
+      );
+    }
+  },
+
+  'query-thiol-balance': {
+    description: 'Query THIOL SNIP20 balance',
+    usage: 'query-thiol-balance',
+    go: () => {
+      validateContractAddress(snip120uAddr2, 'THIOL SNIP20');
+      return handleAsyncCommand(
+        query_balance(snip120uAddr2, entropy),
+        'THIOL balance queried successfully'
+      );
+    }
+  },
+
+
+  // Headstash and utility commands (TODO: Implement these functions)
+  'claim': {
+    description: 'Claim airdrop for an account (not implemented)',
+    usage: 'claim <account-id>',
+    go: (args) => {
+      console.log('❌ Claim functionality not implemented yet.');
+      console.log('   Uncomment and implement the claim import from "./account.js"');
+    }
+  },
+
+  'add-batch': {
+    description: 'Generate batch entries (not implemented)',
+    usage: 'add-batch',
+    go: () => {
+      console.log('❌ Batch functionality not implemented yet.');
+      console.log('   Uncomment and implement the printBatch import from "./batch-add.js"');
+    }
+  },
+
+  'gen-eth-signature': {
+    description: 'Generate test Ethereum signature',
+    usage: 'gen-eth-signature [message]',
+    go: (args) => {
+      const message = args[1] || "H.R.E.A.M. Sender: hs69";
+      generateEthKeyAndSignMessage(message);
+    }
+  },
+
+  'gen-sol-signature': {
+    description: 'Generate test Solana signature',
+    usage: 'gen-sol-signature [message]',
+    go: (args) => {
+      const message = args[1] || "H.R.E.A.M. Sender: hs3";
+      generateSolanaKeyAndSignMessage(message);
+    }
+  },
+
+  // Configuration commands
+  'config': {
+    description: 'Show current configuration',
+    usage: 'config',
+    go: () => config.display()
+  },
+
+  'help': {
+    description: 'Show available commands',
+    usage: 'help [command]',
+    go: (args) => {
+      if (args[1]) {
+        const cmd = commands[args[1]];
+        if (cmd) {
+          console.log(`📖 ${args[1]}: ${cmd.description}`);
+          console.log(`   Usage: node main.js ${cmd.usage}`);
+        } else {
+          console.error(`❌ Unknown command: ${args[1]}`);
+        }
+      } else {
+        showHelp();
+      }
+    }
+  }
+};
+
+// Help function
+function showHelp() {
+  console.log('🚀 Headstash SecretJS CLI\n');
+  console.log('Available commands:\n');
+
+  const categories = {
+    'Upload': ['upload-headstash', 'upload-polytone-note', 'upload-polytone-voice', 'upload-polytone-proxy'],
+    'Initialize': ['init-snip20-terp', 'init-snip20-thiol', 'init-headstash'],
+    'Token Operations': ['convert-terp', 'convert-thiol', 'set-viewing-key-terp', 'set-viewing-key-thiol'],
+    'Queries': ['query-terp-info', 'query-thiol-info', 'query-terp-config', 'query-thiol-config', 'query-snip20-hash', 'query-headstash-hash', 'query-terp-balance', 'query-thiol-balance'],
+    'Headstash': ['claim', 'add-batch'],
+    'Utilities': ['gen-eth-signature', 'gen-sol-signature', 'feegrant', 'config', 'help']
+  };
+
+  for (const [category, cmdList] of Object.entries(categories)) {
+    console.log(`${category}:`);
+    cmdList.forEach(cmd => {
+      const command = commands[cmd];
+      if (command) {
+        console.log(`  ${cmd.padEnd(25)} ${command.description}`);
+      }
+    });
+    console.log('');
+  }
+
+  console.log('For detailed usage of a specific command: node main.js help <command>');
+  console.log('Example: node main.js help convert-terp\n');
+}
 
 // Process command line arguments
 const args = process.argv.slice(2);
+
 if (args.length < 1) {
-  console.error('Invalid option.');
-} else if (args[0] === '-1') {
-  // upload_snip120u(snip120u_blob);
-} else if (args[0] === '-2') {
-  upload_headstash_contract(cw_headstash_blob);
-} else if (args[0] === '-3a') {
-  // name, symbol, supported-denom
-  init_snip120u("secret terp test", "scrtTERP", snip120uNative1)
-    .then(() => { console.log("Created the First Snip20!"); })
-    .catch((error) => { console.error("Failed:", error); });
-} else if (args[0] === '-3b') {
-  init_snip120u("secret thioool test", "scrtTHIOL", snip120uNative2)
-    .then(() => { console.log("Created the Second Snip20!"); })
-    .catch((error) => { console.error("Failed:", error); });
-} else if (args[0] === '-4') {
-  instantiate_headstash_contract();
-  // } else if (args[0] === '-4') {
-  //   if (args.length < 2) {
-  //     console.error('Usage: -convert-token1 amount');
-  //     process.exit(1);
-  //   }
-  //   const [, a,] = args;
-  //   console.log("depositing token ONE")
-  //   deposit_to_snip20(snip120uAddr1, a, snip120uNative1)
-  //     .then(() => { console.log("Converted token ONE into its secret form!"); })
-  //     .catch((error) => { console.error("Failed:", error); });
-  // } else if (args[0] === '-convert-token2') {
-  //   if (args.length < 2) {
-  //     console.error('Usage: -d amount');
-  //     process.exit(1);
-  //   }
-  //   const [, a,] = args;
-  //   console.log("depositing token TWO")
-  //   deposit_to_snip20(snip120uAddr2, a, snip120uNative2)
-  //     .then(() => { console.log("Converted token TWO into its secret form!"); })
-  //     .catch((error) => { console.error("Failed:", error); });
-} else if (args[0] === '-viewing-key-2') {
-  set_viewing_key(snip120uAddr2, entropy)
-    .then(() => { console.log("Created viewing-key!"); })
-    .catch((error) => { console.error("Failed:", error); });
-} else if (args[0] === '-viewing-key-1') {
-  set_viewing_key(snip120uAddr1, entropy)
-    .then(() => { console.log("Created viewing-key!"); })
-    .catch((error) => { console.error("Failed:", error); });
-} else if (args[0] === '-feegrant') {
-  if (args.length < 2) {
-    console.error('Usage: -feegrant <addr-to-feegrant>');
+  showHelp();
+  process.exit(0);
+}
+
+const command = args[0];
+const cmd = commands[command];
+
+if (cmd) {
+  try {
+    cmd.go(args);
+  } catch (error) {
+    console.error(`❌ Error executing command '${command}':`, error.message || error);
     process.exit(1);
   }
-  const [, a,] = args;
-  broadcastFeeGrant(a)
-    .then(() => { console.log("Created FeeGrant!"); })
-    .catch((error) => { console.error("Failed:", error); });
-  //////////////////////////////// SNIP20 QUERIES  /////////////////////////////////
-} else if (args[0] === '-q-snip1-info') {   // query snip20 1 info
-  query_token_info(snip120uAddr1, snip120uCodeHash)
-} else if (args[0] === '-q-snip2-info') {   // query snip20 2 info 
-  query_token_info(snip120uAddr2, snip120uCodeHash)
-} else if (args[0] === '-q-snip1-config') { // query snip20 1 config
-  query_token_config(snip120uAddr1, snip120uCodeHash)
-} else if (args[0] === '-q-snip2-config') { // query snip20 2 config 
-  query_token_config(snip120uAddr2, snip120uCodeHash)
-} else if (args[0] === '-q-snip-hash') { // query snip20 2 config 
-  query_contract_info(snip120uCodeId)
-} else if (args[0] === '-q-headstash-hash') { // query headstash code hash
-  query_contract_info(headstashCodeId)
-} else if (args[0] === '-q-snip1-bal') {    // query balance snip20 1
-  query_balance(snip120uAddr1, entropy)
-    .then(() => { console.log("Queried Balance!"); })
-    .catch((error) => { console.error("Failed:", error); });
-} else if (args[0] === '-q-snip2-bal') {    // query balance snip20 2
-  query_balance(snip120uAddr2, entropy)
-    .then(() => { console.log("Queried Balance!"); })
-    .catch((error) => { console.error("Failed:", error); });
-
-
-  //////////////////////////////// HEADSTASH ACTIONS ///////////////////////////////
-} else if (args[0] === '-claim') { // create an account, claims airdrop 
-  claim(args[1])
-} else if (args[0] === '-add') {
-  printBatch(0)
-    .then(() => { console.log("generated them jawns"); })
-    .catch((error) => { console.error("Failed:", error); });
-} else if (args[0] === '-duplicate-check') { // create an account, claims airdrop 
-  claim(args[1])
-} else if (args[0] === '-gen-test-eth-sig') { // create an account, claims airdrop 
-  // Example usage
-  const message = "H.R.E.A.M. Sender: hs69";
-  generateEthKeyAndSignMessage(message);
-} else if (args[0] === '-gen-test-sol-sig') { // create an account, claims airdrop 
-  // Example usage
-  const message = "H.R.E.A.M. Sender: hs3";
-  generateSolanaKeyAndSignMessage(message);
 } else {
-  console.error('Invalid option.');
+  console.error(`❌ Unknown command: ${command}`);
+  console.log('Run "node main.js help" to see available commands.');
+  process.exit(1);
 }
 
 

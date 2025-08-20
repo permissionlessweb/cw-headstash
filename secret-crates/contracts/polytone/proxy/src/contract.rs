@@ -8,8 +8,8 @@ use cosmwasm_std::{
 use polytone::ack::ack_execute_success;
 
 use crate::error::ContractError;
-use crate::msg::{ExecuteMsg, InstantiateMsg, QueryMsg};
 use crate::state::{COLLECTOR, INSTANTIATOR};
+use polytone::msgs::proxy::{ExecuteMsg, InstantiateMsg, QueryAnswer, QueryMsg};
 
 // const CONTRACT_NAME: &str = "crates.io:polytone-proxy";
 // const CONTRACT_VERSION: &str = env!("CARGO_PKG_VERSION");
@@ -65,7 +65,9 @@ pub fn execute(
 #[cfg_attr(not(feature = "library"), entry_point)]
 pub fn query(deps: Deps, _env: Env, msg: QueryMsg) -> StdResult<Binary> {
     match msg {
-        QueryMsg::Instantiator {} => to_binary(&INSTANTIATOR.load(deps.storage)?),
+        QueryMsg::Instantiator {} => to_binary(&QueryAnswer::InstantiatorResponse {
+            instantiator: INSTANTIATOR.load(deps.storage)?,
+        }),
     }
 }
 

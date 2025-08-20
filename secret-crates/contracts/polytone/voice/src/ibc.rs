@@ -12,15 +12,14 @@ use polytone::{
     callbacks::Callback,
     handshake::voice,
     ibc::Never,
+    msgs::voice::{ExecuteMsg, SenderInfo},
     utils::{parse_reply_execute_data, MsgExecuteContractResponse},
 };
 
 use crate::{
     error::ContractError,
-    msg::ExecuteMsg,
     state::{
-        SenderInfo, BLOCK_MAX_GAS, CHANNEL_TO_CONNECTION, PENDING_PROXY_TXS, PROXY_TO_SENDER,
-        SENDER_TO_PROXY,
+        BLOCK_MAX_GAS, CHANNEL_TO_CONNECTION, PENDING_PROXY_TXS, PROXY_TO_SENDER, SENDER_TO_PROXY,
     },
 };
 
@@ -223,7 +222,7 @@ pub fn reply(deps: DepsMut, _env: Env, msg: Reply) -> Result<Response, ContractE
                     let submsg: SubMsg<Empty> = SubMsg::reply_always(
                         WasmMsg::Execute {
                             contract_addr: proxy_addr.to_string(),
-                            msg: to_binary(&polytone_proxy::msg::ExecuteMsg::Proxy {
+                            msg: to_binary(&polytone::msgs::proxy::ExecuteMsg::Proxy {
                                 msgs: pending,
                             })?,
                             funds: vec![],

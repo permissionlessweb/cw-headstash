@@ -32,12 +32,15 @@ pub struct DefaultHeadstashConfig {
     pub headstash_init_config: HeadstashInitConfig,
 }
 
-use crate::networks::CONTRACT_COMPILER;
+use crate::utils::networks::CONTRACT_COMPILER;
 
-pub async fn deploy_polytone(networks: Vec<ChainInfoOwned>) -> anyhow::Result<()> {
+pub async fn deploy_polytone(
+    networks: Vec<ChainInfoOwned>,
+    interchain: DaemonInterchain,
+) -> anyhow::Result<()> {
     dotenv::from_path(".env").ok();
 
-    let mut file = File::open("headstash_params.json").unwrap();
+    let mut file = File::open("./data/headstash_params.json").unwrap();
     let mut contents = String::new();
     file.read_to_string(&mut contents).unwrap();
 
@@ -45,10 +48,6 @@ pub async fn deploy_polytone(networks: Vec<ChainInfoOwned>) -> anyhow::Result<()
     // create new cw-orch-interchain object with terp & secret.
     let controller = networks[0].clone();
     let host = networks[1].clone();
-    let interchain = DaemonInterchain::new(
-        vec![(controller.clone()), (host.clone())],
-        &ChannelCreationValidator,
-    )?;
 
     // define chain instance.
     let mut terp = interchain.get_chain(controller.chain_id)?;

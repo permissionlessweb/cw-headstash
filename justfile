@@ -21,7 +21,7 @@ build:
     cd secret-crates && make build-mainnet-reproducible
     mkdir -p ../public-crates/contracts/cw-glob/src/globs
     # b. copy compiled binary into cw-glob path
-    sudo mv ./optimized-wasm/cw_headstash.wasm.gz ../public-crates/contracts/cw-glob/src/globs/cw_headstash.wasm.gz &&
+    sudo cp -r ./optimized-wasm/cw_headstash.wasm.gz ../public-crates/contracts/cw-glob/src/globs/cw_headstash.wasm.gz &&
     # build public crates
     cd ../public-crates && just optimize
 

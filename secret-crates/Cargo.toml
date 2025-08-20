@@ -17,18 +17,6 @@ repository = "https://https://github.com/permissionlessweb/cw-headstash/secret-c
 rust-version = "1.67"
 version = "1.1.0"
 
-
-[profile.release]
-opt-level = 3
-debug = false
-rpath = false
-lto = true
-debug-assertions = false
-codegen-units = 1
-panic = 'abort'
-incremental = false
-overflow-checks = true
-
 [workspace.dependencies]
 polytone = { path = "packages/secret-polytone", version = "1.1.0" }
 polytone-proxy = { path = "contracts/polytone/proxy", version = "1.1.0" }
@@ -45,4 +33,13 @@ thiserror = "1.0.31"
 sha2 = { version = "0.10.2", default-features = false }
 anyhow = { version = "1.0.51" }
 
-[workspace.dev-dependencies]
+[profile.release]
+opt-level = 3
+debug = false
+rpath = false
+lto = true
+debug-assertions = false
+codegen-units = 1
+panic = 'abort'
+incremental = false
+overflow-checks = true

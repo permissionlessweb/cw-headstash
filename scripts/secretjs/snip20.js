@@ -1,4 +1,5 @@
-import { chain_id, snip120uCodeHash, snip120uCodeId, secretjs, wallet, headstashAddr } from "./main.js";
+import { snip120uCodeHash, snip120uCodeId, headstashAddr } from "./config.js";
+import { secretjs, wallet, } from "./main.js";
 import { MsgStoreCode, MsgInstantiateContract } from "secretjs"
 
 // stores contract, prints code hash & code id

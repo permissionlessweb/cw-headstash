@@ -1,4 +1,5 @@
-import { headstashCodeHash, snip120us, counterpartyChannelId, snip120uCodeHash, secretjs, wallet, entropy, headstashCodeId, headstashAddr } from "./main.js";
+import { headstashCodeHash, snip120us, counterpartyChannelId, snip120uCodeHash, entropy, headstashCodeId, headstashAddr } from "./config.js";
+import { secretjs, wallet, } from "./main.js";
 import * as fs from "fs";
 
 // json path of headstash allocations

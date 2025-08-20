@@ -10,6 +10,7 @@ use cw_orch::prelude::{ChainInfoOwned, Environment};
 use cw_orch::{daemon::TxSender, prelude::CwOrchUpload};
 use cw_orch_interchain::core::InterchainEnv;
 
+use cw_orch_interchain::daemon::{ChannelCreationValidator, DaemonInterchain};
 use cw_orch_polytone::{Polytone, PolytoneNote};
 use headstash_scripts::deploy::polytone::deploy_polytone;
 use tokio::runtime::Runtime;
@@ -33,27 +34,33 @@ pub fn main() -> anyhow::Result<()> {
 
     let (mut controller_chain, host_chain) = match args.network.as_str() {
         "main" => (
-            headstash_scripts::networks::TERP_MAINNET.to_owned(),
-            headstash_scripts::networks::SECRET_MAINNET.to_owned(),
+            headstash_scripts::utils::networks::TERP_MAINNET.to_owned(),
+            headstash_scripts::utils::networks::SECRET_MAINNET.to_owned(),
         ),
         "testnet" => (
-            headstash_scripts::networks::TERP_TESTNET.to_owned(),
-            headstash_scripts::networks::SECRET_TESTNET.to_owned(),
+            headstash_scripts::utils::networks::TERP_TESTNET.to_owned(),
+            headstash_scripts::utils::networks::SECRET_TESTNET.to_owned(),
         ),
         "local" => (
-            headstash_scripts::networks::TERP_LOCAL.to_owned(),
-            headstash_scripts::networks::SECRET_LOCAL.to_owned(),
+            headstash_scripts::utils::networks::TERP_LOCAL.to_owned(),
+            headstash_scripts::utils::networks::SECRET_LOCAL.to_owned(),
         ),
         _ => panic!("Invalid network"),
     };
 
     // 1.
     let rt = Runtime::new()?;
+
+    let interchain = DaemonInterchain::new(
+        vec![(controller_chain.clone()), (host_chain.clone())],
+        &ChannelCreationValidator,
+    )?;
+
     if let Err(ref err) = match args.method.as_str() {
-        "polytone" => rt.block_on(deploy_polytone(vec![
-            controller_chain.into(),
-            host_chain.into(),
-        ])),
+        "polytone" => rt.block_on(deploy_polytone(
+            vec![controller_chain.into(), host_chain.into()],
+            interchain,
+        )),
         // "ica-controller" => {
         //     deploy_cw_ica_controller(vec![controller_chain.into(), host_chain.into()])
         // }
