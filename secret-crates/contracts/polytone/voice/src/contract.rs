@@ -2,8 +2,7 @@
 use cosmwasm_std::entry_point;
 use cosmwasm_std::{
     from_binary, to_binary, Addr, Attribute, Binary, ContractResult, Deps, DepsMut, Empty, Env,
-    Event, MessageInfo, Response, StdError, StdResult, Storage, SubMsg, SystemResult, Uint64,
-    WasmMsg,
+    MessageInfo, Response, StdError, StdResult, Storage, SubMsg, SystemResult, Uint64, WasmMsg,
 };
 // use cw2::set_contract_version;
 
@@ -141,10 +140,11 @@ pub fn execute(
                             instantiate,
                         )?;
 
+                        let mut attrs = vec![Attribute::new_plaintext("method", "rx_execute")];
+                        attrs.extend(submsg.1);
                         Ok(Response::default()
-                            .add_attribute("method", "rx_execute")
-                            .add_submessage(submsg.0)
-                            .add_event(Event::new("headstash").add_attributes(submsg.1)))
+                            .add_attributes(attrs)
+                            .add_submessage(submsg.0))
                     }
                 }
             }
@@ -222,7 +222,8 @@ pub fn migrate(deps: DepsMut, _env: Env, msg: MigrateMsg) -> Result<Response, Co
     }
 }
 
-/// if proxy is placeholder, we pass the proxy instantiate msgs as submessage, allowing us to save proxy addr to contract state.
+/// if proxy is placeholder, we expect to need to first initalize it.
+/// Here we append attributes our reply entrypoint expects to use for submessages with an `REPLY_INIT_PROXY` id
 fn proxy_submessage_helper(
     storage: &mut dyn Storage,
     connection_id: &str,
@@ -232,32 +233,34 @@ fn proxy_submessage_helper(
     msgs: Vec<cosmwasm_std::CosmosMsg>,
     instantate_msg: Option<WasmMsg>,
 ) -> Result<(SubMsg, Vec<Attribute>), ContractError> {
+    let attributes = vec![
+        Attribute::new_plaintext("connection-id", connection_id),
+        Attribute::new_plaintext("counterparty-port", counterparty_port),
+        Attribute::new_plaintext("sender", sender),
+        Attribute::new_plaintext("proxy", proxy.to_string()),
+    ];
     if proxy != Addr::unchecked("placeholder") {
         // pass msgs to proxy normally
         let submsg: SubMsg<Empty> = SubMsg::reply_always(
             WasmMsg::Execute {
-                contract_addr: proxy.into_string(),
+                contract_addr: proxy.to_string(),
                 msg: to_binary(&polytone::msgs::proxy::ExecuteMsg::Proxy { msgs })?,
                 funds: vec![],
                 code_hash: "".to_string(),
             },
             REPLY_FORWARD_DATA,
         );
-        Ok((submsg, vec![]))
+        Ok((
+            submsg,
+            vec![Attribute::new_plaintext("proxy", proxy.to_string())],
+        ))
     } else if let Some(init_msg) = instantate_msg {
         // pass instantiate msg first, save msgs to pass to proxy once instantiated to state
         let submsg: SubMsg<Empty> = SubMsg::reply_always(init_msg, REPLY_INIT_PROXY);
         if !msgs.is_empty() {
             PENDING_PROXY_TXS.save(storage, &to_binary(&msgs)?)?;
         }
-        return Ok((
-            submsg,
-            vec![
-                Attribute::new("connection-id", connection_id),
-                Attribute::new("counterparty-port", counterparty_port),
-                Attribute::new("sender", sender),
-            ],
-        ));
+        return Ok((submsg, attributes));
     } else {
         return Err(ContractError::Std(StdError::generic_err(
             "proxy has not been instantiated, and no instantiate message passed, panic.",
@@ -265,6 +268,7 @@ fn proxy_submessage_helper(
     }
 }
 
+// NOTE: commented out as secret does not implement instantiate2
 // #[cfg(test)]
 // mod tests {
 //     use cosmwasm_std::{CanonicalAddr, HexBinary};

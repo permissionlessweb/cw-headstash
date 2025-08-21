@@ -7,17 +7,17 @@ global:
     ics20-memo-limit: 0
     max-receiver-size: 150
 chains:
-    terpnetwork:
+    cosmoshub:
         type: cosmos
         value:
-            key-directory: /home/relayer/.relayer/.keys/120u-1
+            key-directory: /home/relayer/.relayer/.keys/cosmoshub
             key: relayer_key
-            chain-id: 120u-1
-            rpc-addr: http://127.0.0.1:23657
-            account-prefix: terp
+            chain-id: cosmoshub-4
+            rpc-addr: https://cosmos-rpc.polkachu.com:443
+            account-prefix: cosmos
             keyring-backend: test
             gas-adjustment: 1.3
-            gas-prices: 0.01uterp
+            gas-prices: 0.01uatom
             min-gas-amount: 0
             max-gas-amount: 0
             debug: false
@@ -35,14 +35,14 @@ chains:
     secretnetwork:
         type: cosmos
         value:
-            key-directory: /home/relayer/.relayer/.keys/secret-1
+            key-directory: /home/relayer/.relayer/.keys/secretnetwork
             key: relayer_key
-            chain-id: devnet-1
-            rpc-addr: http://127.0.0.1:23657
+            chain-id: secret-4
+            rpc-addr: https://rpc.lavenderfive.com:443/secretnetwork
             account-prefix: secret
             keyring-backend: test
             gas-adjustment: 1.3
-            gas-prices: 0.1uscrt
+            gas-prices: 0.1uosmo
             min-gas-amount: 0
             max-gas-amount: 0
             debug: false
@@ -58,3 +58,22 @@ chains:
             extension-options: []
             feegrants: null
 paths:
+    cosmoshub-secretnetwork:
+        src:
+            chain-id: cosmoshub-4
+            client-id: 07-tendermint-492
+            connection-id: connection-401
+        dst:
+            chain-id: secret-4
+            client-id: 07-tendermint-1
+            connection-id: connection-0
+    secretnetwork-cosmoshub:
+        src:
+            chain-id: secret-4
+            client-id: 07-tendermint-1
+            connection-id: connection-0
+        dst:
+            chain-id: cosmoshub-4
+            client-id: 07-tendermint-492
+            connection-id: connection-401
+

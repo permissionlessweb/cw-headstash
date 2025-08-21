@@ -22,8 +22,11 @@ build:
     # build public crates
     cd ../public-crates && just optimize
 
-test:
+test-unit:
     cargo test --locked
+
+test-e2e:
+    sh scripts/e2e-test.sh
 
 # publish:
 #     #!/usr/bin/env bash

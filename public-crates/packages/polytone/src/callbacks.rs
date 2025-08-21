@@ -80,8 +80,6 @@ pub struct ErrorResponse {
 pub struct CallbackRequest {
     pub receiver: String,
     pub msg: Binary,
-    /// unique identifier for effecient idenification of headstash callback msg
-    pub headstash_digits: u32,
 }
 
 /// Disembiguates between a callback for remote message execution and
@@ -107,7 +105,6 @@ pub fn request_callback(
         let receiver = api.addr_validate(&request.receiver)?;
         let initiator_msg = request.msg;
         let key = (channel_id, sequence_number);
-        let headstash_callback_id = request.headstash_digits;
 
         CALLBACKS.save(
             storage,
@@ -117,7 +114,6 @@ pub fn request_callback(
                 initiator_msg,
                 receiver,
                 request_type,
-                headstash_callback_id,
             },
         )?;
     }
@@ -195,7 +191,6 @@ fn callback_message(request: PendingCallback, result: Callback) -> CosmosMsg {
     .into()
 }
 
-
 fn dequeue_callback(
     storage: &mut dyn Storage,
     channel_id: String,
@@ -216,7 +211,6 @@ struct PendingCallback {
     receiver: Addr,
     /// Used to return the appropriate callback type during timeouts.
     request_type: CallbackRequestType,
-    headstash_callback_id: u32,
 }
 
 /// (channel_id, sequence_number) -> callback
@@ -228,7 +222,6 @@ impl CallbackRequest {
         Self {
             receiver,
             msg: to_json_binary(&callback_message).unwrap(),
-            headstash_digits: 000,
         }
     }
     pub fn callback_msg_from_template(&self) -> CallbackMessage {
