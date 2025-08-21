@@ -2409,7 +2409,7 @@ dependencies = [
 
 [[package]]
 name = "cw-orch-polytone"
-version = "1.1.0"
+version = "2.0.0"
 dependencies = [
  "anyhow",
  "cosmwasm-std",
@@ -9254,7 +9254,7 @@ dependencies = [
 
 [[package]]
 name = "polytone"
-version = "1.0.0"
+version = "2.0.0"
 dependencies = [
  "anybuf",
  "cosmos-sdk-proto 0.27.0",
@@ -9284,7 +9284,7 @@ dependencies = [
 
 [[package]]
 name = "polytone-proxy"
-version = "1.0.0"
+version = "2.0.0"
 dependencies = [
  "cosmwasm-schema",
  "cosmwasm-std",
@@ -9299,7 +9299,7 @@ dependencies = [
 
 [[package]]
 name = "polytone-voice"
-version = "1.0.0"
+version = "2.0.0"
 dependencies = [
  "anyhow",
  "cosmwasm-schema",

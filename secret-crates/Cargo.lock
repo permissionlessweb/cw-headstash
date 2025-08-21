@@ -852,6 +852,17 @@ dependencies = [
 ]
 
 [[package]]
+name = "scrt-polytone-tester"
+version = "2.0.0"
+dependencies = [
+ "cosmwasm-schema",
+ "polytone",
+ "secret-cosmwasm-std",
+ "secret-toolkit",
+ "thiserror",
+]
+
+[[package]]
 name = "scrt-polytone-voice"
 version = "2.0.0"
 dependencies = [

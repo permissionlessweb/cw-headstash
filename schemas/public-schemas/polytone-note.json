@@ -323,17 +323,10 @@
         "description": "A request for a callback.",
         "type": "object",
         "required": [
-          "headstash_digits",
           "msg",
           "receiver"
         ],
         "properties": {
-          "headstash_digits": {
-            "description": "unique identifier for effecient idenification of headstash callback msg",
-            "type": "integer",
-            "format": "uint32",
-            "minimum": 0.0
-          },
           "msg": {
             "$ref": "#/definitions/Binary"
           },

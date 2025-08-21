@@ -36,6 +36,12 @@ build-mainnet-reproducible:
 		--mount type=volume,source=registry_cache,target=/usr/local/cargo/registry \
 		ghcr.io/scrtlabs/secret-contract-optimizer:1.0.13
 
+# like build-mainnet, but slower and more deterministic, without caching
+.PHONY: build-mainnet-reproducible
+build-mainnet-reproducible-no-cache:
+	docker run --rm -v "$$(pwd)":/contract \
+		ghcr.io/scrtlabs/secret-contract-optimizer:1.0.13
+
 .PHONY: compress-wasm
 compress-wasm:
 	cp ./target/wasm32-unknown-unknown/release/*.wasm ./contract.wasm

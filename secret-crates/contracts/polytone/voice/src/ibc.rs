@@ -18,9 +18,7 @@ use polytone::{
 
 use crate::{
     error::ContractError,
-    state::{
-        BLOCK_MAX_GAS, CHANNEL_TO_CONNECTION, PENDING_PROXY_TXS, PROXY_TO_SENDER, SENDER_TO_PROXY,
-    },
+    state::{CHANNEL_TO_CONNECTION, PENDING_PROXY_TXS, PROXY_TO_SENDER, SENDER_TO_PROXY},
 };
 
 const REPLY_ACK: u64 = 0;
@@ -86,41 +84,37 @@ pub fn ibc_packet_receive(
     msg: IbcPacketReceiveMsg,
 ) -> Result<IbcReceiveResponse, Never> {
     let connection_id = CHANNEL_TO_CONNECTION
-        .get(deps.storage, &msg.packet.dest.channel_id)
+        .get(deps.storage, &msg.packet.dest.channel_id.clone())
         .expect("handshake sets mapping");
+
     Ok(IbcReceiveResponse::default()
         .add_attribute("method", "ibc_packet_receive")
         .add_attribute("connection_id", connection_id.as_str())
         .add_attribute("channel_id", msg.packet.dest.channel_id.as_str())
         .add_attribute("counterparty_port", msg.packet.src.port_id.as_str())
         .add_attribute("packet_sequence", msg.packet.sequence.to_string())
-        .add_submessage(SubMsg {
-            id: REPLY_ACK,
-            msg: WasmMsg::Execute {
+        .add_submessage(SubMsg::reply_always(
+            WasmMsg::Execute {
                 contract_addr: env.contract.address.into_string(),
                 msg: to_binary(&ExecuteMsg::Rx {
                     connection_id,
-                    counterparty_port: msg.packet.src.port_id,
-                    data: msg.packet.data,
+                    counterparty_port: msg.packet.src.port_id.clone(),
+                    data: msg.packet.data.clone(),
                 })
                 .unwrap(),
                 funds: vec![],
                 code_hash: "".into(),
-            }
-            .into(),
-            gas_limit: Some(
-                BLOCK_MAX_GAS
-                    .load(deps.storage)
-                    .expect("set during instantiation")
-                    - ACK_GAS_NEEDED,
-            ),
-            reply_on: cosmwasm_std::ReplyOn::Always,
-        }))
+            },
+            REPLY_ACK,
+        )))
 }
 
 #[cfg_attr(not(feature = "library"), entry_point)]
 pub fn reply(deps: DepsMut, _env: Env, msg: Reply) -> Result<Response, ContractError> {
+    let response = Response::new();
+    let mut err_data = None;
     let mut msgs = vec![];
+
     match msg.id {
         REPLY_ACK => Ok(match msg.result {
             SubMsgResult::Err(e) => Response::default()
@@ -158,61 +152,59 @@ pub fn reply(deps: DepsMut, _env: Env, msg: Reply) -> Result<Response, ContractE
                 .add_attribute("method", "reply_forward_data_error")
                 .set_data(ack_execute_fail(err))),
         },
+        // Since Secret Network does not have instantiate2, we must implement a novel method to access:
+        //    a. the `sender`` of the ibc packet.
+        //    b. the `proxy_address` we expect to have been instantiated.
+        //    c. the  `connection_id` & `counterparty_port` of the note <-> voice pair.
         REPLY_INIT_PROXY => {
             match msg.result {
                 SubMsgResult::Ok(sub_msg_response) => {
-                    let mut wasm_event = None;
-                    let mut headstash_event = None;
+                    let mut msg_sender = String::default();
+                    let mut connection_id = &String::default();
+                    let mut remote_port = &String::default();
+                    let mut proxy_addr = &String::default();
 
                     for event in &sub_msg_response.events {
                         match event.ty.as_str() {
-                            "wasm" => {
-                                if wasm_event.is_none() {
-                                    wasm_event = Some(event);
+                            "recv_packet" => {
+                                msg_sender = extract_sender(event.attributes[0].value.as_str());
+                                for e in event.attributes.iter() {
+                                    match e.key.as_str() {
+                                        "connection_id" => {
+                                            connection_id = &e.value;
+                                        }
+                                        "packet_src_port" => {
+                                            remote_port = &e.value;
+                                        }
+                                        _ => {}
+                                    }
                                 }
                             }
-                            "headstash" => {
-                                if headstash_event.is_none() {
-                                    headstash_event = Some(event);
-                                }
+                            "instantiate" => {
+                                proxy_addr = &event
+                                    .attributes
+                                    .iter()
+                                    .find(|a| a.key == "contract_address")
+                                    .expect("contract_address attribute not found in wasm event")
+                                    .value;
                             }
                             _ => {}
                         }
                     }
 
-                    let wasm_event = wasm_event.expect("Expected wasm event, but not found");
-                    let headstash_event =
-                        headstash_event.expect("Expected headstash event, but not found");
-
-                    let proxy_addr = wasm_event
-                        .attributes
-                        .iter()
-                        .find(|a| a.key == "contract_address")
-                        .expect("contract_address attribute not found in wasm event")
-                        .value
-                        .clone();
-
-                    let connection_id = &headstash_event.attributes[0].value;
-                    let counterparty_port = &headstash_event.attributes[1].value;
-                    let sender = &headstash_event.attributes[2].value;
-
                     SENDER_TO_PROXY.insert(
                         deps.storage,
-                        &(
-                            connection_id.clone(),
-                            counterparty_port.clone(),
-                            sender.clone(),
-                        ),
-                        &Addr::unchecked(&proxy_addr),
+                        &(connection_id.into(), remote_port.into(), msg_sender.clone()),
+                        &Addr::unchecked(proxy_addr),
                     )?;
 
                     PROXY_TO_SENDER.insert(
                         deps.storage,
-                        &Addr::unchecked(&proxy_addr),
+                        &Addr::unchecked(proxy_addr),
                         &SenderInfo {
-                            connection_id: connection_id.to_string(),
-                            remote_port: counterparty_port.to_string(),
-                            remote_sender: sender.clone(),
+                            connection_id: connection_id.into(),
+                            remote_port: remote_port.into(),
+                            remote_sender: msg_sender.into(),
                         },
                     )?;
 
@@ -233,10 +225,17 @@ pub fn reply(deps: DepsMut, _env: Env, msg: Reply) -> Result<Response, ContractE
 
                     msgs.push(submsg)
                 }
-                SubMsgResult::Err(_) => todo!(),
+                SubMsgResult::Err(e) => {
+                    err_data = Some(ack_execute_fail(e));
+                }
             }
 
-            Ok(Response::new().add_submessage(msgs[0].clone()))
+            Ok(match err_data {
+                Some(data) => response
+                    .add_attribute("method", "reply_forward_data_error")
+                    .set_data(data),
+                None => response,
+            })
         }
 
         _ => unreachable!("unknown reply ID"),
@@ -259,4 +258,16 @@ pub fn ibc_packet_timeout(
     _msg: IbcPacketTimeoutMsg,
 ) -> Result<IbcBasicResponse, ContractError> {
     unreachable!("host will never send a packet")
+}
+
+fn extract_sender(packet_data: &str) -> String {
+    let sender_prefix = "\"sender\":\"";
+    let start = packet_data
+        .find(sender_prefix)
+        .expect("She made herself stronger by fighting with the wind.");
+    let start = start + sender_prefix.len();
+    let end = packet_data[start..]
+        .find('"')
+        .expect("It is the sun shining on the rain and the rain falling on the sunshine");
+    packet_data[start..start + end].to_string()
 }
