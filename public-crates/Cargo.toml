@@ -1,12 +1,12 @@
 [workspace]
 members = [
-  "contracts/polytone/note",
-  "contracts/polytone/proxy",
-  "contracts/polytone/voice",
-  "packages/cw-orch-polytone",
-  "packages/polytone",
+    "contracts/polytone/note",
+    "contracts/polytone/proxy",
+    "contracts/polytone/voice",
+    "packages/cw-orch-polytone",
+    "packages/polytone",
 ]
-exclude = [  "contracts/polytone"]
+exclude = ["contracts/polytone"]
 
 [workspace.package]
 edition = "2021"
@@ -16,27 +16,25 @@ repository = "https://https://github.com/permissionlessweb/cw-headstash/public-c
 version = "2.0.0"
 
 [workspace.dependencies]
+polytone = { package = "abstract-polytone", path = "../../polytone/packages/polytone" }
+polytone-note = { package = "abstract-polytone-note", path = "../../polytone/contracts/main/note" }
 polytone-proxy = { package = "abstract-polytone-proxy", path = "../../polytone/contracts/main/proxy" }
 polytone-voice = { package = "abstract-polytone-voice", path = "../../polytone/contracts/main/voice" }
-polytone-note = { package = "abstract-polytone-note", path = "../../polytone/contracts/main/note" }
-polytone = { package = "abstract-polytone", path = "../../polytone/packages/polytone" }
-
 
 cosmos-sdk-proto = { path = "../../cosmos-rust/cosmos-sdk-proto" }
-cosmwasm-std = { version = "2.2.2", features = ["cosmwasm_1_4", "stargate"] }
-cosmwasm-schema = "2.2.2"
-cw-storage-plus = "2.0.0"
+cosmwasm-schema = { path = "../../cosmwasm/packages/schema" }
+cosmwasm-std = { path = "../../cosmwasm/packages/std" }
+cw-multi-test = { package = "abstract-cw-multi-test", path = "../../cw-multi-test-fork" }
+cw-orch = { path = "../../cw-orchestrator/cw-orch" }
+cw-orch-interchain = { path = "../../cw-orchestrator/cw-orch-interchain" }
+cw-storage-plus = { path = "../../cw-storage-plus" }
 cw-utils = { path = "../../cw-minus/packages/cw-utils" }
-cw-orch = { version = "0.28.0" }
-cw-orch-interchain = { version = "0.9.0", features = ["daemon"] }
 cw2 = { path = "../../cw-minus/packages/cw2" }
-cw-multi-test = "2.1.1"
 
-anyhow = { version = "1.0.51" }
 anybuf = "0.5.0"
-thiserror = { version = "2.0.12" }
+anyhow = { version = "1.0.51" }
 sha2 = "0.10.8"
-
+thiserror = { version = "2.0.12" }
 
 [profile.release]
 opt-level = 3
